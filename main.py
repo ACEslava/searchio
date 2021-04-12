@@ -14,6 +14,12 @@ import discord, os, asyncio, json, textwrap, difflib
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
+#checks if serverSettings.json exists
+if not os.path.exists('serverSettings.json'):
+    with open('serverSettings.json', 'w') as file:
+        file.write('{}')
+
+#loads serverSettings
 with open('serverSettings.json', 'r') as data:
     serverSettings = json.load(data, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
 
@@ -138,7 +144,12 @@ async def help(ctx, *args):
                 embed = discord.Embed(title="Log", description=
                     f"DMs a .csv file of all the logs that the bot has for your username or guild if a sudoer.\nUsage: {commandPrefix}log")  
             elif args[0] == 'config':
-                embed = discord.Embed(title="Guild Configuration", description=f"Views the guild configuration. Only sudoers can edit settings.\nUsage: {commandPrefix}config")
+                embed = discord.Embed(title="Guild Configuration", 
+                    description="Views the guild configuration. Only sudoers can edit settings."+
+                        "\nPrefix: Command prefix that SearchIO uses"+
+                        "\nAdminrole: The role that is automatically given sudo permissions"+
+                        "\nSafesearch: Activates Google's safesearch. NSFW channels override this setting"+
+                        f"\nUsage: {commandPrefix}config [setting]")
             elif args[0] == 'wiki':
                 embed = discord.Embed(title="Wikipedia", description=f"Wikipedia search. \nUsage: {commandPrefix}wiki [query] [flags]")
                 embed.add_field(name="Optional Flags", inline=False, value=
@@ -269,11 +280,12 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                     messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author, timeout=60))
                     search = asyncio.create_task(GoogleSearch.search(bot, ctx, serverSettings, message, userquery))
+                    
                     #checks for message edit
                     waiting = [messageEdit, search]
                     done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
 
-                    if messageEdit in done:
+                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
                         if type(messageEdit.exception()) == asyncio.TimeoutError:
                             raise asyncio.TimeoutError
                         await message.delete()
@@ -285,7 +297,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         continue
                     else: raise asyncio.TimeoutError
                 
-                except asyncio.TimeoutError: 
+                except asyncio.TimeoutError: #after a minute, everything cancels
                     await message.clear_reactions()
                     messageEdit.cancel()
                     search.cancel()

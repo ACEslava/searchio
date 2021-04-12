@@ -8,12 +8,12 @@ class xkcd:
     def __init__(self, num = ''):
         base_url = 'https://xkcd.com/'
         
-        if num == 'random':
+        if num.lower() == 'random':
             self.num = random.randrange(1, xkcd('').num)
         elif str(num).isnumeric() or num == '':
             self.num = num
         else:
-            raise ValueError("Input is not valid")
+            raise ValueError
         
         self.url = base_url + str(self.num)
         json_url = self.url + '/info.0.json'

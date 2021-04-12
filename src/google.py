@@ -64,8 +64,8 @@ class GoogleSearch:
          await asyncio.sleep(random.uniform(0,2))
          http = urllib3.PoolManager()
          url = ("https://google.com/search?pws=0&q=" + 
-            searchQuery.replace(" ", "+") + "+-stock+-pinterest"
-            f"&uule=w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True else ''}")
+            searchQuery.replace(" ", "+") + "+-stock+-pinterest&uule=w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz"
+            f"&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True and ctx.channel.nsfw == False else ''}")
          response = http.request('GET', url)
          soup = BeautifulSoup(response.data, features="lxml")
          result_number = 3
