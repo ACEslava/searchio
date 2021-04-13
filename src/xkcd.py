@@ -12,6 +12,8 @@ class xkcd:
             self.num = random.randrange(1, xkcd('').num)
         elif str(num).isnumeric() or num == '':
             self.num = num
+        elif num.lower() == 'latest':
+            self.num = xkcd('').num
         else:
             raise ValueError
         

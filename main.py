@@ -1,3 +1,4 @@
+import discord, os, asyncio, json, textwrap, csv, datetime
 from src.wikipedia import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
@@ -9,7 +10,6 @@ from src.youtube import YoutubeSearch
 from src.xkcd import XKCDSearch
 from dotenv import load_dotenv
 from discord.ext import commands
-import discord, os, asyncio, json, textwrap, difflib
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -85,6 +85,15 @@ async def on_connect():
     
     with open('serverSettings.json', 'w') as data:
         data.write(json.dumps(serverSettings, indent=4))
+
+    with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
+        lines = [dict(row) for row in csv.DictReader(file) if datetime.datetime.utcnow()-datetime.datetime.fromisoformat(row["Time"]) < datetime.timedelta(weeks=8)]
+        
+    with open("logs.csv", "w", newline='', encoding='utf-8-sig') as file:
+        logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
+        writer = csv.DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
+        writer.writeheader()
+        writer.writerows(lines)           
     return
 
 @bot.event
@@ -189,7 +198,7 @@ async def help(ctx, *args):
                 f"Searches through MyAnimeList\nUsage:{commandPrefix}anime [query]")
             elif args[0] == 'xkcd':
                 embed = discord.Embed(title="XKCD", description=
-                f"Searches for an XKCD comic\nUsage:{commandPrefix}anime [XKCD Comic #]")
+                f"Searches for an XKCD comic. Search query can be an XKCD comic number, random, or latest. \nUsage:{commandPrefix}xkcd [query]")
             else: pass
         else: pass
         
@@ -208,7 +217,7 @@ async def help(ctx, *args):
             return
     
     except Exception as e:
-        ErrorHandler(bot, ctx, e, 'help', '')
+        ErrorHandler(bot, ctx, e, 'help')
 
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
@@ -278,7 +287,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             while continueLoop==True:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
-                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author, timeout=60))
+                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author))
                     search = asyncio.create_task(GoogleSearch.search(bot, ctx, serverSettings, message, userquery))
                     
                     #checks for message edit
@@ -458,11 +467,7 @@ class Administration(commands.Cog, name="Administration"):
         else:
             Log.appendToLog(ctx, "sudo", ' '.join(args).strip())
             command = Sudo(bot, ctx, serverSettings)
-            await command.sudo(args)
-
-        with open('serverSettings.json', 'r') as data:
-            serverSettings = json.load(data, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
-        return
+            serverSettings = await command.sudo(args)
 
     @commands.command(name='config')
     async def config(self, ctx, *args):
@@ -470,13 +475,11 @@ class Administration(commands.Cog, name="Administration"):
         global serverSettings
         command = Sudo(bot, ctx, serverSettings)
         if Sudo.isSudoer(bot, ctx, serverSettings) == True:
-            await command.config(args)
-        else: await command.config([])
+            serverSettings = await command.config(args)
+        else: serverSettings = await command.config([])
+        
+        Log.appendToLog(ctx, 'config', args if len(args) > 0 else None)
 
-        with open('serverSettings.json', 'r') as data:
-            serverSettings = json.load(data, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
-        return
-    
 bot.add_cog(SearchEngines(bot))
 bot.add_cog(Administration(bot))
 

@@ -1,6 +1,5 @@
-import datetime as dt
 from datetime import datetime
-import discord, asyncio, json, textwrap, difflib, csv, os, random, traceback
+import discord, asyncio, json, textwrap, difflib, csv, os, random, traceback, re
 
 class Sudo:
     def __init__(
@@ -68,29 +67,31 @@ class Sudo:
                 user = self.ctx.guild.get_member_named(search)
             
             if user == None:
-                await self.ctx.send(f"No user named {search} was found in the guild")
+                await self.ctx.send(f"No user named `{search}` was found in the guild")
                 pass
             else: return user
+        
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            raise
 
     async def echo(self, args):
         try:
-            isOwner = await self.bot.is_owner(self.ctx.author)
-            if isOwner == True and "--channel" in args:
-                channel = int(args[args.index("--channel")+1])
-                channel = await self.bot.fetch_channel(channel)
-            elif "--channel" in args:
-                channel = int(args[args.index("--channel")+1]) #Prevents non-owner sudoers from using bot in other servers
-                channel = self.ctx.guild.get_channel(channel)
-
             if "--channel" in args:
-                    args.pop(args.index("--channel")+1)
-                    args.pop(args.index("--channel"))
-                    await channel.send(' '.join(args[1:]).strip())
-            else: await self.ctx.send(' '.join(args[1:]).strip())
+                channel = int(args[args.index("--channel")+1])
+                args.pop(args.index("--channel")+1)
+                args.pop(args.index("--channel"))
+
+                if await self.bot.is_owner(self.ctx.author):
+                    channel = await self.bot.fetch_channel(channel)
+                else: #Prevents non-owner sudoers from using bot in other servers
+                    channel = self.ctx.guild.get_channel(channel)
+
+            else: channel = None
+               
+            await channel.send(' '.join(args).strip()) if channel else self.ctx.send(' '.join(args).strip())
+
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            raise
         finally: return
     
     async def blacklist(self, args):
@@ -101,9 +102,9 @@ class Sudo:
             if len(args) == 1:
                 user = await self.userSearch(' '.join(args))
                 self.serverSettings[self.ctx.guild.id]['blacklist'].append(user.id)
-                await self.ctx.send(f"{str(user)} blacklisted")
+                await self.ctx.send(f"`{str(user)}` blacklisted")
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            raise
         finally: return
     
     async def whitelist(self, args):
@@ -115,11 +116,11 @@ class Sudo:
                 try:
                     user = await self.userSearch(' '.join(args))
                     self.serverSettings[self.ctx.guild.id]['blacklist'].remove(user.id)
-                    await self.ctx.send(f"{str(user)} removed from blacklist")
+                    await self.ctx.send(f"`{str(user)}` removed from blacklist")
                 except ValueError:
-                    await self.ctx.send(f"{str(user)} not in blacklist")
+                    await self.ctx.send(f"`{str(user)}` not in blacklist")
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            raise
         finally: return
 
     async def sudoer(self, args):
@@ -128,11 +129,11 @@ class Sudo:
                 user = await self.userSearch(' '.join(args))
                 if user.id not in self.serverSettings[self.ctx.guild.id]['sudoer']:
                     self.serverSettings[self.ctx.guild.id]['sudoer'].append(user.id)
-                    await self.ctx.send(f"{str(user)} is now a sudoer")
+                    await self.ctx.send(f"`{str(user)}` is now a sudoer")
                 else: 
-                    await self.ctx.send(f"{str(user)} is already a sudoer")
+                    await self.ctx.send(f"`{str(user)}` is already a sudoer")
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            raise
         finally: return
     
     async def unsudoer(self, args):
@@ -141,21 +142,22 @@ class Sudo:
                 user = await self.userSearch(' '.join(args))
                 if user.id in self.serverSettings[self.ctx.guild.id]['sudoer']:
                     self.serverSettings[self.ctx.guild.id]['sudoer'].remove(user.id)
-                    await self.ctx.send(f"{str(user)} has been removed from sudo")
+                    await self.ctx.send(f"`{str(user)}` has been removed from sudo")
                 else: 
-                    await self.ctx.send(f"{str(user)} is not a sudoer")
+                    await self.ctx.send(f"`{str(user)}` is not a sudoer")
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            raise
         finally: return
     
     async def config(self, args):
-        try:
-            def check(reaction, user):
+        def check(reaction, user):
                 return user == self.ctx.author and str(reaction.emoji) in ['✅', '❌']
+        
+        try:
             adminrole = self.serverSettings[self.ctx.guild.id]['adminrole']
             if adminrole != None:
                 adminrole = self.ctx.guild.get_role(int(adminrole)) 
-            if len(args) == 0:
+            if not args:
                 embed = discord.Embed(title="Guild Configuration")
                 embed.add_field(name="Administration", value=f"""
                     ` Adminrole:` {adminrole.name if adminrole != None else 'None set'}
@@ -169,25 +171,41 @@ class Sudo:
                     `     XKCD:` {'✅' if self.serverSettings[self.ctx.guild.id]['xkcd'] == True else '❌'}
                     `  Youtube:` {'✅' if self.serverSettings[self.ctx.guild.id]['youtube'] == True else '❌'}""")
                 embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
-                await self.ctx.send(embed=embed)
-            elif args[0].lower() in ['wikipedia', 'scholar', 'google', 'myanimelist', 'youtube', 'safesearch', 'xkcd']:
-                embed = discord.Embed(title=args[0].capitalize(), description=f"{'✅' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else '❌'}")
-                embed.set_footer(text=f"React with ✅/❌ to enable/disable")
-                message = await self.ctx.send(embed=embed)
+                configMessage = await self.ctx.send(embed=embed)
                 try:
-                    await message.add_reaction('✅')
-                    await message.add_reaction('❌')
-
-                    reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
-                    if str(reaction.emoji) == '✅':
-                        self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
-                    elif str(reaction.emoji) == '❌':
-                        self.serverSettings[self.ctx.guild.id][args[0].lower()] = False
-                    await message.delete()
-                    await self.ctx.send(f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else 'disabled'}")
-                    return
+                    await configMessage.add_reaction('🗑️')
+                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) == "🗑️", timeout=60)
+                    if str(reaction.emoji) == '🗑️':
+                        await configMessage.delete()
+        
                 except asyncio.TimeoutError as e: 
-                    await message.clear_reactions()
+                    await configMessage.clear_reactions()
+
+            elif args[0].lower() in ['wikipedia', 'scholar', 'google', 'myanimelist', 'youtube', 'safesearch', 'xkcd']:
+                if bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
+                    self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
+                elif bool(re.search('^disable', args[1].lower()) or re.search('^off', args[1].lower())):
+                    self.serverSettings[self.ctx.guild.id][args[0].lower()] = False
+                else:
+                    embed = discord.Embed(title=args[0].capitalize(), description=f"{'✅' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else '❌'}")
+                    embed.set_footer(text=f"React with ✅/❌ to enable/disable")
+                    message = await self.ctx.send(embed=embed)
+                    try:
+                        await message.add_reaction('✅')
+                        await message.add_reaction('❌')
+
+                        reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
+                        if str(reaction.emoji) == '✅':
+                            self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
+                        elif str(reaction.emoji) == '❌':
+                            self.serverSettings[self.ctx.guild.id][args[0].lower()] = False
+                        await message.delete()
+                        return
+                    except asyncio.TimeoutError as e: 
+                        await message.clear_reactions()
+                
+                await self.ctx.send(f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else 'disabled'}")
+
             elif args[0].lower() == 'adminrole':
                 if not args[1]:
                     embed = discord.Embed(title='Adminrole', description=f"{await self.ctx.guild.get_role(int(adminrole)) if adminrole != None else 'None set'}")
@@ -256,136 +274,123 @@ class Sudo:
                 await self.ctx.send(f"'{response}' is now the guild prefix")
 
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            args = args if len(args) > 0 else None
+            await ErrorHandler(self.bot, self.ctx, e, 'config', args)
             return
         finally: 
             with open('serverSettings.json', 'w') as data:
                 data.write(json.dumps(self.serverSettings, indent=4))
-            return
+            return self.serverSettings
                               
     async def sudo(self, args):
         try:
             if args:
-                if args[0] == 'echo':
+                command = args.pop(0)
+                if command == 'echo':
                     await self.echo(args)
-                elif args[0] == 'blacklist':
-                    del args[0]
+                elif command == 'blacklist':
                     await self.blacklist(args)
-                elif args[0] == 'whitelist':
-                    del args[0]
+                elif command == 'whitelist':
                     await self.whitelist(args)
-                elif args[0] == 'sudoer':
-                    del args[0]
+                elif command == 'sudoer':
                     await self.sudoer(args)
-                elif args[0] == 'unsudoer':
-                    del args[0]
+                elif command == 'unsudoer':
                     await self.unsudoer(args)
-                elif args[0] == 'safesearch':
-                    del args[0]
+                elif command == 'safesearch':
                     await self.safesearch(args)
-                elif args[0] == 'config':
-                    del args[0]
+                elif command == 'config':
                     await self.config(args)
                 else:
-                    await self.ctx.send(f"'{args[0]}' is not a valid command.")
+                    await self.ctx.send(f"'{command}' is not a valid command.")
             else:
-                await self.ctx.send(
-                    textwrap.dedent("""\
-                    We trust you have received the usual lecture from the local System Administrator. It usually boils down to these three things:
-                    #1) Respect the privacy of others.
-                    #2) Think before you type.
-                    #3) With great power comes great responsibility."""))
+                embed = discord.Embed(title="Sudo", description=f"Admin commands. Server owner has sudo privilege by default.\nUsage: {self.printPrefix(self.ctx)}sudo [command] [args]")
+                embed.add_field(name="Commands", inline=False, value=
+                    f"""`     echo:` Have the bot say something. 
+                        Args: message 
+                        Optional flag: --channel [channelID]
+
+                        `blacklist:` Block a user from using the bot. 
+                        Args: userName OR userID 
+
+                        `whitelist:` Unblock a user from using the bot. 
+                        Args: userName OR userID
+
+                        `   sudoer:` Add a user to the sudo list. Only guild owners can do this. 
+                        Args: userName OR userID  
+
+                        ` unsudoer:` Remove a user from the sudo list. Only guild owners can do this. 
+                        Args: userName OR userID""")
+
+                helpMessage = await self.ctx.send(embed=embed)
+                try:
+                    await helpMessage.add_reaction('🗑️')
+                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) == "🗑️", timeout=60)
+                    if str(reaction.emoji) == '🗑️':
+                        await helpMessage.delete()
+        
+                except asyncio.TimeoutError as e: 
+                    await helpMessage.clear_reactions()
 
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            args = args if len(args) > 0 else None
+            await ErrorHandler(self.bot, self.ctx, e, 'sudo', args)
         finally: 
             with open('serverSettings.json', 'w') as data:
                 data.write(json.dumps(self.serverSettings, indent=4))
-            return
+            return self.serverSettings
 
 class Log():
-
     @staticmethod
-    def appendToLog(ctx, command, args=[]):
+    def appendToLog(ctx, command, args=None):     
+        if args == None: args = "None"
         logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
-        guild = "DM"
-        if ctx.guild.id:
-            guild = ctx.guild.id
+        if ctx.guild: guild = ctx.guild.id
+        else: guild = "DM"
         
-        logDict = {
-            "Time": datetime.utcnow().isoformat(),
-            "Guild": guild,
-            "User": ctx.author.id,
-            "User_Plaintext": str(ctx.author),
-            "Command": command,
-            "Args": ''.join(list(args)).strip()
-        }
-        lines = []
-        with open("logs.csv", "r+", encoding='utf-8-sig') as file:
-            for row in csv.DictReader(file):
-                logTime = datetime.fromisoformat(row["Time"])
-                if datetime.utcnow()-logTime < dt.timedelta(weeks=4):
-                    lines.append(row)
-        
-        with open("logs.csv", "w", newline='', encoding='utf-8-sig') as file:
-            writer = csv.DictWriter(file, fieldnames=logFieldnames)
-            writer.writeheader()
-            for items in lines:
-                writer.writerow(items)
-            writer.writerow(logDict)              
+        if isinstance(args, list): args = ''.join(args).strip() 
+
+        with open("logs.csv", "a", newline='', encoding='utf-8-sig') as file:
+            writer = csv.DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
+            writer.writerow(dict(zip(logFieldnames, [datetime.utcnow().isoformat(), guild, ctx.author.id, str(ctx.author), command, args])))              
         return
     
     @staticmethod
     async def logRequest(bot, ctx, serverSettings):
-        logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
-        
-        #if bot owner
-        if await bot.is_owner(ctx.author):
+        try:
+            logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
+            
+            #if bot owner
+            if await bot.is_owner(ctx.author):
+                dm = await ctx.author.create_dm()
+                await dm.send(file=discord.File(r'logs.csv'))
+                return
+
+            #if guild owner/guild sudoer
+            elif Sudo.isSudoer(bot, ctx, serverSettings):
+                filename = f'{ctx.guild}_guildLogs'
+                with open("logs.csv", 'r', encoding='utf-8-sig') as file: 
+                    line = [dict(row) for row in csv.DictReader(file) if int(row["Guild"]) == ctx.guild.id]
+            
+            #else just bot user
+            else:
+                filename = f'{ctx.author}_personalLogs'
+                with open("logs.csv", 'r', encoding='utf-8-sig') as file: 
+                    line = [dict(row) for row in csv.DictReader(file) if int(row["User"]) == ctx.author.id]
+
+            with open(f"./src/cache/{filename}.csv", "w", newline='', encoding='utf-8-sig') as newFile:
+                writer = csv.DictWriter(newFile, fieldnames=logFieldnames, extrasaction='ignore')
+                writer.writeheader()
+                writer.writerows(line)
+            
             dm = await ctx.author.create_dm()
-            await dm.send(file=discord.File(r'logs.csv'))
-            return
-    
-        #if guild owner/guild sudoer
-        elif Sudo.isSudoer(bot, ctx, serverSettings):
-            try:
-                with open("logs.csv", 'r', encoding='utf-8-sig') as file: 
-                    for line in csv.DictReader(file): 
-                        if int(line["Guild"]) == ctx.guild.id:
-                            with open(f"./src/cache/{ctx.guild}_guildLogs.csv", "a+", newline='', encoding='utf-8-sig') as newFile:
-                                writer = csv.DictWriter(newFile, fieldnames=logFieldnames)
-                                writer.writerow(line)
-
-                dm = await ctx.author.create_dm()
-                await dm.send(file=discord.File(f"./src/cache/{ctx.guild}_guildLogs.csv"))
-                os.remove(f"./src/cache/{ctx.guild}_guildLogs.csv")
-            
-            except Exception as e:
-                print(e)
-            
-            finally: 
-                return
+            await dm.send(file=discord.File(f"./src/cache/{filename}.csv"))
+            os.remove(f"./src/cache/{ctx.author}_personalLogs.csv")
         
-        #else just bot user
-        else:
-            try:
-                with open("logs.csv", 'r', encoding='utf-8-sig') as file: 
-                    for line in csv.DictReader(file): 
-                        if int(line["User"]) == ctx.author.id:
-                            with open(f"./src/cache/{ctx.author}_personalLogs.csv", "a+", newline='', encoding='utf-8-sig') as newFile:
-                                writer = csv.DictWriter(newFile, fieldnames=logFieldnames)
-                                writer.writerow(line)
+        except Exception as e:
+            await ErrorHandler(bot, ctx, e, 'logs')
+        finally: return
 
-                dm = await ctx.author.create_dm()
-                await dm.send(file=discord.File(f"./src/cache/{ctx.author}_personalLogs.csv"))
-                os.remove(f"./src/cache/{ctx.author}_personalLogs.csv")
-            
-            except Exception as e:
-                print(e)
-            
-            finally: 
-                return
-
-async def ErrorHandler(bot, ctx, error, command, args):
+async def ErrorHandler(bot, ctx, error, command, args=None):
     if type(args) is list:
         ' '.join(args)
         
@@ -404,9 +409,9 @@ async def ErrorHandler(bot, ctx, error, command, args):
     Log.appendToLog(ctx, "error", errorCode)
 
     errorLoggingChannel = await bot.fetch_channel(829172391557070878)
-    await errorLoggingChannel.send(f"```Error {errorCode}\nIn Guild: {ctx.guild.id}\nBy User: {str(ctx.author)}\nCommand: {command}\nArgs: {args}\n{traceback.format_exc()}```")
+    await errorLoggingChannel.send(f"```Error {errorCode}\nIn Guild: {ctx.guild.id}\nBy User: {str(ctx.author)}\nCommand: {command}\nArgs: {args if type(args) != None else 'None'}\n{traceback.format_exc()}```")
 
-    embed = discord.Embed(description=f"An unknown error has occured. Please try again later. \nError Code: {errorCode}")
+    embed = discord.Embed(description=f"An unknown error has occured. Please try again later. \n If you wish to report this error, send the error code `{errorCode}` to ACEslava#9735")
     errorMsg = await ctx.send(embed=embed)
     await asyncio.sleep(60)
     await errorMsg.delete()

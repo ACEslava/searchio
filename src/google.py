@@ -1,8 +1,6 @@
-from warnings import WarningMessage
 from src.utils import Log, ErrorHandler
 from bs4 import BeautifulSoup
 from google_trans_new import google_translator
-from src.loadingmessage import LoadingMessage
 from iso639 import languages as Languages
 import asyncio, discord, urllib3, re, random
 
@@ -10,15 +8,12 @@ class GoogleSearch:
    @staticmethod
    async def search(bot, ctx, serverSettings, message, searchQuery=None):
       try:
-         def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in ["🔍", "🗑️"]
-
          def linkUnicodeParse(link: str):
             return re.sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
          
          Log.appendToLog(ctx, "googlesearch", searchQuery)
 
-         if bool(re.search('^translate', searchQuery.lower())):
+         if bool(re.search('translate', searchQuery.lower())):
             query = searchQuery.lower().split(' ')
             if len(query) > 1:
                del query[0]
@@ -46,7 +41,7 @@ class GoogleSearch:
                   await message.edit(content=None, embed=embed)
                   await message.add_reaction('🗑️')
                   await message.add_reaction('🔍')
-                  reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
+                  reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and str(reaction.emoji) in ["🔍", "🗑️"], timeout=60)
                   if str(reaction.emoji) == '🗑️':
                      await message.delete()
                   
@@ -80,19 +75,19 @@ class GoogleSearch:
             Log.appendToLog(ctx, "googlesearch results", url)
 
             
-            if bool(re.search('^image', searchQuery.lower())):
+            if bool(re.search('image', searchQuery.lower())):
                while 'Images' not in google_snippet_result.strings:
                   result_number +=1
                   google_snippet_result = soup.find("div", {"id": "main"}).contents[result_number]
 
-                  if result_number < len(soup.find("div", {"id": "main"}).contents)-1:
+                  if result_number == len(soup.find("div", {"id": "main"}).contents)-1:
                      result_number = 3
                      foundImage = False
                      break
-            
-            while any(map(lambda wrong_first_result: wrong_first_result in google_snippet_result.strings, wrong_first_results)):
-               result_number+=1
-               google_snippet_result = soup.find("div", {"id": "main"}).contents[result_number]
+            else:
+               while any(map(lambda wrong_first_result: wrong_first_result in google_snippet_result.strings, wrong_first_results)):
+                  result_number+=1
+                  google_snippet_result = soup.find("div", {"id": "main"}).contents[result_number]
 
             printstring = ""
             for div in [d for d in google_snippet_result.findAll('div') if not d.find('div')]:  # makes the text portion of the message by finding all strings in the snippet + formatting
@@ -146,7 +141,7 @@ class GoogleSearch:
          await message.edit(content=None, embed=embed)
          try:
             await message.add_reaction('🗑️')
-            reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
+            reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and str(reaction.emoji) == "🗑️", timeout=60)
             if str(reaction.emoji) == '🗑️':
                await message.delete()
                 
