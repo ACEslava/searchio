@@ -36,6 +36,26 @@ intents.presences = True
 
 bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
 
+async def searchQueryParse(ctx, args):
+    UserCancel = Exception
+    if not args: #checks if search is empty
+                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
+                try:
+                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
+                    userquery = userquery.content
+                    if userquery.lower() == 'cancel': raise UserCancel
+                
+                except asyncio.TimeoutError:
+                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
+
+                except UserCancel:
+                    await ctx.send('Aborting')
+    else: 
+        args = list(args)
+        userquery = ' '.join(args).strip() #turns multiword search into single string.
+
+    return userquery
+
 @bot.event
 async def on_guild_join(guild):
     #Reads settings of server
@@ -266,22 +286,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
         if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['google'] != False:
-            if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    userquery = userquery.content
-                    if userquery.lower() == 'cancel': raise UserCancel
-                
-                except asyncio.TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-                except UserCancel:
-                    await ctx.send('Aborting')
-            else: 
-                args = list(args)
-                userquery = ' '.join(args).strip() #turns multiword search into single string.
-            
+            userquery = await searchQueryParse(ctx, args)
             continueLoop = True
             
             while continueLoop==True:
@@ -325,26 +330,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
         if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['google'] != False:
-            if ctx.message.reference:
-                imagemsg = await ctx.fetch_message(ctx.message.reference.message_id)
-                if imagemsg.attachments:
-                    userquery = imagemsg.attachments[0].url
-
-            elif not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    userquery = userquery.content
-                    if userquery.lower() == 'cancel': raise UserCancel
-                
-                except asyncio.TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-                except UserCancel:
-                    await ctx.send('Aborting')
-            else: 
-                args = list(args)
-                userquery = ' '.join(args).strip() #turns multiword search into single string
+            userquery = await searchQueryParse(ctx, args)
 
             search = ImageSearch(bot, ctx, userquery)
             await search.search()
@@ -381,22 +367,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
         if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['youtube'] != False:
-            if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    userquery = userquery.content
-                    if userquery.lower() == 'cancel': raise UserCancel
-                
-                except asyncio.TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-                except UserCancel:
-                    await ctx.send('Aborting')
-            else: 
-                args = list(args)
-                userquery = ' '.join(args).strip() #turns multiword search into single string.
-
+            userquery = await searchQueryParse(ctx, args)
             search = YoutubeSearch(bot, ctx, userquery)
             await search.search()
             return
@@ -406,21 +377,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
         if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['mal'] != False:
-            if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    userquery = userquery.content
-                    if userquery.lower() == 'cancel': raise UserCancel
-                
-                except asyncio.TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-                except UserCancel:
-                    await ctx.send('Aborting')
-            else: 
-                userquery = ' '.join(args).strip() #turns multiword search into single string
-            
+            userquery = await searchQueryParse(ctx, args) 
             search = MyAnimeListSearch(bot, ctx, userquery)
             await search.search()
             return
@@ -430,21 +387,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
         if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['xkcd'] != False:
-            if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    userquery = userquery.content
-                    if userquery.lower() == 'cancel': raise UserCancel
-                
-                except asyncio.TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-                except UserCancel:
-                    await ctx.send('Aborting')
-            else: 
-                userquery = ' '.join(args).strip() #turns multiword search into single string
-            
+            userquery = await searchQueryParse(ctx, args)
             await XKCDSearch.search(bot, ctx, userquery)
             return
 class Administration(commands.Cog, name="Administration"):
