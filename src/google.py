@@ -74,13 +74,12 @@ class GoogleSearch:
 
             Log.appendToLog(ctx, "googlesearch results", url)
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
+
+            #end div filtering
             googleSnippetResults = [googleSnippetResults[resultNumber] for resultNumber in range(3, len(googleSnippetResults)-2)]
             
             #bad result filtering
-            for index, result in enumerate(googleSnippetResults):
-               for badResult in wrongFirstResults:
-                  if badResult in result.strings or result.strings == '':
-                     del googleSnippetResults[index]
+            googleSnippetResults = [result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings=='']
            
             #checks if user searched specifically for images
             if bool(re.search('image', searchQuery.lower())):

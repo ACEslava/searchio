@@ -56,20 +56,20 @@ class YoutubeSearch:
                     embed.set_footer(text=f"Requested by {self.ctx.author}")
                     searchresult = await self.ctx.send(embed=embed)
 
-                    def check(reaction, user):
-                        return user == self.ctx.author and str(reaction.emoji) in ["🗑️"]
-
                     try:
                         await searchresult.add_reaction('🗑️')
-                        reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
+                        reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) == "🗑️", timeout=60)
                         if str(reaction.emoji) == '🗑️':
                             await searchresult.delete()
                     
                     except asyncio.TimeoutError as e: 
                         await searchresult.clear_reactions()
-                    
+                        
                     except Exception as e:
                         await searchresult.delete()
+                        raise
+                    finally: return
+                    
 
         except UserCancel as e:
             await self.ctx.send(f"Cancelled")
