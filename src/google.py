@@ -56,7 +56,6 @@ class GoogleSearch:
                   await ErrorHandler(bot, ctx, e, 'google', searchQuery)
                finally: return
                   
-         await asyncio.sleep(random.uniform(0,2))
          http = urllib3.PoolManager()
          url = ("https://google.com/search?pws=0&q=" + 
             searchQuery.replace(" ", "+") + "+-stock+-pinterest&uule=w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz"
