@@ -158,11 +158,11 @@ async def help(ctx, *args):
                         Args: message 
                         Optional flag: --channel [channelID]
 
-                        `blacklist:` Block a user from using the bot. 
-                        Args: userName OR userID 
+                        `blacklist:` Block a user/role from using the bot. 
+                        Args: userName OR userID OR roleID
 
-                        `whitelist:` Unblock a user from using the bot. 
-                        Args: userName OR userID
+                        `whitelist:` Unblock a user/role from using the bot. 
+                        Args: userName OR userID OR roleID
 
                         `   sudoer:` Add a user to the sudo list. Only guild owners can do this. 
                         Args: userName OR userID  
@@ -246,7 +246,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     @commands.command(name = 'wiki')
     async def wikisearch(self, ctx, *args):
         global serverSettings
-        if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['wikipedia'] != False:
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['wikipedia'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             UserCancel = Exception
             language = "en"
             if not args: #checks if search is empty
@@ -275,7 +276,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     @commands.command(name = 'wikilang')
     async def wikilang(self, ctx):
         global serverSettings
-        if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist']:
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['wikipedia'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             Log.appendToLog(ctx, 'wikilang')
 
             await WikipediaSearch(bot, ctx, "en").lang()
@@ -285,7 +287,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def gsearch(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['google'] != False:
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             continueLoop = True
             
@@ -329,7 +332,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def image(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['google'] != False:
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
 
             search = ImageSearch(bot, ctx, userquery)
@@ -339,7 +343,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     @commands.command(name = 'scholar')   
     async def scholarsearch(self, ctx, *args):
         global serverSettings
-        if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['scholar'] != False:
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['scholar'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             UserCancel = Exception
             if not args: #checks if search is empty
                 await ctx.send("Enter search query or cancel") #if empty, asks user for search query
@@ -366,7 +371,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def ytsearch(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['youtube'] != False:
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['youtube'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             search = YoutubeSearch(bot, ctx, userquery)
             await search.search()
@@ -376,7 +382,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def animesearch(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['mal'] != False:
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['mal'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args) 
             search = MyAnimeListSearch(bot, ctx, userquery)
             await search.search()
@@ -386,7 +393,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def xkcdsearch(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and serverSettings[ctx.guild.id]['xkcd'] != False:
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['xkcd'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             await XKCDSearch.search(bot, ctx, userquery)
             return

@@ -67,8 +67,7 @@ class Sudo:
                 user = self.ctx.guild.get_member_named(search)
             
             if user == None:
-                await self.ctx.send(f"No user named `{search}` was found in the guild")
-                pass
+                return None
             else: return user
         
         except Exception as e:
@@ -101,8 +100,15 @@ class Sudo:
 
             if len(args) == 1:
                 user = await self.userSearch(' '.join(args))
-                self.serverSettings[self.ctx.guild.id]['blacklist'].append(user.id)
-                await self.ctx.send(f"`{str(user)}` blacklisted")
+                role = self.ctx.guild.get_role(int(''.join(args)))
+                if user is not None:
+                    self.serverSettings[self.ctx.guild.id]['blacklist'].append(user.id)
+                    await self.ctx.send(f"`{str(user)}` blacklisted")
+                elif role is not None:
+                    self.serverSettings[self.ctx.guild.id]['blacklist'].append(role.id)
+                    await self.ctx.send(f"'{role.name}' is now blacklisted")
+                else: 
+                    await self.ctx.send(f"No user/role named `{''.join(args)}` was found in the guild")
         except Exception as e:
             raise
         finally: return
@@ -115,10 +121,17 @@ class Sudo:
             if len(args) == 1:
                 try:
                     user = await self.userSearch(' '.join(args))
-                    self.serverSettings[self.ctx.guild.id]['blacklist'].remove(user.id)
-                    await self.ctx.send(f"`{str(user)}` removed from blacklist")
+                    role = self.ctx.guild.get_role(int(''.join(args)))
+                    if user is not None:
+                        self.serverSettings[self.ctx.guild.id]['blacklist'].remove(user.id)
+                        await self.ctx.send(f"`{str(user)}` removed from blacklist")
+                    elif role is not None:
+                        self.serverSettings[self.ctx.guild.id]['blacklist'].remove(role.id)
+                        await self.ctx.send(f"'{role.name}' removed from blacklist")
+                    else: 
+                        await self.ctx.send(f"No user/role with the ID `{''.join(args)}` was found in the guild")
                 except ValueError:
-                    await self.ctx.send(f"`{str(user)}` not in blacklist")
+                    await self.ctx.send(f"`{''.join(args)}` not in blacklist")
         except Exception as e:
             raise
         finally: return
