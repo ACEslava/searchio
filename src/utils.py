@@ -296,8 +296,6 @@ class Sudo:
                     await self.sudoer(args)
                 elif command == 'unsudoer':
                     await self.unsudoer(args)
-                elif command == 'safesearch':
-                    await self.safesearch(args)
                 elif command == 'config':
                     await self.config(args)
                 else:

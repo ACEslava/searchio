@@ -292,7 +292,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             while continueLoop==True:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
-                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author))
+                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = asyncio.create_task(GoogleSearch.search(bot, ctx, serverSettings, message, userquery))
                     
                     #checks for message edit

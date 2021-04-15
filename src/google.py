@@ -159,6 +159,7 @@ class GoogleSearch:
                         print(" link: " + link)
                      except:
                         print("adding link failed")
+                     
                   resultEmbed.url = url
                   embeds.append(resultEmbed)
             
@@ -169,6 +170,7 @@ class GoogleSearch:
             await message.add_reaction('▶️')
             await message.add_reaction('🗑️')
             
+            for index, item in enumerate(embeds): item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
             while doExit == False:
                try:
                   await message.edit(content=None, embed=embeds[curPage])
