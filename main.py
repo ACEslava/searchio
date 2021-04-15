@@ -297,7 +297,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
-                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
+                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
 
                     if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
                         if type(messageEdit.exception()) == asyncio.TimeoutError:

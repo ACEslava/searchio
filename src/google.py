@@ -94,24 +94,23 @@ class GoogleSearch:
                
             embeds = []
             print(ctx.author.name + " searched for: "+searchQuery[:233])
-            for result in googleSnippetResults:  
-               
-               #if the search term is images, all results will only be images
-               if foundImage == True: 
-                  for image in images:
-                     try:
-                        resultEmbed = discord.Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}')
-                        imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
-                        if "encrypted" in imgurl:
-                              imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", result.findAll("img")[1].parent.parent["href"])[0]
-                        # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
-                        print(" image: " + imgurl)
-                        resultEmbed.set_image(url=imgurl)
-                        embeds.append(resultEmbed)
-                     except: pass 
-                  del embeds[-1]
-                     
-               else:  
+
+            #if the search term is images, all results will only be images
+            if foundImage == True: 
+               for image in images:
+                  try:
+                     resultEmbed = discord.Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}')
+                     imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
+                     if "encrypted" in imgurl:
+                           imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
+                     # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
+                     print(" image: " + imgurl)
+                     resultEmbed.set_image(url=imgurl)
+                     embeds.append(resultEmbed)
+                  except: pass 
+               del embeds[-1]
+            else:
+               for result in googleSnippetResults:  
                   resultEmbed = discord.Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}') 
                   printstring = ""
                   for div in [d for d in result.findAll('div') if not d.find('div')]:  # makes the text portion of the message by finding all strings in the snippet + formatting
@@ -127,22 +126,7 @@ class GoogleSearch:
                         break
                   
                   resultEmbed.description = re.sub("\n\n+", "\n\n", printstring)
-                  image = result.find("img")  # can also be done for full html (soup) with about same result.
                
-                  # tries to add an image to the embed
-                  if image is not None: 
-                     try:
-                        imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
-                        if "encrypted" in imgurl:
-                              imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", result.findAll("img")[1].parent.parent["href"])[0]
-                        # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
-                        print(" image: " + imgurl)
-                        if "Images" in result.strings:
-                              resultEmbed.set_image(url=imgurl)
-                        else:
-                              resultEmbed.set_thumbnail(url=imgurl)
-                     except: pass
-
                   # tries to add a link to the embed
                   link_list = [a for a in result.findAll("a", href_="") if not a.find("img")] 
                   if len(link_list) != 0: 
@@ -159,18 +143,32 @@ class GoogleSearch:
                         print(" link: " + link)
                      except:
                         print("adding link failed")
-                     
                   resultEmbed.url = url
-                  embeds.append(resultEmbed)
+
+                  # tries to add an image to the embed
+                  image = result.find("img", recursive=True)
+                  if image is not None:
+                     try:
+                        imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
+                        if "encrypted" in imgurl:
+                              imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
+                        # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
+                        print(" image: " + imgurl)
+                        resultEmbed.set_image(url=imgurl)
+                        embeds.insert(0, resultEmbed)
+                     except: pass 
+                  else:   
+                     embeds.append(resultEmbed)
+            
+            for index, item in enumerate(embeds): item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
             
             doExit = False
             curPage = 0
-
-            await message.add_reaction('◀️')
-            await message.add_reaction('▶️')
             await message.add_reaction('🗑️')
+            if len(embeds) > 1:
+               await message.add_reaction('◀️')
+               await message.add_reaction('▶️')
             
-            for index, item in enumerate(embeds): item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
             while doExit == False:
                try:
                   await message.edit(content=None, embed=embeds[curPage])
