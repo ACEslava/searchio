@@ -107,7 +107,9 @@ class GoogleSearch:
                      print(" image: " + imgurl)
                      resultEmbed.set_image(url=imgurl)
                      embeds.append(resultEmbed)
-                  except: pass 
+                  except: 
+                     resultEmbed.description = 'Image failed to load'
+                     pass
                del embeds[-1]
             else:
                for result in googleSnippetResults:  
@@ -156,7 +158,9 @@ class GoogleSearch:
                         print(" image: " + imgurl)
                         resultEmbed.set_image(url=imgurl)
                         embeds.insert(0, resultEmbed)
-                     except: pass 
+                     except: 
+                        resultEmbed.description = 'Image failed to load'
+                        pass
                   else:   
                      embeds.append(resultEmbed)
             
