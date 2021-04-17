@@ -30,8 +30,6 @@ class xkcd:
 class XKCDSearch:
     @staticmethod
     async def search(bot, ctx, searchQuery):
-        def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in ["🗑️"]
 
         Log.appendToLog(ctx, "xkcd", searchQuery)
         message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
@@ -48,7 +46,7 @@ class XKCDSearch:
                 Log.appendToLog(ctx, "xkcd", x.url)
 
                 await message.add_reaction('🗑️')
-                reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
+                reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                 if str(reaction.emoji) == '🗑️':
                     await message.delete()
                 return

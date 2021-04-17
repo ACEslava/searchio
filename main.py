@@ -10,6 +10,7 @@ from src.youtube import YoutubeSearch
 from src.xkcd import XKCDSearch
 from dotenv import load_dotenv
 from discord.ext import commands
+from urllib3 import PoolManager
 
 load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
@@ -35,24 +36,24 @@ intents.members = True
 intents.presences = True
 
 bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
-
+http = PoolManager()
 async def searchQueryParse(ctx, args):
     UserCancel = Exception
     if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    userquery = userquery.content
-                    if userquery.lower() == 'cancel': raise UserCancel
-                
-                except asyncio.TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
+        await ctx.send("Enter search query or cancel") #if empty, asks user for search query
+        try:
+            userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
+            userquery = userquery.content
+            if userquery.lower() == 'cancel': raise UserCancel
+        
+        except asyncio.TimeoutError:
+            await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
 
-                except UserCancel:
-                    await ctx.send('Aborting')
+        except UserCancel:
+            await ctx.send('Aborting')
+            return
     else: 
-        args = list(args)
-        userquery = ' '.join(args).strip() #turns multiword search into single string.
+        userquery = ' '.join(list(args)).strip() #turns multiword search into single string.
 
     return userquery
 
@@ -290,13 +291,14 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
+            if userquery is None: return
             continueLoop = True
             
-            while continueLoop==True:
+            while continueLoop:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                     messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = asyncio.create_task(GoogleSearch.search(bot, ctx, serverSettings, message, userquery))
+                    search = asyncio.create_task(GoogleSearch.search(http, bot, ctx, serverSettings, message, userquery))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
@@ -310,7 +312,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace('&google ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}google ', '')
                         continue
                     else: raise asyncio.TimeoutError
                 
@@ -335,6 +337,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
+            if userquery is None: return
 
             search = ImageSearch(bot, ctx, userquery)
             await search.search()
@@ -358,25 +361,93 @@ class SearchEngines(commands.Cog, name="Search Engines"):
 
                 except UserCancel:
                     await ctx.send('Aborting')
+                    return
             else:
                 args = ' '.join(list(args)).strip().split('--') #turns entire command into list split by flag operator
                 userquery = args[0].strip()
                 del args[0]
 
-            search = ScholarSearch(bot, ctx, args, userquery)
-            await search.search()
-            return
+            continueLoop = True 
+            while continueLoop:
+                try:
+                    message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = asyncio.create_task(ScholarSearch.search(bot, ctx, message, args, userquery))
+                    
+                    #checks for message edit
+                    waiting = [messageEdit, search]
+                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+
+                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
+                        if type(messageEdit.exception()) == asyncio.TimeoutError:
+                            raise asyncio.TimeoutError
+                        await message.delete()
+                        messageEdit.cancel()
+                        search.cancel()
+
+                        messageEdit = messageEdit.result()
+                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}scholar ', '')
+                        continue
+                    else: raise asyncio.TimeoutError
+                
+                except asyncio.TimeoutError: #after a minute, everything cancels
+                    await message.clear_reactions()
+                    messageEdit.cancel()
+                    search.cancel()
+                    continueLoop = False
+                    return
+                
+                except asyncio.CancelledError:
+                    pass
+                
+                except Exception as e:
+                    await ErrorHandler(bot, ctx, e, 'scholar', userquery)
+                    return
 
     @commands.command(name = 'youtube')
     async def ytsearch(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['youtube'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
-            search = YoutubeSearch(bot, ctx, userquery)
-            await search.search()
-            return
+            if userquery is None: return
+            continueLoop = True 
+            while continueLoop:
+                try:
+                    message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = asyncio.create_task(YoutubeSearch.search(bot, ctx, message, userquery))
+                    
+                    #checks for message edit
+                    waiting = [messageEdit, search]
+                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+
+                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
+                        if type(messageEdit.exception()) == asyncio.TimeoutError:
+                            raise asyncio.TimeoutError
+                        await message.delete()
+                        messageEdit.cancel()
+                        search.cancel()
+
+                        messageEdit = messageEdit.result()
+                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}youtube ', '')
+                        continue
+                    else: raise asyncio.TimeoutError
+                
+                except asyncio.TimeoutError: #after a minute, everything cancels
+                    await message.clear_reactions()
+                    messageEdit.cancel()
+                    search.cancel()
+                    continueLoop = False
+                    return
+                
+                except asyncio.CancelledError:
+                    pass
+                
+                except Exception as e:
+                    await ErrorHandler(bot, ctx, e, 'youtube', userquery)
+                    return
 
     @commands.command(name = 'anime')
     async def animesearch(self, ctx, *args):
@@ -384,7 +455,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         UserCancel = Exception
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['mal'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args) 
+            userquery = await searchQueryParse(ctx, args)
+            if userquery is None: return
             search = MyAnimeListSearch(bot, ctx, userquery)
             await search.search()
             return
@@ -396,6 +468,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['xkcd'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
+            if userquery is None: return
             await XKCDSearch.search(bot, ctx, userquery)
             return
 class Administration(commands.Cog, name="Administration"):

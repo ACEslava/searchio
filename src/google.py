@@ -1,16 +1,75 @@
 from src.utils import Log, ErrorHandler
+from src.loadingmessage import LoadingMessage
 from bs4 import BeautifulSoup
 from google_trans_new import google_translator
 from iso639 import languages as Languages
-import asyncio, discord, urllib3, re, random, wikipedia
+from discord import Embed
+import asyncio, re, wikipedia
 
 class GoogleSearch:
    @staticmethod
-   async def search(bot, ctx, serverSettings, message, searchQuery=None):
-      try:
-         def linkUnicodeParse(link: str):
-            return re.sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
+   async def search(http, bot, ctx, serverSettings, message, searchQuery=None):
+      def imageEmbed(image):
+         try:
+            resultEmbed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}')
+            imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
+            if "encrypted" in imgurl:
+                  imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
+            # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
+            print(" image: " + imgurl)
+            resultEmbed.set_image(url=imgurl)
+         except: 
+            resultEmbed.description = 'Image failed to load'
+         finally: return resultEmbed
+            
+      def textEmbed(result):
+         resultEmbed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}') 
          
+         divs = [d for d in result.findAll('div') if not d.find('div')]
+         lines = [' '.join([string if string != 'View all' else '' for string in div.stripped_strings]) for div in divs]
+         printstring = '\n'.join(lines)
+         
+         resultEmbed.description = re.sub("\n\n+", "\n\n", printstring)
+      
+         # tries to add a link to the embed
+         link_list = [a for a in result.findAll("a", href_="") if not a.find("img")] 
+         if len(link_list) != 0: 
+            try:
+               link = linkUnicodeParse(re.findall("(?<=url\?q=).*(?=&sa)", link_list[0]["href"])[0])
+               
+               if 'wikipedia' in link:
+                  page = wikipedia.WikipediaPage(title=link.split('/')[-1])
+                  summary = page.summary
+                  summary = summary[:233] + f'{"..." if len(summary) > 233 else ""}'
+                  resultEmbed.description = f'Wikipedia: {link.split("/")[-1]}\n {summary}' #outputs wikipedia article
+
+               resultEmbed.add_field(name="Relevant Link", value=link)
+               print(" link: " + link)
+            except:
+               print("adding link failed")
+         resultEmbed.url = url
+
+         # tries to add an image to the embed
+         image = result.find("img", recursive=True)
+         try:
+            imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
+            if "encrypted" in imgurl:
+                  imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
+            # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
+            print(" image: " + imgurl)
+            resultEmbed.set_image(url=imgurl)
+         except AttributeError:
+            pass
+         except: 
+            resultEmbed.description = 'Image failed to load'
+            pass
+         
+         return resultEmbed
+                
+      def linkUnicodeParse(link: str):
+         return re.sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
+      
+      try:
          Log.appendToLog(ctx, "googlesearch", searchQuery)
 
          if bool(re.search('translate', searchQuery.lower())):
@@ -28,38 +87,33 @@ class GoogleSearch:
                   del query[query.index('from')+1]
                   del query[query.index('from')]
                else: srcLanguage = None
+               
                query = ' '.join(query)
                translator = google_translator()
                result = translator.translate(query, lang_src=f'{srcLanguage if srcLanguage != None else "auto"}' , lang_tgt=destLanguage)
-               if type(result) == list:
-                  result = '\n'.join(result)
-               try:
-                  embed = discord.Embed(title=f"{Languages.get(alpha2=srcLanguage).name if srcLanguage != None else translator.detect(query)[1].capitalize()} " +
-                     f"to {Languages.get(part1=destLanguage).name} Translation", 
-                     description = result + '\n\nReact with 🔍 to search Google')
-                  embed.set_footer(text=f"Requested by {ctx.author}")
-                  await message.edit(content=None, embed=embed)
-                  await message.add_reaction('🗑️')
-                  await message.add_reaction('🔍')
-                  reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and str(reaction.emoji) in ["🔍", "🗑️"], timeout=60)
-                  if str(reaction.emoji) == '🗑️':
-                     await message.delete()
-                  
-                  elif str(reaction.emoji) == '🔍':
-                     await message.delete()
-                     pass
                
-               except asyncio.TimeoutError: 
-                  pass
-               except Exception as e:
+               if isinstance(result, list): result = '\n'.join(result)
+               embed = Embed(title=f"{Languages.get(alpha2=srcLanguage).name if srcLanguage != None else translator.detect(query)[1].capitalize()} " +
+                  f"to {Languages.get(part1=destLanguage).name} Translation", 
+                  description = result + '\n\nReact with 🔍 to search Google')
+               embed.set_footer(text=f"Requested by {ctx.author}")
+               await message.edit(content=None, embed=embed)
+               await message.add_reaction('🗑️')
+               await message.add_reaction('🔍')
+               reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and str(reaction.emoji) in ["🔍", "🗑️"], timeout=60)
+               
+               if str(reaction.emoji) == '🗑️':
                   await message.delete()
-                  await ErrorHandler(bot, ctx, e, 'google', searchQuery)
-               finally: return
-                  
-         http = urllib3.PoolManager()
-         url = ("https://google.com/search?pws=0&q=" + 
-            searchQuery.replace(" ", "+") + "+-stock+-pinterest&uule=w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz"
-            f"&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True and ctx.channel.nsfw == False else ''}")
+                  return
+               
+               elif str(reaction.emoji) == '🔍':
+                  await message.clear_reactions()
+                  await message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+                  pass
+                 
+         url = (''.join(["https://google.com/search?pws=0&q=", 
+            searchQuery.replace(" ", "+"), "+-stock+-pinterest&uule=w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz",
+            f"&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True and ctx.channel.nsfw == False else ''}"]))
          response = http.request('GET', url)
          soup = BeautifulSoup(response.data, features="lxml")
          index = 3
@@ -68,7 +122,6 @@ class GoogleSearch:
    
          if google_snippet_result is not None:
             google_snippet_result = google_snippet_result.contents[index]
-            breaklines = ["People also search for", "Episodes"]
             wrongFirstResults = ["Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >']
 
             Log.appendToLog(ctx, "googlesearch results", url)
@@ -79,95 +132,27 @@ class GoogleSearch:
             
             #bad result filtering
             googleSnippetResults = [result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings=='']
-           
+         
             #checks if user searched specifically for images
             if bool(re.search('image', searchQuery.lower())):
-               index = 0
                for results in googleSnippetResults:
-                  if index == len(soup.find("div", {"id": "main"}).contents):
-                        break
-                  elif 'Images' in results.strings: 
+                  if 'Images' in results.strings: 
                      images = results.findAll("img", recursive=True)
                      foundImage = True
                      break
-                  else: index += 1
                
-            embeds = []
             print(ctx.author.name + " searched for: "+searchQuery[:233])
 
             #if the search term is images, all results will only be images
-            if foundImage == True: 
-               for image in images:
-                  try:
-                     resultEmbed = discord.Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}')
-                     imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
-                     if "encrypted" in imgurl:
-                           imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
-                     # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
-                     print(" image: " + imgurl)
-                     resultEmbed.set_image(url=imgurl)
-                     embeds.append(resultEmbed)
-                  except: 
-                     resultEmbed.description = 'Image failed to load'
-                     pass
+            if foundImage: 
+               embeds = list(map(imageEmbed, images))
                del embeds[-1]
             else:
-               for result in googleSnippetResults:  
-                  resultEmbed = discord.Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}') 
-                  printstring = ""
-                  for div in [d for d in result.findAll('div') if not d.find('div')]:  # makes the text portion of the message by finding all strings in the snippet + formatting
-                     linestring = ""
-                     for string in div.stripped_strings:
-                        linestring += string + " "
-                     if linestring == "View all ":  # clean this part up
-                        linestring = ""
-
-                     if len(printstring+linestring+"\n") < 2000 and not any(map(lambda breakline: breakline in linestring, breaklines)):
-                        printstring += linestring + "\n"
-                     else:
-                        break
+               embeds = list(map(textEmbed, googleSnippetResults))
                   
-                  resultEmbed.description = re.sub("\n\n+", "\n\n", printstring)
-               
-                  # tries to add a link to the embed
-                  link_list = [a for a in result.findAll("a", href_="") if not a.find("img")] 
-                  if len(link_list) != 0: 
-                     try:
-                        link = linkUnicodeParse(re.findall("(?<=url\?q=).*(?=&sa)", link_list[0]["href"])[0])
-                        if 'wikipedia' in link:
-                           page = wikipedia.WikipediaPage(title=link.split('/')[-1])
-                           summary = page.summary
-                           summary = summary[:233] + f'{"..." if len(summary) > 233 else ""}'
-                           resultEmbed.description = f'Wikipedia: {link.split("/")[-1]}\n {summary}' #outputs wikipedia article
-                           resultEmbed.url = page.url
-
-                        resultEmbed.add_field(name="Relevant Link", value=link)
-                        print(" link: " + link)
-                     except:
-                        print("adding link failed")
-                  resultEmbed.url = url
-
-                  # tries to add an image to the embed
-                  image = result.find("img", recursive=True)
-                  if image is not None:
-                     try:
-                        imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
-                        if "encrypted" in imgurl:
-                              imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
-                        # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
-                        print(" image: " + imgurl)
-                        resultEmbed.set_image(url=imgurl)
-                        embeds.insert(0, resultEmbed)
-                     except: 
-                        resultEmbed.description = 'Image failed to load'
-                        pass
-                  else:   
-                     embeds.append(resultEmbed)
-            
             for index, item in enumerate(embeds): item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
             
-            doExit = False
-            curPage = 0
+            doExit, curPage = False, 0
             await message.add_reaction('🗑️')
             if len(embeds) > 1:
                await message.add_reaction('◀️')
@@ -176,7 +161,7 @@ class GoogleSearch:
             while doExit == False:
                try:
                   await message.edit(content=None, embed=embeds[curPage])
-                  reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and str(reaction.emoji) in ["◀️", "▶️", "🗑️"], timeout=60)
+                  reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == message]), timeout=60)
                   if str(reaction.emoji) == '🗑️':
                      await message.delete()
                      doExit = True
@@ -194,17 +179,15 @@ class GoogleSearch:
                except asyncio.TimeoutError: 
                   raise
 
-         
-         
          else:
-            embed = discord.Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}',
+            embed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}',
                description = 'No results found')
          
             embed.set_footer(text=f"Requested by {ctx.author}")
             await message.edit(content=None, embed=embed)
             try:
                await message.add_reaction('🗑️')
-               reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and str(reaction.emoji) == "🗑️", timeout=60)
+               reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and reaction.message == message and str(reaction.emoji) == "🗑️", timeout=60)
                if str(reaction.emoji) == '🗑️':
                   await message.delete()
                   

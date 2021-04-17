@@ -45,9 +45,9 @@ class WikipediaSearch:
                     await msg[0].edit(content=None, embed=embed)
                     msg.append(await self.ctx.send("Please choose option or cancel"))
 
-                while True:
+                while 1:
                     try: #checks for user input or reaction input.
-                        emojitask = asyncio.create_task(self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) in ["◀️", "▶️", "🗑️"], timeout=30))
+                        emojitask = asyncio.create_task(self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == message]), timeout=30))
                         responsetask = asyncio.create_task(self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout=30))
                         waiting = [emojitask,responsetask]
                         done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
@@ -102,7 +102,7 @@ class WikipediaSearch:
                                 
                                 try:
                                     await searchresult.add_reaction('🗑️')
-                                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) in ["🗑️"], timeout=60)
+                                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                                     if str(reaction.emoji) == '🗑️':
                                         await searchresult.delete()
                                         return

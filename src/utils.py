@@ -187,7 +187,7 @@ class Sudo:
                 configMessage = await self.ctx.send(embed=embed)
                 try:
                     await configMessage.add_reaction('🗑️')
-                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) == "🗑️", timeout=60)
+                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
                         await configMessage.delete()
         
@@ -335,7 +335,7 @@ class Sudo:
                 helpMessage = await self.ctx.send(embed=embed)
                 try:
                     await helpMessage.add_reaction('🗑️')
-                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) == "🗑️", timeout=60)
+                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
                         await helpMessage.delete()
         
@@ -353,7 +353,7 @@ class Sudo:
 class Log():
     @staticmethod
     def appendToLog(ctx, command, args=None):     
-        if args == None: args = "None"
+        if args is None: args = "None"
         logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
         if ctx.guild: guild = ctx.guild.id
         else: guild = "DM"
