@@ -50,7 +50,7 @@ class GoogleSearch:
          resultEmbed.url = url
 
          # tries to add an image to the embed
-         image = result.find("img", recursive=True)
+         image = result.find("img")
          try:
             imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
             if "encrypted" in imgurl:
@@ -58,10 +58,7 @@ class GoogleSearch:
             # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
             print(" image: " + imgurl)
             resultEmbed.set_image(url=imgurl)
-         except AttributeError:
-            pass
          except: 
-            resultEmbed.description = 'Image failed to load'
             pass
          
          return resultEmbed
