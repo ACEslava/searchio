@@ -493,7 +493,7 @@ class Administration(commands.Cog, name="Administration"):
         global serverSettings
         args = list(args)
         if Sudo.isSudoer(bot, ctx, serverSettings) == False:
-            await ctx.send(f"{ctx.author} is not in the sudoers file.  This incident will be reported.")
+            await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
             Log.appendToLog(ctx, 'sudo', 'unauthorised')
         else:
             Log.appendToLog(ctx, "sudo", ' '.join(args).strip())

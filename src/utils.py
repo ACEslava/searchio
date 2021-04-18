@@ -187,7 +187,7 @@ class Sudo:
                 configMessage = await self.ctx.send(embed=embed)
                 try:
                     await configMessage.add_reaction('🗑️')
-                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == configMessage]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
                         await configMessage.delete()
         
