@@ -65,25 +65,27 @@ async def on_guild_join(guild):
     owner = await bot.fetch_user(guild.owner_id)
     dm = await owner.create_dm()
     appInfo = await bot.application_info()
+    try:
+        embed = discord.Embed(title=f"Search.io was added to your server: '{guild.name}'.", 
+            description = f"""
+        Search.io is a bot that searches through multiple search engines/APIs.
+        The activation command is '&', and a list of various commands can be found using '&help'.
+                
+        A list of admin commands can be found by using '&help sudo'. These commands may need ID numbers, which requires Developer Mode.
+        To turn on Developer Mode, go to Settings > Appearances > Advanced > Developer Mode. Then right click on users, roles, channels, or guilds to copy their ID.
+        If you need to block a specific user from using Search.io, do '&sudo blacklist [userID]'. Unblock with '&sudo whitelist [userID]'
 
-    embed = discord.Embed(title=f"Search.io was added to your server: '{guild.name}'.", 
-        description = f"""
-    Search.io is a bot that searches through multiple search engines/APIs.
-    The activation command is '&', and a list of various commands can be found using '&help'.
-            
-    A list of admin commands can be found by using '&help sudo'. These commands may need ID numbers, which requires Developer Mode.
-    To turn on Developer Mode, go to Settings > Appearances > Advanced > Developer Mode. Then right click on users, roles, channels, or guilds to copy their ID.
-    If you need to block a specific user from using Search.io, do '&sudo blacklist [userID]'. Unblock with '&sudo whitelist [userID]'
+        Guild-specific settings can be accessed with '&config'
+        As a start, it is suggested to designate an administrator role that can use Search.io's sudo commands. Do '&config adminrole [roleID]' to designate an admin role.
+        You can change the command prefix with '&config prefix [character]'
+        You can also block or unblock specific commands with '&config [command]'
+        It is also suggested to turn on Safe Search, if needed. Do '&config safesearch'. The default is off. 
 
-    Guild-specific settings can be accessed with '&config'
-    As a start, it is suggested to designate an administrator role that can use Search.io's sudo commands. Do '&config adminrole [roleID]' to designate an admin role.
-    You can change the command prefix with '&config prefix [character]'
-    You can also block or unblock specific commands with '&config [command]'
-    It is also suggested to turn on Safe Search, if needed. Do '&config safesearch'. The default is off. 
-
-    If you have any problems with Search.io, DM {str(appInfo.owner)}""")
-    await dm.send(embed=embed)
-    return
+        If you have any problems with Search.io, DM {str(appInfo.owner)}""")
+        await dm.send(embed=embed)
+    except discord.errors.Forbidden:
+        pass
+    finally: return
 
 @bot.event
 async def on_guild_remove(guild):
@@ -130,13 +132,14 @@ async def help(ctx, *args):
         commandPrefix = Sudo.printPrefix(ctx)
         args = list(args)
         
-        embed = discord.Embed(title="Help", 
+        embed = discord.Embed(title="SearchIO", 
             description="Search.io is a bot that searches through multiple search engines/APIs.\nIt is developed by ACEslava#9735, K1NG#6219, and Nanu#3294")
         
         embed.add_field(name="Administration", inline=False, value=textwrap.dedent(f"""\
             `  sudo:` Various admin commands. Usage: {commandPrefix}sudo [command] [args].
             `  logs:` DMs a .csv of personal logs or guild logs if user is a sudoer. Usage: {commandPrefix}log
             `config:` Views the guild settings. Requires sudo privileges to edit settings
+            `invite:` DMs an invite link of the bot to add to other servers
         """))
         
         embed.add_field(name="Search Engines", inline=False, value=textwrap.dedent(f"""\
@@ -222,23 +225,27 @@ async def help(ctx, *args):
                 f"Searches for an XKCD comic. Search query can be an XKCD comic number, random, or latest. \nUsage:{commandPrefix}xkcd [query]")
             else: pass
         else: pass
+        dm = await ctx.author.create_dm()
+        await dm.send(embed=embed)
+        await dm.send('If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ \nWant to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot')
+        # try:
+        #     await helpMessage.add_reaction('🗑️')
+        #     reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
+        #     if str(reaction.emoji) == '🗑️':
+        #         await helpMessage.delete()
+        #         return
         
-        helpMessage = await ctx.send(embed=embed)
-        try:
-            await helpMessage.add_reaction('🗑️')
-            reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
-            if str(reaction.emoji) == '🗑️':
-                await helpMessage.delete()
-                return
+        # except asyncio.TimeoutError as e: 
+        #     await helpMessage.clear_reactions()
         
-        except asyncio.TimeoutError as e: 
-            await helpMessage.clear_reactions()
-        
-        finally: 
-            return
+        # finally: 
+        #     return
     
+    except discord.errors.Forbidden:
+        await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
     except Exception as e:
-        ErrorHandler(bot, ctx, e, 'help')
+        await ErrorHandler(bot, ctx, e, 'help')
+    finally: return
 
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
@@ -503,6 +510,17 @@ class Administration(commands.Cog, name="Administration"):
         else: serverSettings = await command.config([])
         
         Log.appendToLog(ctx, 'config', args if len(args) > 0 else None)
+
+    @commands.command(name='invite')
+    async def invite(self, ctx):
+        try:
+            dm = await ctx.author.create_dm()
+            await dm.send('Here ya go: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot')
+        except discord.errors.Forbidden:
+            await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
+        except Exception as e:
+            await ErrorHandler(bot, ctx, e, 'help')
+        finally: return
 
 bot.add_cog(SearchEngines(bot))
 bot.add_cog(Administration(bot))

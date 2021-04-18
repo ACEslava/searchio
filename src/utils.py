@@ -420,7 +420,11 @@ async def ErrorHandler(bot, ctx, error, command, args=None):
     Log.appendToLog(ctx, "error", errorCode)
 
     errorLoggingChannel = await bot.fetch_channel(829172391557070878)
-    await errorLoggingChannel.send(f"```Error {errorCode}\nIn Guild: {ctx.guild.id}\nBy User: {str(ctx.author)}\nCommand: {command}\nArgs: {args if type(args) != None else 'None'}\n{traceback.format_exc()}```")
+
+    #prevents doxxing by removing username
+    errorOut = '\n'.join([lines if r'C:\Users' not in lines else '\\'.join(lines.split('\\')[:2]+lines.split('\\')[3:]) for lines in str(traceback.format_exc()).split('\n')])
+            
+    await errorLoggingChannel.send(f"Error `{errorCode}`\n```\nIn Guild: {ctx.guild.id}\nBy User: {str(ctx.author)}\nCommand: {command}\nArgs: {args if type(args) != None else 'None'}\n{errorOut}```")
 
     embed = discord.Embed(description=f"An unknown error has occured. Please try again later. \n If you wish to report this error, send the error code `{errorCode}` to ACEslava#9735")
     errorMsg = await ctx.send(embed=embed)
