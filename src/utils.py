@@ -85,7 +85,7 @@ class Sudo:
                 else: #Prevents non-owner sudoers from using bot in other servers
                     channel = self.ctx.guild.get_channel(channel)
 
-            else: channel = None
+            else: channel = self.ctx.channel
                
             await channel.send(' '.join(args).strip()) if channel else self.ctx.send(' '.join(args).strip())
 
