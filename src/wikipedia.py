@@ -28,7 +28,23 @@ class WikipediaSearch:
                 result = [result[x:x+10] for x in range(0, len(result), 10)]
                 pages = len(result)
                 cur_page = 1
-                if len(result) != 1:
+                if len(result) == 0:
+                    embed=discord.Embed(description=f"No results found for '{self.searchQuery}'")
+                    await message.send(embed=embed)
+
+                    try:
+                        await message.add_reaction('🗑️')
+                        reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                        if str(reaction.emoji) == '🗑️':
+                            await message.delete()
+                    
+                    except asyncio.TimeoutError: 
+                        await searchresult.clear_reactions()
+                    
+                    except Exception as e:
+                        ErrorHandler(self.bot, self.ctx, e, 'wiki', self.searchQuery)
+                    finally: return
+                elif len(result) != 1:
                     embed=discord.Embed(title=f"Titles matching '{self.searchQuery}'\n Page {cur_page}/{pages}:", description=
                         ''.join([f'[{index}]: {value}\n' for index, value in enumerate(result[cur_page-1])]))
                     embed.set_footer(text=f"Requested by {self.ctx.author}")
@@ -102,7 +118,7 @@ class WikipediaSearch:
                                 
                                 try:
                                     await searchresult.add_reaction('🗑️')
-                                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == searchresult]), timeout=60)
                                     if str(reaction.emoji) == '🗑️':
                                         await searchresult.delete()
                                         return
