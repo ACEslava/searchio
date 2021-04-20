@@ -139,7 +139,8 @@ async def help(ctx, *args):
             `  sudo:` Various admin commands. Usage: {commandPrefix}sudo [command] [args].
             `  logs:` DMs a .csv of personal logs or guild logs if user is a sudoer. Usage: {commandPrefix}log
             `config:` Views the guild settings. Requires sudo privileges to edit settings
-            `invite:` DMs an invite link of the bot to add to other servers
+            `invite:` DMs an invite link of the bot to add to other servers.text=
+            `  ping:` Tests if bot is alive
         """))
         
         embed.add_field(name="Search Engines", inline=False, value=textwrap.dedent(f"""\
@@ -520,6 +521,14 @@ class Administration(commands.Cog, name="Administration"):
             await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
         except Exception as e:
             await ErrorHandler(bot, ctx, e, 'help')
+        finally: return
+
+    @commands.command(name='ping')
+    async def ping(self, ctx):
+        try:
+            await ctx.send(f'Response in {bot.latency}ms')
+        except Exception as e:
+            await ErrorHandler(bot, ctx, e, 'ping')
         finally: return
 
 bot.add_cog(SearchEngines(bot))
