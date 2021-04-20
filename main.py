@@ -526,7 +526,7 @@ class Administration(commands.Cog, name="Administration"):
     @commands.command(name='ping')
     async def ping(self, ctx):
         try:
-            await ctx.send(f'Response in {bot.latency}ms')
+            await ctx.send(f'Response in {round(bot.latency, 3)}ms')
         except Exception as e:
             await ErrorHandler(bot, ctx, e, 'ping')
         finally: return
