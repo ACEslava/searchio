@@ -17,9 +17,9 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
 #checks if serverSettings.json exists
 if not os.path.exists('logs.csv'):
-    with open('logs.csv') as file:
+    with open('logs.csv', 'w') as file:
         file.write('')
-        
+
 if not os.path.exists('serverSettings.yaml'):
     with open('serverSettings.yaml', 'w') as file:
         file.write('---')
