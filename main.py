@@ -25,18 +25,12 @@ if not os.path.exists('userSettings.yaml'):
         file.write('---')
 
 #loads serverSettings
-with open('serverSettings.json', 'r') as data:
-    serverSettings = json.load(data, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
+with open('serverSettings.yaml', 'r') as data:
+    serverSettings = yaml.load(data)
 
-with open('serverSettings.yaml', 'w') as data:
-    yaml.dump(serverSettings, data, allow_unicode=True)
-
-#loads serverSettings
-with open('userSettings.json', 'r') as data:
-    userSettings = json.load(data, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
-
-with open('userSettings.yaml', 'w') as data:
-    yaml.dump(userSettings, data, allow_unicode=True)
+#loads userSettings
+with open('userSettings.yaml', 'r') as data:
+    userSettings = yaml.load(data)
 
 def prefix(bot, message):
     try:
@@ -105,8 +99,8 @@ async def on_guild_join(guild):
 async def on_guild_remove(guild):
     del serverSettings[guild.id]
     
-    with open('serverSettings.json', 'w') as data:
-        data.write(json.dumps(serverSettings, indent=4))
+    with open('serverSettings.yaml', 'w') as data:
+        yaml.dump(serverSettings, data, allow_unicode=True)
     return
 
 @bot.event
@@ -120,8 +114,8 @@ async def on_connect():
     for servers in bot.guilds:
         serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id)
     
-    with open('serverSettings.json', 'w') as data:
-        data.write(json.dumps(serverSettings, indent=4))
+    with open('serverSettings.yaml', 'w') as data:
+        yaml.dump(serverSettings, data, allow_unicode=True)
 
     with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
         lines = [dict(row) for row in csv.DictReader(file) if datetime.datetime.utcnow()-datetime.datetime.fromisoformat(row["Time"]) < datetime.timedelta(weeks=8)]

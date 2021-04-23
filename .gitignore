@@ -5,8 +5,8 @@ __pycache__/
 startserver
 logs.csv
 .google-cookie
-serverSettings.json
-userSettings.json
+serverSettings.yaml
+userSettings.yaml
 scholar.log
 __pycache__/
 .python-version

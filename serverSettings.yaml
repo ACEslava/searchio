@@ -40,7 +40,7 @@
   commandprefix: '&'
   google: true
   mal: true
-  safesearch: false
+  safesearch: true
   scholar: true
   sudoer: []
   wikipedia: true

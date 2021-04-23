@@ -1,5 +1,5 @@
 from datetime import datetime
-import discord, asyncio, json, textwrap, difflib, csv, os, random, traceback, re
+import discord, asyncio, yaml, textwrap, difflib, csv, os, random, traceback, re
 
 class Sudo:
     def __init__(
@@ -44,8 +44,8 @@ class Sudo:
     @staticmethod
     def isSudoer(bot, ctx, serverSettings=None):
         if serverSettings == None:
-            with open('serverSettings.json', 'r') as data:
-                serverSettings = json.load(data, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
+            with open('serverSettings.yaml', 'w') as data:
+                yaml.dump(serverSettings, data, allow_unicode=True)
 
         #Checks if sudoer is owner
         isOwner = ctx.author.id == bot.owner_id
@@ -68,19 +68,19 @@ class Sudo:
             return '&'
         else: return serverSettings[ctx.guild.id]['commandprefix']
 
-    async def userSearch(self, search):
-        try:
-            if search.isnumeric():
-                user = self.ctx.guild.get_member(int(search))
-            else:
-                user = self.ctx.guild.get_member_named(search)
+    # async def userSearch(self, search):
+    #     try:
+    #         if search.isnumeric():
+    #             user = self.ctx.guild.get_member(int(search))
+    #         else:
+    #             user = self.ctx.guild.get_member_named(search)
             
-            if user == None:
-                return None
-            else: return user
+    #         if user == None:
+    #             return None
+    #         else: return user
         
-        except Exception as e:
-            raise
+    #     except Exception as e:
+    #         raise
 
     async def echo(self, args):
         try:
@@ -192,8 +192,8 @@ class Sudo:
                     `Wikipedia:` {'✅' if self.serverSettings[self.ctx.guild.id]['wikipedia'] == True else '❌'}
                     `     XKCD:` {'✅' if self.serverSettings[self.ctx.guild.id]['xkcd'] == True else '❌'}
                     `  Youtube:` {'✅' if self.serverSettings[self.ctx.guild.id]['youtube'] == True else '❌'}""")
-                embed.add_field(name="User Configuration", value=f"""
-                    `   Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}""")
+                # embed.add_field(name="User Configuration", value=f"""
+                #     `   Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}""")
 
                 embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
                 configMessage = await self.ctx.send(embed=embed)
@@ -324,8 +324,8 @@ class Sudo:
             await ErrorHandler(self.bot, self.ctx, e, 'config', args)
             return
         finally: 
-            with open('serverSettings.json', 'w') as data:
-                data.write(json.dumps(self.serverSettings, indent=4))
+            with open('serverSettings.yaml', 'w') as data:
+                yaml.dump(self.serverSettings, data, allow_unicode=True)
             return self.serverSettings
                               
     async def sudo(self, args):
@@ -379,8 +379,8 @@ class Sudo:
             args = args if len(args) > 0 else None
             await ErrorHandler(self.bot, self.ctx, e, 'sudo', args)
         finally: 
-            with open('serverSettings.json', 'w') as data:
-                data.write(json.dumps(self.serverSettings, indent=4))
+            with open('serverSettings.yaml', 'w') as data:
+                yaml.dump(serverSettings, data, allow_unicode=True)
             return self.serverSettings
 
 class Log():
