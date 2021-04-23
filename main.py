@@ -205,8 +205,9 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         help='Google search. If a keyword is detected in [query], a special function will activate',
         description=''.join(["translate: Uses Google Translate API to translate languages.",
             "Input automatically detects language unless specified with 'from [language]'", 
-            "Defaults to output English unless specified with 'to [language]'",
-            "Example Query: translate مرحبا from arabic to spanish"]))
+            "Defaults to output English OR user locale if set, unless explicitly specified with 'to [language]'",
+            "Example Query: translate مرحبا from arabic to spanish",
+            "\n\nimage: Searches only for image results."]))
     async def google(self, ctx, *args):
         global serverSettings
         UserCancel = Exception

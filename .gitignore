@@ -2,7 +2,7 @@
 .venv/
 .vscode/
 __pycache__/
-startserver
+startBot
 logs.csv
 .google-cookie
 serverSettings.yaml

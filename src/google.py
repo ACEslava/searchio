@@ -119,7 +119,7 @@ class GoogleSearch:
                   await message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
                   pass
 
-         if bool(re.search('image', searchQuery.lower())):
+         elif bool(re.search('image', searchQuery.lower())):
             foundImage = True
          else: foundImage = False        
          
