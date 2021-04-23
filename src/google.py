@@ -47,7 +47,6 @@ class GoogleSearch:
                print(" link: " + link)
             except:
                print("adding link failed")
-         resultEmbed.url = url
 
          # tries to add an image to the embed
          image = result.find("img")
@@ -71,7 +70,6 @@ class GoogleSearch:
          secret_list = list(string.ascii_uppercase) + \
             list(string.ascii_lowercase) + list(string.digits) + ["-", "_"]
          return secret_list[length % len(secret_list)]
-
 
       def uule(city: str) -> str:
          #Creates UULE code
@@ -120,15 +118,18 @@ class GoogleSearch:
                   await message.clear_reactions()
                   await message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
                   pass
-                 
+
+         if bool(re.search('image', searchQuery.lower())):
+            foundImage = True
+         else: foundImage = False        
+         
          uuleParse = uule(userSettings[ctx.author.id]['locale']) if userSettings[ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
          url = (''.join(["https://google.com/search?pws=0&q=", 
-            searchQuery.replace(" ", "+"), "+-stock+-pinterest",
+            searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if foundImage else ""}',
             f"&uule={uuleParse}&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True and ctx.channel.nsfw == False else ''}"]))
          response = http.request('GET', url)
          soup = BeautifulSoup(response.data, features="lxml")
          index = 3
-         foundImage = False
          google_snippet_result = soup.find("div", {"id": "main"})
    
          if google_snippet_result is not None:
@@ -145,23 +146,20 @@ class GoogleSearch:
             googleSnippetResults = [result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings=='']
          
             #checks if user searched specifically for images
-            if bool(re.search('image', searchQuery.lower())):
+            if foundImage:
                for results in googleSnippetResults:
                   if 'Images' in results.strings: 
                      images = results.findAll("img", recursive=True)
-                     foundImage = True
+                     embeds = list(map(imageEmbed, images))
+                     del embeds[-1]
                      break
+            else: embeds = list(map(textEmbed, googleSnippetResults))
                
             print(ctx.author.name + " searched for: "+searchQuery[:233])
-
-            #if the search term is images, all results will only be images
-            if foundImage: 
-               embeds = list(map(imageEmbed, images))
-               del embeds[-1]
-            else:
-               embeds = list(map(textEmbed, googleSnippetResults))
-                  
-            for index, item in enumerate(embeds): item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
+       
+            for index, item in enumerate(embeds): 
+               item.url = url
+               item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
             
             doExit, curPage = False, 0
             await message.add_reaction('🗑️')
