@@ -36,6 +36,7 @@ if not os.path.exists('logs.csv'):
 
 if not os.path.exists('serverSettings.yaml'):
     with open('serverSettings.yaml', 'w') as file:
+        serverSettings = {}
         for servers in bot.guilds:
             serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id)
         yaml.dump(serverSettings, file, allow_unicode=True)
