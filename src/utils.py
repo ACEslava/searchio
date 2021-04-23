@@ -301,7 +301,7 @@ class Sudo:
                 await self.ctx.send(f"'{response}' is now the guild prefix")
             elif args[0].lower() == 'locale':
                 msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
-                UserCancel = Exception
+                UserCancel = KeyboardInterrupt
                 uuleDB = open('./src/cache/googleUULE.csv', 'r', encoding='utf-8-sig').read().split('\n')
                 fieldnames = uuleDB.pop(0).split(',')
                 uuleDB = [dict(zip(fieldnames, [string.replace('"','') for string in lines.split('",')])) for lines in uuleDB] #parses get request into list of dicts
@@ -315,9 +315,8 @@ class Sudo:
                         localequery = localequery.content
                         await askUser.delete()
                         if localequery.lower() == 'cancel': 
-                            await self.ctx.send('Aborting')
-                            return self.serverSettings, self.userSettings
-                        
+                            raise UserCancel
+
                     except asyncio.TimeoutError:
                         await self.ctx.send(f'{self.ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
                 else:
@@ -402,6 +401,12 @@ class Sudo:
                             await self.ctx.send(f'Locale successfully set to `{result[cur_page-1][input]}`')
                             break
 
+        except UserCancel:
+            await self.ctx.send('Aborting')
+            if msg:
+                for message in msg: await message.delete()
+            
+            return self.serverSettings, self.userSettings
         except Exception as e:
             args = args if len(args) > 0 else None
             await ErrorHandler(self.bot, self.ctx, e, 'config', args)
