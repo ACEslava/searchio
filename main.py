@@ -1,4 +1,4 @@
-import discord, os, asyncio, json, textwrap, csv, datetime
+import discord, os, asyncio, json, yaml, textwrap, csv, datetime
 from src.wikipedia import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
@@ -16,13 +16,27 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
 #checks if serverSettings.json exists
-if not os.path.exists('serverSettings.json'):
-    with open('serverSettings.json', 'w') as file:
-        file.write('{}')
+if not os.path.exists('serverSettings.yaml'):
+    with open('serverSettings.yaml', 'w') as file:
+        file.write('---')
+
+if not os.path.exists('userSettings.yaml'):
+    with open('userSettings.yaml', 'w') as file:
+        file.write('---')
 
 #loads serverSettings
 with open('serverSettings.json', 'r') as data:
     serverSettings = json.load(data, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
+
+with open('serverSettings.yaml', 'w') as data:
+    yaml.dump(serverSettings, data, allow_unicode=True)
+
+#loads serverSettings
+with open('userSettings.json', 'r') as data:
+    userSettings = json.load(data, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
+
+with open('userSettings.yaml', 'w') as data:
+    yaml.dump(userSettings, data, allow_unicode=True)
 
 def prefix(bot, message):
     try:
@@ -104,7 +118,7 @@ async def on_connect():
     bot.owner_id = appInfo.owner.id
 
     for servers in bot.guilds:
-        serverSettings = Sudo.settingsCheck(serverSettings, servers.id)
+        serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id)
     
     with open('serverSettings.json', 'w') as data:
         data.write(json.dumps(serverSettings, indent=4))
@@ -505,7 +519,7 @@ class Administration(commands.Cog, name="Administration"):
     async def config(self, ctx, *args):
         args = list(args)
         global serverSettings
-        command = Sudo(bot, ctx, serverSettings)
+        command = Sudo(bot, ctx, serverSettings, userSettings)
         if Sudo.isSudoer(bot, ctx, serverSettings) == True:
             serverSettings = await command.config(args)
         else: serverSettings = await command.config([])

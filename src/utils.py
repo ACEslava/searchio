@@ -6,14 +6,16 @@ class Sudo:
         self,
         bot,
         ctx,
-        serverSettings):
+        serverSettings,
+        userSettings):
 
         self.bot = bot
         self.ctx = ctx
         self.serverSettings = serverSettings
+        self.userSettings = userSettings
 
     @staticmethod
-    def settingsCheck(serverSettings, serverID):
+    def serverSettingsCheck(serverSettings, serverID):
         if serverID not in serverSettings.keys():
             serverSettings[serverID] = {}
         if 'blacklist' not in serverSettings[serverID].keys():
@@ -31,6 +33,13 @@ class Sudo:
                 serverSettings[serverID][searchEngines] = True
         
         return serverSettings
+
+    @staticmethod
+    def userSettingsCheck(userSettings, userID):
+        if userID not in userSettings.keys():
+            userSettings[userID] = {}
+        if 'locale' not in userSettings[userID].keys():
+            userSettings[userID]['locale'] = None
         
     @staticmethod
     def isSudoer(bot, ctx, serverSettings=None):
@@ -171,18 +180,21 @@ class Sudo:
             if adminrole != None:
                 adminrole = self.ctx.guild.get_role(int(adminrole)) 
             if not args:
-                embed = discord.Embed(title="Guild Configuration")
-                embed.add_field(name="Administration", value=f"""
+                embed = discord.Embed(title="Configuration")
+                embed.add_field(name="Guild Administration", value=f"""
                     ` Adminrole:` {adminrole.name if adminrole != None else 'None set'}
                     `Safesearch:` {'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}
                     `    Prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}""")
-                embed.add_field(name="Search Engines", value=f"""
+                embed.add_field(name="Guild Search Engines", value=f"""
                     `   Google:` {'✅' if self.serverSettings[self.ctx.guild.id]['google'] == True else '❌'}
                     `      MAL:` {'✅' if self.serverSettings[self.ctx.guild.id]['mal'] == True else '❌'}
                     `  Scholar:` {'✅' if self.serverSettings[self.ctx.guild.id]['scholar'] == True else '❌'}
                     `Wikipedia:` {'✅' if self.serverSettings[self.ctx.guild.id]['wikipedia'] == True else '❌'}
                     `     XKCD:` {'✅' if self.serverSettings[self.ctx.guild.id]['xkcd'] == True else '❌'}
                     `  Youtube:` {'✅' if self.serverSettings[self.ctx.guild.id]['youtube'] == True else '❌'}""")
+                embed.add_field(name="User Configuration", value=f"""
+                    `   Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}""")
+
                 embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
                 configMessage = await self.ctx.send(embed=embed)
                 try:
@@ -285,6 +297,27 @@ class Sudo:
                 
                 self.serverSettings[self.ctx.guild.id]['commandprefix'] = response
                 await self.ctx.send(f"'{response}' is now the guild prefix")
+
+            # elif args[0].lower() == 'locale':
+            #     UserCancel = Exception
+            #     if not args[1]:
+            #         await self.ctx.send("Enter search query or cancel") #if empty, asks user for search query
+            #         try:
+            #             userquery = await self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout = 30) # 30 seconds to reply
+            #             userquery = userquery.content
+            #             if userquery.lower() == 'cancel': raise UserCancel
+                    
+            #         except asyncio.TimeoutError:
+            #             await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
+
+            #         except UserCancel:
+            #             await ctx.send('Aborting')
+            
+            else:
+                configMessage = await self.ctx.send('That is not a valid configuration')
+                await asyncio.sleep(60)
+                await configMessage.delete()
+                return self.serverSettings
 
         except Exception as e:
             args = args if len(args) > 0 else None
