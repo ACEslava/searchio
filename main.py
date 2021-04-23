@@ -12,30 +12,6 @@ from dotenv import load_dotenv
 from discord.ext import commands
 from urllib3 import PoolManager
 
-load_dotenv()
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-
-#checks if serverSettings.json exists
-if not os.path.exists('logs.csv'):
-    with open('logs.csv', 'w') as file:
-        file.write('')
-
-if not os.path.exists('serverSettings.yaml'):
-    with open('serverSettings.yaml', 'w') as file:
-        file.write('---')
-
-if not os.path.exists('userSettings.yaml'):
-    with open('userSettings.yaml', 'w') as file:
-        file.write('---')
-
-#loads serverSettings
-with open('serverSettings.yaml', 'r') as data:
-    serverSettings = yaml.load(data)
-
-#loads userSettings
-with open('userSettings.yaml', 'r') as data:
-    userSettings = yaml.load(data)
-
 def prefix(bot, message):
     try:
         commandprefix = serverSettings[message.guild.id]['commandprefix']
@@ -47,8 +23,35 @@ intents = discord.Intents.default()
 intents.members = True
 intents.presences = True
 
+load_dotenv()
+DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+
 bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
 http = PoolManager()
+
+#checks if serverSettings.json exists
+if not os.path.exists('logs.csv'):
+    with open('logs.csv', 'w') as file:
+        file.write('')
+
+if not os.path.exists('serverSettings.yaml'):
+    with open('serverSettings.yaml', 'w') as file:
+        for servers in bot.guilds:
+            serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id)
+        yaml.dump(serverSettings, file, allow_unicode=True)
+
+if not os.path.exists('userSettings.yaml'):
+    with open('userSettings.yaml', 'w') as file:
+        file.write('')
+
+#loads serverSettings
+with open('serverSettings.yaml', 'r') as data:
+    serverSettings = yaml.load(data)
+
+#loads userSettings
+with open('userSettings.yaml', 'r') as data:
+    userSettings = yaml.load(data)
+
 async def searchQueryParse(ctx, args):
     UserCancel = Exception
     global userSettings
