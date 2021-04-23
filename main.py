@@ -132,136 +132,17 @@ async def on_command_error(ctx, error):
     if isinstance(error, discord.ext.commands.errors.CommandNotFound):
         await ctx.send(f"Command not found. Do {Sudo.printPrefix(serverSettings, ctx)}help for available commands")
 
-@bot.command()
-async def help(ctx, *args):
-    try:
-        def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in ["🗑️"]
-        commandPrefix = Sudo.printPrefix(ctx)
-        args = list(args)
-        
-        embed = discord.Embed(title="SearchIO", 
-            description="Search.io is a bot that searches through multiple search engines/APIs.\nIt is developed by ACEslava#9735, K1NG#6219, and Nanu#3294")
-        
-        embed.add_field(name="Administration", inline=False, value=textwrap.dedent(f"""\
-            `  sudo:` Various admin commands. Usage: {commandPrefix}sudo [command] [args].
-            `  logs:` DMs a .csv of personal logs or guild logs if user is a sudoer. Usage: {commandPrefix}log
-            `config:` Views the guild settings. Requires sudo privileges to edit settings
-            `invite:` DMs an invite link of the bot to add to other servers.text=
-            `  ping:` Tests if bot is alive
-        """))
-        
-        embed.add_field(name="Search Engines", inline=False, value=textwrap.dedent(f"""\
-            {"`wikipedia:` Search through Wikipedia." if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
-            {"` wikilang:` Lists supported languages for Wikipedia's --lang flag" if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
-            {"`   google:` Search through Google" if serverSettings[ctx.guild.id]['google'] == True else ''}
-            {"`    image:` Google's Reverse Image Search with an image URL or image reply" if serverSettings[ctx.guild.id]['google'] == True else ''}
-            {"`  scholar:` Search through Google Scholar" if serverSettings[ctx.guild.id]['scholar'] == True else ''}
-            {"`  youtube:` Search through Youtube" if serverSettings[ctx.guild.id]['youtube'] == True else ''}
-            {"`    anime:` Search through MyAnimeList" if serverSettings[ctx.guild.id]['mal'] == True else ''}
-            {"`     xkcd:` Search for XKCD comics" if serverSettings[ctx.guild.id]['xkcd'] == True else ''}
-        """))
-        embed.set_footer(text=f"Do {commandPrefix}help [command] for more information")
-
-        if args:
-            if args[0] == 'sudo':
-                embed = discord.Embed(title="Sudo", description=f"Admin commands. Server owner has sudo privilege by default.\nUsage: {commandPrefix}sudo [command] [args]")
-                embed.add_field(name="Commands", inline=False, value=
-                    f"""`     echo:` Have the bot say something. 
-                        Args: message 
-                        Optional flag: --channel [channelID]
-
-                        `blacklist:` Block a user/role from using the bot. 
-                        Args: userName OR userID OR roleID
-
-                        `whitelist:` Unblock a user/role from using the bot. 
-                        Args: userName OR userID OR roleID
-
-                        `   sudoer:` Add a user to the sudo list. Only guild owners can do this. 
-                        Args: userName OR userID  
-
-                        ` unsudoer:` Remove a user from the sudo list. Only guild owners can do this. 
-                        Args: userName OR userID""")
-            elif args[0] == 'log':
-                embed = discord.Embed(title="Log", description=
-                    f"DMs a .csv file of all the logs that the bot has for your username or guild if a sudoer.\nUsage: {commandPrefix}log")  
-            elif args[0] == 'config':
-                embed = discord.Embed(title="Guild Configuration", 
-                    description="Views the guild configuration. Only sudoers can edit settings."+
-                        "\nPrefix: Command prefix that SearchIO uses"+
-                        "\nAdminrole: The role that is automatically given sudo permissions"+
-                        "\nSafesearch: Activates Google's safesearch. NSFW channels override this setting"+
-                        f"\nUsage: {commandPrefix}config [setting]")
-            elif args[0] == 'wiki':
-                embed = discord.Embed(title="Wikipedia", description=f"Wikipedia search. \nUsage: {commandPrefix}wiki [query] [flags]")
-                embed.add_field(name="Optional Flags", inline=False, value=
-                    f"""`--lang [ISO Language Code]:` Specifies a country code to search through Wikipedia. Use {commandPrefix}wikilang to see available codes""")
-            elif args[0] == 'wikilang':
-                embed = discord.Embed(title="WikiLang", description=
-                """Lists Wikipedia's supported wikis in ISO codes. Common language codes are:
-                    zh: 中文
-                    es: Español
-                    en: English
-                    pt: Português
-                    hi: हिन्दी
-                    bn: বাংলা
-                    ru: русский""")
-            elif args[0] == 'google':
-                embed = discord.Embed(title="Google", description=
-                    f"Google search.\nUsage: {commandPrefix}google [query].\nIf a keyword is detected in [query], a special function will activate")
-                embed.add_field(name="Keywords", inline=False, value=
-                """`translate:` Uses Google Translate API to translate languages. 
-                Input automatically detects language unless specified with 'from [language]' 
-                Defaults to output English unless specified with 'to [language]'
-                Example Query: translate مرحبا from arabic to spanish""")
-            elif args[0] == 'image':
-                embed = discord.Embed(title="Google Image", description=
-                    f"Uses Google's Reverse Image search to output URLs that contain the image.\nUsage: {commandPrefix}image [imageURL] OR reply to an image in the chat")
-            elif args[0] == 'scholar':
-                embed = discord.Embed(title="GoogleScholar", description=
-                    f"Google Scholar search. \nUsage: {commandPrefix}scholar [query] [flags].")
-                embed.add_field(name="Flags", inline=False, value="""
-                    `--author:` Use [query] to search for a specific author. Cannot be used with --cite
-                    `  --cite:` Outputs a citation for [query] in BibTex. Cannot be used with --author""")        
-            elif args[0] == 'youtube':
-                embed = discord.Embed(title="Youtube", description=
-                f"Searches through Youtube videos.\nUsage: {commandPrefix}youtube [query].")
-            elif args[0] == 'anime':
-                embed = discord.Embed(title="MyAnimeList", description=
-                f"Searches through MyAnimeList\nUsage:{commandPrefix}anime [query]")
-            elif args[0] == 'xkcd':
-                embed = discord.Embed(title="XKCD", description=
-                f"Searches for an XKCD comic. Search query can be an XKCD comic number, random, or latest. \nUsage:{commandPrefix}xkcd [query]")
-            else: pass
-        else: pass
-        dm = await ctx.author.create_dm()
-        await dm.send(embed=embed)
-        await dm.send('If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ \nWant to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot')
-        # try:
-        #     await helpMessage.add_reaction('🗑️')
-        #     reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
-        #     if str(reaction.emoji) == '🗑️':
-        #         await helpMessage.delete()
-        #         return
-        
-        # except asyncio.TimeoutError as e: 
-        #     await helpMessage.clear_reactions()
-        
-        # finally: 
-        #     return
-    
-    except discord.errors.Forbidden:
-        await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
-    except Exception as e:
-        await ErrorHandler(bot, ctx, e, 'help')
-    finally: return
-
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name = 'wiki')
-    async def wikisearch(self, ctx, *args):
+    @commands.command(
+        name = 'wiki',
+        brief='Search through Wikipedia.',
+        usage='wiki [query] [optional flags]',
+        help='Wikipedia search.',
+        description='--lang [ISO Language Code]: Specifies a country code to search through Wikipedia. Use wikilang to see available codes.')
+    async def wikipedia(self, ctx, *args):
         global serverSettings
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['wikipedia'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
@@ -290,7 +171,18 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             await search.search()
             return
     
-    @commands.command(name = 'wikilang')
+    @commands.command(
+        name= 'wikilang',
+        brief="Lists supported languages for Wikipedia's --lang flag",
+        usage='wikilang',
+        help="""Lists Wikipedia's supported wikis in ISO codes. Common language codes are:
+                    zh: 中文
+                    es: Español
+                    en: English
+                    pt: Português
+                    hi: हिन्दी
+                    bn: বাংলা
+                    ru: русский""")
     async def wikilang(self, ctx):
         global serverSettings
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
@@ -300,8 +192,16 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             await WikipediaSearch(bot, ctx, "en").lang()
             return
 
-    @commands.command(name = 'google')
-    async def gsearch(self, ctx, *args):
+    @commands.command(
+        name= 'google',
+        brief='Search through Google',
+        usage='google [query]',
+        help='Google search. If a keyword is detected in [query], a special function will activate',
+        description=''.join(["translate: Uses Google Translate API to translate languages.",
+            "Input automatically detects language unless specified with 'from [language]'", 
+            "Defaults to output English unless specified with 'to [language]'",
+            "Example Query: translate مرحبا from arabic to spanish"]))
+    async def google(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
@@ -346,7 +246,11 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     await ErrorHandler(bot, ctx, e, 'google', userquery)
                     return
 
-    @commands.command(name='image')
+    @commands.command(
+        name='image',
+        brief="Google's Reverse Image Search with an image URL or image reply",
+        usage='image [imageURL] OR reply to an image in the chat',
+        help="Uses Google's Reverse Image search to output URLs that contain the image")
     async def image(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
@@ -359,8 +263,14 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             await search.search()
             return
 
-    @commands.command(name = 'scholar')   
-    async def scholarsearch(self, ctx, *args):
+    @commands.command(
+        name= 'scholar',
+        brief='Search through Google Scholar',
+        usage='scholar [query] [flags]',
+        help='Google Scholar search',
+        description="""--author: Use [query] to search for a specific author. Cannot be used with --cite
+                         --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
+    async def scholar(self, ctx, *args):
         global serverSettings
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['scholar'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
@@ -420,8 +330,12 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     await ErrorHandler(bot, ctx, e, 'scholar', userquery)
                     return
 
-    @commands.command(name = 'youtube')
-    async def ytsearch(self, ctx, *args):
+    @commands.command(
+        name= 'youtube',
+        brief='Search through Youtube',
+        usage='youtube [query]',
+        help='Searches through Youtube videos')
+    async def youtube(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
@@ -465,8 +379,12 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     await ErrorHandler(bot, ctx, e, 'youtube', userquery)
                     return
 
-    @commands.command(name = 'anime')
-    async def animesearch(self, ctx, *args):
+    @commands.command(
+        name= 'anime',
+        brief='Search through MyAnimeList',
+        usage='anime [query]',
+        help='Searches through MyAnimeList')
+    async def anime(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
@@ -477,8 +395,12 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             await search.search()
             return
 
-    @commands.command(name = 'xkcd')
-    async def xkcdsearch(self, ctx, *args):
+    @commands.command(
+        name= 'xkcd',
+        brief='Search for XKCD comics',
+        usage='xkcd [comic# OR random OR latest]',
+        help='Searches for an XKCD comic. Search query can be an XKCD comic number, random, or latest.')
+    async def xkcd(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
@@ -491,13 +413,36 @@ class Administration(commands.Cog, name="Administration"):
     def __init__(self, bot):
         self.bot = bot
     
-    @commands.command(name='log')
+    @commands.command(
+        name='log',
+        brief='DMs a .csv file of all the logs that the bot has for your username or guild if a sudoer.',
+        usage='log')
     async def logging(self, ctx): 
         Log.appendToLog(ctx, 'log')
         await Log.logRequest(bot, ctx, serverSettings)
         return
 
-    @commands.command(name='sudo')
+    @commands.command(
+        name='sudo',
+        brief='Various admin commands.',
+        usage=f'sudo [command] [args]',
+        help='Admin commands. Server owner has sudo privilege by default.',
+        description=f"""
+                echo: Have the bot say something. 
+                Args: message 
+                Optional flag: --channel [channelID]
+
+                blacklist: Block a user/role from using the bot. 
+                Args: userName OR userID OR roleID
+ 
+                whitelist: Unblock a user/role from using the bot. 
+                Args: userName OR userID OR roleID
+ 
+                sudoer: Add a user to the sudo list. Only guild owners can do this. 
+                Args: userName OR userID  
+ 
+                unsudoer: Remove a user from the sudo list. Only guild owners can do this. 
+                Args: userName OR userID""")
     async def sudo(self, ctx, *args):
         global serverSettings
         args = list(args)
@@ -509,7 +454,14 @@ class Administration(commands.Cog, name="Administration"):
             command = Sudo(bot, ctx, serverSettings)
             serverSettings = await command.sudo(args)
 
-    @commands.command(name='config')
+    @commands.command(
+        name='config',
+        brief='Views the guild configuration. Only sudoers can edit settings.',
+        usage='config [setting] [args]',
+        help="""Views the guild configuration. Requires sudo privileges to edit settings,
+                Prefix: Command prefix that SearchIO uses
+                Adminrole: The role that is automatically given sudo permissions
+                Safesearch: Activates Google's safesearch. NSFW channels override this setting""")
     async def config(self, ctx, *args):
         args = list(args)
         global serverSettings
@@ -520,7 +472,11 @@ class Administration(commands.Cog, name="Administration"):
         
         Log.appendToLog(ctx, 'config', args if len(args) > 0 else None)
 
-    @commands.command(name='invite')
+    @commands.command(
+        name='invite',
+        brief="DMs SearchIO's invite link to the user",
+        usage='invite',
+        help="DMs SearchIO's invite link to the user")
     async def invite(self, ctx):
         try:
             dm = await ctx.author.create_dm()
@@ -531,13 +487,84 @@ class Administration(commands.Cog, name="Administration"):
             await ErrorHandler(bot, ctx, e, 'help')
         finally: return
 
-    @commands.command(name='ping')
+    @commands.command(
+        name='ping',
+        brief="Sends SearchIO's DiscordAPI connection latency",
+        usage='ping',
+        help="Sends SearchIO's DiscordAPI connection latency")
     async def ping(self, ctx):
         try:
             await ctx.send(f'Response in {round(bot.latency, 3)}ms')
         except Exception as e:
             await ErrorHandler(bot, ctx, e, 'ping')
         finally: return
+
+@bot.command()
+async def help(ctx, *args):
+    try:
+        def check(reaction, user):
+            return user == ctx.author and str(reaction.emoji) in ["🗑️"]
+        commandPrefix = Sudo.printPrefix(ctx)
+        searchEngineCog = dict(bot.cogs)['Search Engines']
+        adminCog = dict(bot.cogs)['Administration']
+
+        maxAdminCommandStrLength = len(max([command.name for command in adminCog.get_commands()], key=len))
+        args = list(args)
+        
+        embed = discord.Embed(title="SearchIO", 
+            description="Search.io is a bot that searches through multiple search engines/APIs.\nIt is developed by ACEslava#9735, K1NG#6219, and Nanu#3294")
+        
+        embed.add_field(name="Administration", inline=False, value="\n".join([f'`{command.name:>{maxAdminCommandStrLength}}:` {command.brief}' for command in adminCog.get_commands()]))
+        
+        embed.add_field(name="Search Engines", inline=False, value=textwrap.dedent(f"""\
+            {f"`wikipedia:` {searchEngineCog.wikipedia.brief}" if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
+            {f"` wikilang:` {searchEngineCog.wikilang.brief}" if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
+            {f"`   google:` {searchEngineCog.google.brief}" if serverSettings[ctx.guild.id]['google'] == True else ''}
+            {f"`    image:` {searchEngineCog.image.brief}" if serverSettings[ctx.guild.id]['google'] == True else ''}
+            {f"`  scholar:` {searchEngineCog.scholar.brief}" if serverSettings[ctx.guild.id]['scholar'] == True else ''}
+            {f"`  youtube:` {searchEngineCog.youtube.brief}" if serverSettings[ctx.guild.id]['youtube'] == True else ''}
+            {f"`    anime:` {searchEngineCog.anime.brief}" if serverSettings[ctx.guild.id]['mal'] == True else ''}
+            {f"`     xkcd:` {searchEngineCog.xkcd.brief}" if serverSettings[ctx.guild.id]['xkcd'] == True else ''}
+        """))
+        embed.set_footer(text=f"Do {commandPrefix}help [command] for more information")
+
+        if args:
+            try:
+                command = getattr(searchEngineCog, args[0].lower())
+            except AttributeError:
+                try: command = getattr(adminCog, args[0].lower())
+                except AttributeError: command = None
+            
+            if command is not None:
+                embed = discord.Embed(title=command.name, 
+                    description=f"""
+                    {command.help}
+                    Usage:
+                    ```{command.usage}```
+                    {'Optionals:```'+command.description+'```' if command.description != '' else ''}""")
+                embed.set_footer(text=f"Requested by {ctx.author}")
+                helpMessage = await ctx.send(embed=embed)
+                try:
+                    await helpMessage.add_reaction('🗑️')
+                    reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
+                    if str(reaction.emoji) == '🗑️':
+                        await helpMessage.delete()
+                        return
+                
+                except asyncio.TimeoutError as e: 
+                    await helpMessage.clear_reactions()
+            else: pass
+        else:
+            dm = await ctx.author.create_dm()
+            await dm.send(embed=embed)
+            await dm.send('\n'.join(['If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ',
+            'Want to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot']))
+    
+    except discord.errors.Forbidden:
+        await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
+    except Exception as e:
+        await ErrorHandler(bot, ctx, e, 'help')
+    finally: return
 
 bot.add_cog(SearchEngines(bot))
 bot.add_cog(Administration(bot))
