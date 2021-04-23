@@ -1,4 +1,4 @@
-import discord, os, asyncio, json, yaml, textwrap, csv, datetime
+import discord, os, asyncio, json, yaml, textwrap, csv, datetime, requests
 from src.wikipedia import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
@@ -47,6 +47,9 @@ bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
 http = PoolManager()
 async def searchQueryParse(ctx, args):
     UserCancel = Exception
+    global userSettings
+    userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+
     if not args: #checks if search is empty
         await ctx.send("Enter search query or cancel") #if empty, asks user for search query
         try:
@@ -124,7 +127,10 @@ async def on_connect():
         logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
         writer = csv.DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
         writer.writeheader()
-        writer.writerows(lines)           
+        writer.writerows(lines)
+
+    with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
+        file.write(requests.get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)           
     return
 
 @bot.event
@@ -214,7 +220,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                     messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = asyncio.create_task(GoogleSearch.search(http, bot, ctx, serverSettings, message, userquery))
+                    search = asyncio.create_task(GoogleSearch.search(http, bot, ctx, serverSettings, userSettings, message, userquery))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
@@ -445,6 +451,8 @@ class Administration(commands.Cog, name="Administration"):
                 Args: userName OR userID""")
     async def sudo(self, ctx, *args):
         global serverSettings
+        global userSettings
+
         args = list(args)
         if Sudo.isSudoer(bot, ctx, serverSettings) == False:
             await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
@@ -465,10 +473,17 @@ class Administration(commands.Cog, name="Administration"):
     async def config(self, ctx, *args):
         args = list(args)
         global serverSettings
+        global userSettings
+
         command = Sudo(bot, ctx, serverSettings, userSettings)
-        if Sudo.isSudoer(bot, ctx, serverSettings) == True:
-            serverSettings = await command.config(args)
-        else: serverSettings = await command.config([])
+        if len(args) > 0:
+            localSetting = args[0] in ['locale']
+        else: localSetting = False
+        
+        if Sudo.isSudoer(bot, ctx, serverSettings) == True or localSetting:
+            serverSettings, userSettings = await command.config(args)
+        
+        else: serverSettings, userSettings = await command.config([])
         
         Log.appendToLog(ctx, 'config', args if len(args) > 0 else None)
 

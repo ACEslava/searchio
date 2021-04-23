@@ -4,11 +4,11 @@ from bs4 import BeautifulSoup
 from google_trans_new import google_translator
 from iso639 import languages as Languages
 from discord import Embed
-import asyncio, re, wikipedia
+import asyncio, re, wikipedia, string, base64
 
 class GoogleSearch:
    @staticmethod
-   async def search(http, bot, ctx, serverSettings, message, searchQuery=None):
+   async def search(http, bot, ctx, serverSettings, userSettings, message, searchQuery=None):
       def imageEmbed(image):
          try:
             resultEmbed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}')
@@ -66,6 +66,19 @@ class GoogleSearch:
       def linkUnicodeParse(link: str):
          return re.sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
       
+      def uule_secret(length: int) -> str:
+         #Creates UULE secret
+         secret_list = list(string.ascii_uppercase) + \
+            list(string.ascii_lowercase) + list(string.digits) + ["-", "_"]
+         return secret_list[length % len(secret_list)]
+
+
+      def uule(city: str) -> str:
+         #Creates UULE code
+         secret = uule_secret(len(city))
+         hashed = base64.standard_b64encode(city.encode()).decode().strip("=")
+         return f"w+CAIQICI{secret}{hashed}"
+      
       try:
          Log.appendToLog(ctx, "googlesearch", searchQuery)
 
@@ -108,9 +121,10 @@ class GoogleSearch:
                   await message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
                   pass
                  
+         uuleParse = uule(userSettings[ctx.author.id]['locale']) if userSettings[ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
          url = (''.join(["https://google.com/search?pws=0&q=", 
-            searchQuery.replace(" ", "+"), "+-stock+-pinterest&uule=w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz",
-            f"&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True and ctx.channel.nsfw == False else ''}"]))
+            searchQuery.replace(" ", "+"), "+-stock+-pinterest",
+            f"&uule={uuleParse}&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True and ctx.channel.nsfw == False else ''}"]))
          response = http.request('GET', url)
          soup = BeautifulSoup(response.data, features="lxml")
          index = 3

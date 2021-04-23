@@ -1,5 +1,6 @@
 from datetime import datetime
-import discord, asyncio, yaml, textwrap, difflib, csv, os, random, traceback, re
+from src.loadingmessage import LoadingMessage
+import discord, asyncio, yaml, textwrap, difflib, csv, os, random, traceback, re, requests
 
 class Sudo:
     def __init__(
@@ -40,6 +41,7 @@ class Sudo:
             userSettings[userID] = {}
         if 'locale' not in userSettings[userID].keys():
             userSettings[userID]['locale'] = None
+        return userSettings
         
     @staticmethod
     def isSudoer(bot, ctx, serverSettings=None):
@@ -68,19 +70,19 @@ class Sudo:
             return '&'
         else: return serverSettings[ctx.guild.id]['commandprefix']
 
-    # async def userSearch(self, search):
-    #     try:
-    #         if search.isnumeric():
-    #             user = self.ctx.guild.get_member(int(search))
-    #         else:
-    #             user = self.ctx.guild.get_member_named(search)
+    async def userSearch(self, search):
+        try:
+            if search.isnumeric():
+                user = self.ctx.guild.get_member(int(search))
+            else:
+                user = self.ctx.guild.get_member_named(search)
             
-    #         if user == None:
-    #             return None
-    #         else: return user
+            if user == None:
+                return None
+            else: return user
         
-    #     except Exception as e:
-    #         raise
+        except Exception as e:
+            raise
 
     async def echo(self, args):
         try:
@@ -176,6 +178,8 @@ class Sudo:
                 return user == self.ctx.author and str(reaction.emoji) in ['✅', '❌']
         
         try:
+            self.userSettings = self.userSettingsCheck(self.userSettings, self.ctx.author.id)
+            
             adminrole = self.serverSettings[self.ctx.guild.id]['adminrole']
             if adminrole != None:
                 adminrole = self.ctx.guild.get_role(int(adminrole)) 
@@ -192,8 +196,8 @@ class Sudo:
                     `Wikipedia:` {'✅' if self.serverSettings[self.ctx.guild.id]['wikipedia'] == True else '❌'}
                     `     XKCD:` {'✅' if self.serverSettings[self.ctx.guild.id]['xkcd'] == True else '❌'}
                     `  Youtube:` {'✅' if self.serverSettings[self.ctx.guild.id]['youtube'] == True else '❌'}""")
-                # embed.add_field(name="User Configuration", value=f"""
-                #     `   Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}""")
+                embed.add_field(name="User Configuration", value=f"""
+                    `   Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}""")
 
                 embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
                 configMessage = await self.ctx.send(embed=embed)
@@ -205,7 +209,6 @@ class Sudo:
         
                 except asyncio.TimeoutError as e: 
                     await configMessage.clear_reactions()
-
             elif args[0].lower() in ['wikipedia', 'scholar', 'google', 'myanimelist', 'youtube', 'safesearch', 'xkcd']:
                 if bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
                     self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
@@ -230,7 +233,6 @@ class Sudo:
                         await message.clear_reactions()
                 
                 await self.ctx.send(f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else 'disabled'}")
-
             elif args[0].lower() == 'adminrole':
                 if not args[1]:
                     embed = discord.Embed(title='Adminrole', description=f"{await self.ctx.guild.get_role(int(adminrole)) if adminrole != None else 'None set'}")
@@ -297,36 +299,122 @@ class Sudo:
                 
                 self.serverSettings[self.ctx.guild.id]['commandprefix'] = response
                 await self.ctx.send(f"'{response}' is now the guild prefix")
+            elif args[0].lower() == 'locale':
+                msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
+                UserCancel = Exception
+                uuleDB = open('./src/cache/googleUULE.csv', 'r', encoding='utf-8-sig').read().split('\n')
+                fieldnames = uuleDB.pop(0).split(',')
+                uuleDB = [dict(zip(fieldnames, [string.replace('"','') for string in lines.split('",')])) for lines in uuleDB] #parses get request into list of dicts
+                uuleDB = [placeDict for placeDict in uuleDB if all(['Name' in placeDict.keys(), 'Canonical Name' in placeDict.keys()])]
 
-            # elif args[0].lower() == 'locale':
-            #     UserCancel = Exception
-            #     if not args[1]:
-            #         await self.ctx.send("Enter search query or cancel") #if empty, asks user for search query
-            #         try:
-            #             userquery = await self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout = 30) # 30 seconds to reply
-            #             userquery = userquery.content
-            #             if userquery.lower() == 'cancel': raise UserCancel
+                if len(args) == 1:
+                    askUser = await self.ctx.send("Enter location or cancel to abort") #if empty, asks user for search query
+                    try:
+                        localequery = await self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout = 30) # 30 seconds to reply
+                        await localequery.delete()
+                        localequery = localequery.content
+                        await askUser.delete()
+                        if localequery.lower() == 'cancel': 
+                            await self.ctx.send('Aborting')
+                            return self.serverSettings, self.userSettings
+                        
+                    except asyncio.TimeoutError:
+                        await self.ctx.send(f'{self.ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
+                else:
+                    localequery = ' '.join(args[1:]).strip()
+                
+                userPlaces = [canonName for canonName in uuleDB if localequery.lower() in canonName['Name'].lower() and canonName['Status'] == 'Active'] #searches uuleDB for locale query
+                result = [canonName['Canonical Name'] for canonName in userPlaces]
+                
+                if len(result) == 0:
+                    embed=discord.Embed(description=f"No results found for '{localequery}'")
+                    await msg[0].edit(content=None, embed=embed)
+
+                elif len(result) == 1:
+                    self.userSettings[self.ctx.author.id]['locale'] = result[0]
+                    await msg[0].edit(content=f'Locale successfully set to `{result[0]}`')
+                elif len(result) > 1:
+                    result = [result[x:x+10] for x in range(0, len(result), 10)]
+                    pages = len(result)
+                    cur_page = 1
+
+                    if len(result) > 1:
+                        embed=discord.Embed(title=f"Locales matching '{localequery.capitalize()}'\n Page {cur_page}/{pages}:", description=
+                        ''.join([f'[{index}]: {value}\n' for index, value in enumerate(result[cur_page-1])]))
+                        embed.set_footer(text=f"Requested by {self.ctx.author}")
+                        await msg[0].edit(content=None, embed=embed)
+                        await msg[-1].add_reaction('◀️')
+                        await msg[-1].add_reaction('▶️')
                     
-            #         except asyncio.TimeoutError:
-            #             await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
+                    else:
+                        embed=discord.Embed(title=f"Locales matching '{localequery.capitalize()}':", description=
+                            ''.join([f'[{index}]: {value}\n' for index, value in enumerate(result[0])]))
+                        embed.set_footer(text=f"Requested by {self.ctx.author}")
+                        await msg[0].edit(content=None, embed=embed)
+                    msg.append(await self.ctx.send("Please choose option or cancel"))
 
-            #         except UserCancel:
-            #             await ctx.send('Aborting')
-            
-            else:
-                configMessage = await self.ctx.send('That is not a valid configuration')
-                await asyncio.sleep(60)
-                await configMessage.delete()
-                return self.serverSettings
+                    while 1:
+                        emojitask = asyncio.create_task(self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == msg[0]]), timeout=30))
+                        responsetask = asyncio.create_task(self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout=30))
+                        waiting = [emojitask,responsetask]
+                        done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
+                        
+                        if emojitask in done: # if reaction input, change page
+                            reaction, user = emojitask.result()
+                            if str(reaction.emoji) == "▶️" and cur_page != pages:
+                                cur_page += 1
+                                embed=discord.Embed(title=f"Locales matching '{localequery.capitalize()}'\nPage {cur_page}/{pages}:", description=
+                                    ''.join([f'[{index}]: {value}\n' for index, value in enumerate(result[cur_page-1])]))
+                                embed.set_footer(text=f"Requested by {self.ctx.author}")
+                                await msg[-2].edit(embed=embed)
+                                await msg[-2].remove_reaction(reaction, user)
+                            
+                            elif str(reaction.emoji) == "◀️" and cur_page > 1:
+                                cur_page -= 1
+                                embed=discord.Embed(title=f"Locales matching '{localequery.capitalize()}'\n Page {cur_page}/{pages}:", description=
+                                    ''.join([f'[{index}]: {value}\n' for index, value in enumerate(result[cur_page-1])]))
+                                embed.set_footer(text=f"Requested by {self.ctx.author}")
+                                await msg[-2].edit(embed=embed)
+                                await msg[-2].remove_reaction(reaction, user)
+                            
+                            else:
+                                await msg[-2].remove_reaction(reaction, user)
+                                # removes reactions if the user tries to go forward on the last page or
+                                # backwards on the first page
+                        
+                        elif responsetask in done:
+                            emojitask.cancel()
+                            input = responsetask.result() 
+                            await input.delete()
+                            if input.content == 'cancel':
+                                raise UserCancel
+                            elif input.content not in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
+                                continue
+                            input = int(input.content)
+                            
+                            try:
+                                for message in msg:
+                                    await message.delete()
+                            except:
+                                pass
+
+                            self.userSettings[self.ctx.author.id]['locale'] = result[cur_page-1][input]
+                            await self.ctx.send(f'Locale successfully set to `{result[cur_page-1][input]}`')
+                            break
 
         except Exception as e:
             args = args if len(args) > 0 else None
             await ErrorHandler(self.bot, self.ctx, e, 'config', args)
-            return
-        finally: 
-            with open('serverSettings.yaml', 'w') as data:
-                yaml.dump(self.serverSettings, data, allow_unicode=True)
-            return self.serverSettings
+            return self.serverSettings, self.userSettings
+        finally:
+            if args: 
+                with open('serverSettings.yaml', 'w') as data:
+                    yaml.dump(self.serverSettings, data, allow_unicode=True)
+
+                with open('userSettings.yaml', 'w') as data:
+                    yaml.dump(self.userSettings, data, allow_unicode=True)
+                Log.appendToLog(self.ctx, "config", args)
+            return self.serverSettings, self.userSettings
                               
     async def sudo(self, args):
         try:
@@ -342,8 +430,6 @@ class Sudo:
                     await self.sudoer(args)
                 elif command == 'unsudoer':
                     await self.unsudoer(args)
-                elif command == 'config':
-                    await self.config(args)
                 else:
                     await self.ctx.send(f"'{command}' is not a valid command.")
             else:
@@ -379,9 +465,13 @@ class Sudo:
             args = args if len(args) > 0 else None
             await ErrorHandler(self.bot, self.ctx, e, 'sudo', args)
         finally: 
-            with open('serverSettings.yaml', 'w') as data:
-                yaml.dump(serverSettings, data, allow_unicode=True)
-            return self.serverSettings
+            if command in ['blacklist', 'whitelist', 'sudoer', 'unsudoer']:
+                with open('serverSettings.yaml', 'w') as data:
+                    yaml.dump(self.serverSettings, data, allow_unicode=True)
+
+                with open('userSettings.yaml', 'w') as data:
+                    yaml.dump(self.userSettings, data, allow_unicode=True)
+            return self.serverSettings, self.userSettings
 
 class Log():
     @staticmethod
