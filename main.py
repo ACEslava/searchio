@@ -36,10 +36,7 @@ if not os.path.exists('logs.csv'):
 
 if not os.path.exists('serverSettings.yaml'):
     with open('serverSettings.yaml', 'w') as file:
-        serverSettings = {}
-        for servers in bot.guilds:
-            serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id)
-        yaml.dump(serverSettings, file, allow_unicode=True)
+        file.write('')
 
 if not os.path.exists('userSettings.yaml'):
     with open('userSettings.yaml', 'w') as file:
@@ -48,10 +45,12 @@ if not os.path.exists('userSettings.yaml'):
 #loads serverSettings
 with open('serverSettings.yaml', 'r') as data:
     serverSettings = yaml.load(data)
+    if serverSettings is None: serverSettings = {}
 
 #loads userSettings
 with open('userSettings.yaml', 'r') as data:
     userSettings = yaml.load(data)
+    if userSettings is None: userSettings = {}
 
 async def searchQueryParse(ctx, args):
     UserCancel = Exception
@@ -218,7 +217,14 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             "\n\nimage: Searches only for image results."]))
     async def google(self, ctx, *args):
         global serverSettings
-        UserCancel = Exception
+        global userSettings
+
+        userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+
+        with open('userSettings.yaml', 'w') as data:
+            yaml.dump(userSettings, data, allow_unicode=True)
+
+        UserCancel = KeyboardInterrupt
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
