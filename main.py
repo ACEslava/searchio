@@ -1,4 +1,5 @@
 import discord, os, asyncio, json, yaml, textwrap, csv, datetime, requests
+from discord.ext.commands.core import before_invoke
 from src.wikipedia import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
@@ -137,7 +138,7 @@ async def on_connect():
         writer.writerows(lines)
 
     with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
-        file.write(requests.get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)           
+        file.write(requests.get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)         
     return
 
 @bot.event
@@ -148,6 +149,12 @@ async def on_command_error(ctx, error):
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
         self.bot = bot
+    
+    async def cog_before_invoke(self, ctx):
+        global userSettings
+        userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+        Log.appendToLog(ctx)
+        return
 
     @commands.command(
         name = 'wiki',
@@ -200,8 +207,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['wikipedia'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
-            Log.appendToLog(ctx, 'wikilang')
-
             await WikipediaSearch(bot, ctx, "en").lang()
             return
 
@@ -220,9 +225,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global userSettings
 
         userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
-
-        with open('userSettings.yaml', 'w') as data:
-            yaml.dump(userSettings, data, allow_unicode=True)
 
         UserCancel = KeyboardInterrupt
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
@@ -264,7 +266,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(bot, ctx, e, 'google', userquery)
+                    await ErrorHandler(bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -348,7 +350,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(bot, ctx, e, 'scholar', userquery)
+                    await ErrorHandler(bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -397,7 +399,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(bot, ctx, e, 'youtube', userquery)
+                    await ErrorHandler(bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -434,13 +436,17 @@ class Administration(commands.Cog, name="Administration"):
     def __init__(self, bot):
         self.bot = bot
     
+    async def cog_before_invoke(self, ctx):
+        global userSettings
+        userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+        return
+    
     @commands.command(
         name='log',
         brief='DMs a .csv file of all the logs that the bot has for your username or guild if a sudoer.',
         usage='log')
     async def logging(self, ctx): 
-        Log.appendToLog(ctx, 'log')
-        await Log.logRequest(bot, ctx, serverSettings)
+        await Log.logRequest(bot, ctx, serverSettings, userSettings)
         return
 
     @commands.command(
@@ -468,14 +474,13 @@ class Administration(commands.Cog, name="Administration"):
         global serverSettings
         global userSettings
 
-        args = list(args)
         if Sudo.isSudoer(bot, ctx, serverSettings) == False:
             await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
-            Log.appendToLog(ctx, 'sudo', 'unauthorised')
+            Log.appendToLog(ctx, None, 'unauthorised')
         else:
-            Log.appendToLog(ctx, "sudo", ' '.join(args).strip())
+            Log.appendToLog(ctx, None, args)
             command = Sudo(bot, ctx, serverSettings)
-            serverSettings = await command.sudo(args)
+            serverSettings = await command.sudo(list(args))
 
     @commands.command(
         name='config',
@@ -499,8 +504,7 @@ class Administration(commands.Cog, name="Administration"):
             serverSettings, userSettings = await command.config(args)
         
         else: serverSettings, userSettings = await command.config([])
-        
-        Log.appendToLog(ctx, 'config', args if len(args) > 0 else None)
+        Log.appendToLog(ctx)
 
     @commands.command(
         name='invite',
@@ -509,12 +513,13 @@ class Administration(commands.Cog, name="Administration"):
         help="DMs SearchIO's invite link to the user")
     async def invite(self, ctx):
         try:
+            Log.appendToLog(ctx)
             dm = await ctx.author.create_dm()
             await dm.send('Here ya go: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot')
         except discord.errors.Forbidden:
             await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
         except Exception as e:
-            await ErrorHandler(bot, ctx, e, 'help')
+            await ErrorHandler(bot, ctx, e)
         finally: return
 
     @commands.command(
@@ -524,9 +529,10 @@ class Administration(commands.Cog, name="Administration"):
         help="Sends SearchIO's DiscordAPI connection latency")
     async def ping(self, ctx):
         try:
+            Log.appendToLog(ctx)
             await ctx.send(f'Response in {round(bot.latency, 3)}ms')
         except Exception as e:
-            await ErrorHandler(bot, ctx, e, 'ping')
+            await ErrorHandler(bot, ctx, e)
         finally: return
 
 @bot.command()
@@ -593,7 +599,7 @@ async def help(ctx, *args):
     except discord.errors.Forbidden:
         await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
     except Exception as e:
-        await ErrorHandler(bot, ctx, e, 'help')
+        await ErrorHandler(bot, ctx, e)
     finally: return
 
 bot.add_cog(SearchEngines(bot))

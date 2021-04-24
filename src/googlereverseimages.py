@@ -15,8 +15,6 @@ class ImageSearch:
 
     async def search(self): 
         try:       
-            Log.appendToLog(self.ctx, "imagesearch", self.searchQuery)
-
             headers = {
                         'Host': 'www.google.com',
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:71.0) Gecko/20100101 Firefox/71.0',
@@ -59,7 +57,7 @@ class ImageSearch:
                     
                     result = await self.ctx.send(embed=embed)
 
-                    Log.appendToLog(self.ctx, "imagesearch result", f"{self.searchQuery}")
+                    Log.appendToLog(self.ctx, f"{self.ctx.command} result", f"{self.searchQuery}")
 
                     def check(reaction, user):
                         return user == self.ctx.author and str(reaction.emoji) in ["🗑️"]
@@ -80,7 +78,7 @@ class ImageSearch:
 
                     result = await self.ctx.send(embed=embed)
 
-                    Log.appendToLog(self.ctx, "imagesearch result", f"no similar images")
+                    Log.appendToLog(self.ctx, f"{self.ctx.command} result", f"no similar images")
 
                     def check(reaction, user):
                         return user == self.ctx.author and str(reaction.emoji) in ["🗑️"]
@@ -98,5 +96,5 @@ class ImageSearch:
                 await self.ctx.send("Google is currently blocking searches. Please try again later")
         
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e, 'image', self.searchQuery)
+            await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
         finally: return

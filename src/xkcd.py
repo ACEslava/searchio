@@ -30,8 +30,6 @@ class xkcd:
 class XKCDSearch:
     @staticmethod
     async def search(bot, ctx, searchQuery):
-
-        Log.appendToLog(ctx, "xkcd", searchQuery)
         message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
         errorCount = 0
         while errorCount <= 1:
@@ -43,7 +41,7 @@ class XKCDSearch:
                 embed.set_footer(text=f"Requested by {ctx.author}")
 
                 await message.edit(content=None, embed=embed)
-                Log.appendToLog(ctx, "xkcd", x.url)
+                Log.appendToLog(ctx, f"{ctx.command} result", x.url)
 
                 await message.add_reaction('🗑️')
                 reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
@@ -85,7 +83,7 @@ class XKCDSearch:
                 return
 
             except Exception as e:
-                await ErrorHandler(bot, ctx, e, 'youtube', searchQuery)
+                await ErrorHandler(bot, ctx, e, searchQuery)
                 return
 
 class UserCancel(Exception):

@@ -22,8 +22,6 @@ class WikipediaSearch:
             await asyncio.sleep(random.uniform(0,2))
             result = wikipedia.search(self.searchQuery)
 
-            Log.appendToLog(self.ctx, "wikisearch", self.searchQuery)
-
             while True:
                 result = [result[x:x+10] for x in range(0, len(result), 10)]
                 pages = len(result)
@@ -42,7 +40,7 @@ class WikipediaSearch:
                         await searchresult.clear_reactions()
                     
                     except Exception as e:
-                        ErrorHandler(self.bot, self.ctx, e, 'wiki', self.searchQuery)
+                        ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
                     finally: return
                 elif len(result) != 1:
                     embed=discord.Embed(title=f"Titles matching '{self.searchQuery}'\n Page {cur_page}/{pages}:", description=
@@ -108,7 +106,7 @@ class WikipediaSearch:
                                 embed.set_footer(text=f"Requested by {self.ctx.author}")
                                 searchresult = await self.ctx.send(embed=embed)
                                 
-                                Log.appendToLog(self.ctx, "wikisearch result", f"{page.original_title}")
+                                Log.appendToLog(self.ctx, f"{ctx.command} results", f"{page.original_title}")
 
                                 try:
                                     for message in msg:
@@ -136,16 +134,12 @@ class WikipediaSearch:
                                 break  
 
                     except UserCancel as e:
-                        Log.appendToLog(self.ctx, "wikisearch cancel")
-
                         for message in msg:
                             await message.delete()
                     
                     except asyncio.TimeoutError:
                         for message in msg:
                             await message.delete()
-
-                        Log.appendToLog(self.ctx, "wikisearch timeout")
 
                         await self.ctx.send(f"Search timed out. Aborting")
 
@@ -156,7 +150,7 @@ class WikipediaSearch:
                         return
 
         except Exception as e:
-                await ErrorHandler(self.bot, self.ctx, e, 'wiki', self.searchQuery)
+                await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
         finally: return
 
     async def lang(self):
@@ -208,7 +202,7 @@ class WikipediaSearch:
                     break
         
         except Exception as e:
-                await ErrorHandler(self.bot, self.ctx, e, 'wikilang', '')
+                await ErrorHandler(self.bot, self.ctx, e)
         finally: return
 
 class UserCancel(Exception):

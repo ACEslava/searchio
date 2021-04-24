@@ -56,8 +56,6 @@ class ScholarSearch:
                 results = [next(scholarly.search_pubs(searchQuery)) for _ in range(5)]
                 embeds = list(map(publicationEmbeds, results))
 
-            Log.appendToLog(ctx, "scholar", searchQuery)
-
             doExit, curPage = False, 0
             await message.add_reaction('🗑️')
             if len(embeds) > 1:
@@ -85,5 +83,5 @@ class ScholarSearch:
             raise
 
         except Exception as e:
-            await ErrorHandler(bot, ctx, e, 'scholar', searchQuery)
+            await ErrorHandler(bot, ctx, e, searchQuery)
         finally: return

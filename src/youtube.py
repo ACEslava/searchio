@@ -23,7 +23,6 @@ class YoutubeSearch:
             result = ytsearch(searchQuery, max_results=10).to_dict()
 
             embeds = list(map(resultEmbed, result))
-            Log.appendToLog(ctx, "ytsearch", searchQuery) 
 
             doExit, curPage = False, 0
             await message.add_reaction('🗑️')
@@ -62,7 +61,7 @@ class YoutubeSearch:
             return
 
         except Exception as e:
-            await ErrorHandler(bot, ctx, e, 'youtube', searchQuery)
+            await ErrorHandler(bot, ctx, e, searchQuery)
         finally: return
 
 class UserCancel(Exception):

@@ -37,10 +37,17 @@ class Sudo:
 
     @staticmethod
     def userSettingsCheck(userSettings, userID):
+        olduserSetting = userSettings
+
         if userID not in userSettings.keys():
             userSettings[userID] = {}
         if 'locale' not in userSettings[userID].keys():
             userSettings[userID]['locale'] = None
+
+        if olduserSetting != userSettings:
+            with open('userSettings.yaml', 'w') as data:
+                yaml.dump(userSettings, data, allow_unicode=True)
+
         return userSettings
         
     @staticmethod
@@ -177,9 +184,7 @@ class Sudo:
         def check(reaction, user):
                 return user == self.ctx.author and str(reaction.emoji) in ['✅', '❌']
         
-        try:
-            self.userSettings = self.userSettingsCheck(self.userSettings, self.ctx.author.id)
-            
+        try:    
             adminrole = self.serverSettings[self.ctx.guild.id]['adminrole']
             if adminrole != None:
                 adminrole = self.ctx.guild.get_role(int(adminrole)) 
@@ -409,7 +414,7 @@ class Sudo:
             return self.serverSettings, self.userSettings
         except Exception as e:
             args = args if len(args) > 0 else None
-            await ErrorHandler(self.bot, self.ctx, e, 'config', args)
+            await ErrorHandler(self.bot, self.ctx, e, args)
             return self.serverSettings, self.userSettings
         finally:
             if args: 
@@ -468,7 +473,7 @@ class Sudo:
 
         except Exception as e:
             args = args if len(args) > 0 else None
-            await ErrorHandler(self.bot, self.ctx, e, 'sudo', args)
+            await ErrorHandler(self.bot, self.ctx, e, args)
         finally: 
             if command in ['blacklist', 'whitelist', 'sudoer', 'unsudoer']:
                 with open('serverSettings.yaml', 'w') as data:
@@ -480,24 +485,41 @@ class Sudo:
 
 class Log():
     @staticmethod
-    def appendToLog(ctx, command, args=None):     
-        if args is None: args = "None"
+    def appendToLog(ctx, optcommand=None, args=None):     
+        if args is None: 
+            if ctx.args is None:
+                args = "None"
+            else: args = ' '.join(list(ctx.args[2:]))
+        elif isinstance(args, list): 
+            args = ' '.join(args).strip()
+        else:
+            pass
+
         logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
         if ctx.guild: guild = ctx.guild.id
         else: guild = "DM"
-        
-        if isinstance(args, list): args = ''.join(args).strip() 
+         
 
         with open("logs.csv", "a", newline='', encoding='utf-8-sig') as file:
             writer = csv.DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
-            writer.writerow(dict(zip(logFieldnames, [datetime.utcnow().isoformat(), guild, ctx.author.id, str(ctx.author), command, args])))              
+            writer.writerow(dict(zip(logFieldnames, [datetime.utcnow().isoformat(), 
+                guild, 
+                ctx.author.id, 
+                str(ctx.author), 
+                optcommand if optcommand is not None else ctx.command, 
+                args
+            ])))              
         return
     
     @staticmethod
-    async def logRequest(bot, ctx, serverSettings):
+    async def logRequest(bot, ctx, serverSettings, userSettings):
         try:
             logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
             
+            with open(f'./src/cache/{ctx.author}_userSettings.yaml') as file:
+                setting = userSettings[ctx.author.id]
+                yaml.dump(setting, file, allow_unicode=True)
+
             #if bot owner
             if await bot.is_owner(ctx.author):
                 dm = await ctx.author.create_dm()
@@ -523,15 +545,22 @@ class Log():
             
             dm = await ctx.author.create_dm()
             await dm.send(file=discord.File(f"./src/cache/{filename}.csv"))
+            await dm.send(file=discord.File(f'./src/cache/{ctx.author}_userSettings.yaml'))
             os.remove(f"./src/cache/{ctx.author}_personalLogs.csv")
         
         except Exception as e:
-            await ErrorHandler(bot, ctx, e, 'logs')
+            await ErrorHandler(bot, ctx, e)
         finally: return
 
-async def ErrorHandler(bot, ctx, error, command, args=None):
-    if type(args) is list:
-        ' '.join(args)
+async def ErrorHandler(bot, ctx, error, args=None):
+    if args is None: 
+            if ctx.args is None:
+                args = "None"
+            else: args = ' '.join(list(ctx.args[2:]))
+    elif isinstance(args, list): 
+        args = ' '.join(args).strip()
+    else:
+        pass
         
     with open("logs.csv", 'r', encoding='utf-8-sig') as file: 
         doesErrorCodeMatch = False
@@ -552,7 +581,7 @@ async def ErrorHandler(bot, ctx, error, command, args=None):
     #prevents doxxing by removing username
     errorOut = '\n'.join([lines if r'C:\Users' not in lines else '\\'.join(lines.split('\\')[:2]+lines.split('\\')[3:]) for lines in str(traceback.format_exc()).split('\n')])
             
-    await errorLoggingChannel.send(f"Error `{errorCode}`\n```\nIn Guild: {ctx.guild.id}\nBy User: {str(ctx.author)}\nCommand: {command}\nArgs: {args if type(args) != None else 'None'}\n{errorOut}```")
+    await errorLoggingChannel.send(f"Error `{errorCode}`\n```\nIn Guild: {ctx.guild.id}\nBy User: {str(ctx.author)}\nCommand: {ctx.command}\nArgs: {args if type(args) != None else 'None'}\n{errorOut}```")
 
     embed = discord.Embed(description=f"An unknown error has occured. Please try again later. \n If you wish to report this error, send the error code `{errorCode}` to ACEslava#9735")
     errorMsg = await ctx.send(embed=embed)

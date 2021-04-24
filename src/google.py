@@ -78,8 +78,6 @@ class GoogleSearch:
          return f"w+CAIQICI{secret}{hashed}"
       
       try:
-         Log.appendToLog(ctx, "googlesearch", searchQuery)
-
          if bool(re.search('translate', searchQuery.lower())):
             query = searchQuery.lower().split(' ')
             if len(query) > 1:
@@ -136,7 +134,7 @@ class GoogleSearch:
             google_snippet_result = google_snippet_result.contents[index]
             wrongFirstResults = ["Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >']
 
-            Log.appendToLog(ctx, "googlesearch results", url)
+            Log.appendToLog(ctx, f"{ctx.command} results", url)
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
 
             #end div filtering
@@ -208,7 +206,7 @@ class GoogleSearch:
 
       except Exception as e:
          await message.delete()
-         await ErrorHandler(bot, ctx, e, 'google', searchQuery)
+         await ErrorHandler(bot, ctx, e, searchQuery)
       finally: return
 
 class UserCancel(Exception):

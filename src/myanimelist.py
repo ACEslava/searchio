@@ -20,8 +20,6 @@ class MyAnimeListSearch:
             await asyncio.sleep(random.uniform(0,1))
             search = AnimeSearch(self.searchQuery)
 
-            Log.appendToLog(self.ctx, "animesearch", self.searchQuery)
-
             while True:
                 result = [[anime for anime in search.results][x:x+10] for x in range(0, len([anime for anime in search.results]), 10)]
                 pages = len(result)
@@ -96,7 +94,7 @@ class MyAnimeListSearch:
                             embed.set_footer(text=f"Requested by {self.ctx.author}")
                             searchresult = await self.ctx.send(embed=embed)
                             
-                            Log.appendToLog(self.ctx, "animesearch result", animeItem.title )
+                            Log.appendToLog(self.ctx, f"{self.ctx.command} result", animeItem.title )
                             for message in msg:
                                 await message.delete()
                             
@@ -113,7 +111,6 @@ class MyAnimeListSearch:
                                 return
                     
                     except UserCancel as e:
-                        Log.appendToLog(self.ctx, "animesearch cancel")
 
                         for message in msg:
                             await message.delete()
@@ -121,8 +118,6 @@ class MyAnimeListSearch:
                     except asyncio.TimeoutError:
                         for message in msg:
                             await message.delete()
-
-                        Log.appendToLog(self.ctx, "animesearch timeout")
 
                         await self.ctx.send(f"Search timed out. Aborting")
 
@@ -133,7 +128,7 @@ class MyAnimeListSearch:
                         return
 
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e, 'anime', self.searchQuery)
+            await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
         finally: return
 
 class UserCancel(Exception):
