@@ -124,9 +124,6 @@ async def on_connect():
 
     for servers in bot.guilds:
         serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id)
-    
-    with open('serverSettings.yaml', 'w') as data:
-        yaml.dump(serverSettings, data, allow_unicode=True)
 
     with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
         lines = [dict(row) for row in csv.DictReader(file) if datetime.datetime.utcnow()-datetime.datetime.fromisoformat(row["Time"]) < datetime.timedelta(weeks=8)]
@@ -162,7 +159,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         usage='wiki [query] [optional flags]',
         help='Wikipedia search.',
         description='--lang [ISO Language Code]: Specifies a country code to search through Wikipedia. Use wikilang to see available codes.')
-    async def wikipedia(self, ctx, *args):
+    async def wiki(self, ctx, *args):
         global serverSettings
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['wikipedia'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
@@ -419,7 +416,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             return
 
     @commands.command(
-        name= 'xkcd',
+        name='xkcd',
         brief='Search for XKCD comics',
         usage='xkcd [comic# OR random OR latest]',
         help='Searches for an XKCD comic. Search query can be an XKCD comic number, random, or latest.')
@@ -432,6 +429,38 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             if userquery is None: return
             await XKCDSearch.search(bot, ctx, userquery)
             return
+
+    @commands.command(
+        name='s',
+        brief='A shortcut search function',
+        usage='s [query]',
+        help='A user-settable shortcut for any search function')
+    async def s(self, ctx, *args):
+        try:
+            if userSettings[ctx.author.id]['searchAlias'] is None:
+                embed = discord.Embed(description=f'Your shortcut is not set. Set it with {Sudo.printPrefix(serverSettings, ctx)}config alias [Search Engine]')
+                message = await ctx.send(embed=embed)
+                await message.add_reaction('🗑️')
+                reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                if str(reaction.emoji) == '🗑️':
+                    await message.delete()
+            
+            else: 
+                try:
+                    await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
+                except AttributeError:
+                    embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.printPrefix(serverSettings, ctx)}help')
+                    message = ctx.send(embed=embed)
+                    await message.add_reaction('🗑️')
+                    reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                    if str(reaction.emoji) == '🗑️':
+                        await message.delete()
+
+        except asyncio.TimeoutError as e: 
+                    await message.clear_reactions()
+        except Exception as e:
+            await ErrorHandler(bot, ctx, e, args)
+        finally: return
 class Administration(commands.Cog, name="Administration"):
     def __init__(self, bot):
         self.bot = bot
@@ -486,10 +515,22 @@ class Administration(commands.Cog, name="Administration"):
         name='config',
         brief='Views the guild configuration. Only sudoers can edit settings.',
         usage='config [setting] [args]',
-        help="""Views the guild configuration. Requires sudo privileges to edit settings,
+        help=f"""Views the configuration menu.
+
+                Guild Configurations:
+                ```
                 Prefix: Command prefix that SearchIO uses
                 Adminrole: The role that is automatically given sudo permissions
-                Safesearch: Activates Google's safesearch. NSFW channels override this setting""")
+                Safesearch: Activates Google's safesearch. NSFW channels override this setting
+                
+                Guilds can deactivate each search engine if they choose to.
+                Requires sudo privileges to edit
+                ```
+                
+                User Configurations:
+                ```
+                Locale: Sets the user's locale for more accurate Google searches
+                Alias: Sets the search function's command to use.""")
     async def config(self, ctx, *args):
         args = list(args)
         global serverSettings
@@ -497,7 +538,7 @@ class Administration(commands.Cog, name="Administration"):
 
         command = Sudo(bot, ctx, serverSettings, userSettings)
         if len(args) > 0:
-            localSetting = args[0] in ['locale']
+            localSetting = args[0] in ['locale', 'alias']
         else: localSetting = False
         
         if Sudo.isSudoer(bot, ctx, serverSettings) == True or localSetting:
@@ -553,7 +594,7 @@ async def help(ctx, *args):
         embed.add_field(name="Administration", inline=False, value="\n".join([f'`{command.name:>{maxAdminCommandStrLength}}:` {command.brief}' for command in adminCog.get_commands()]))
         
         embed.add_field(name="Search Engines", inline=False, value=textwrap.dedent(f"""\
-            {f"`wikipedia:` {searchEngineCog.wikipedia.brief}" if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
+            {f"`     wiki:` {searchEngineCog.wiki.brief}" if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
             {f"` wikilang:` {searchEngineCog.wikilang.brief}" if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
             {f"`   google:` {searchEngineCog.google.brief}" if serverSettings[ctx.guild.id]['google'] == True else ''}
             {f"`    image:` {searchEngineCog.image.brief}" if serverSettings[ctx.guild.id]['google'] == True else ''}
@@ -561,6 +602,7 @@ async def help(ctx, *args):
             {f"`  youtube:` {searchEngineCog.youtube.brief}" if serverSettings[ctx.guild.id]['youtube'] == True else ''}
             {f"`    anime:` {searchEngineCog.anime.brief}" if serverSettings[ctx.guild.id]['mal'] == True else ''}
             {f"`     xkcd:` {searchEngineCog.xkcd.brief}" if serverSettings[ctx.guild.id]['xkcd'] == True else ''}
+            {f"`        s:` {searchEngineCog.s.brief}"}
         """))
         embed.set_footer(text=f"Do {commandPrefix}help [command] for more information")
 

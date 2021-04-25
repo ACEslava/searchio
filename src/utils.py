@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta, date
 from src.loadingmessage import LoadingMessage
-import discord, asyncio, yaml, textwrap, difflib, csv, os, random, traceback, re, requests
+import discord, asyncio, yaml, difflib, csv, os, random, traceback, re, copy
 
 class Sudo:
     def __init__(
@@ -17,6 +17,8 @@ class Sudo:
 
     @staticmethod
     def serverSettingsCheck(serverSettings, serverID):
+        oldserverSetting = copy.deepcopy(serverSettings)
+
         if serverID not in serverSettings.keys():
             serverSettings[serverID] = {}
         if 'blacklist' not in serverSettings[serverID].keys():
@@ -32,17 +34,31 @@ class Sudo:
         for searchEngines in ['wikipedia', 'scholar', 'google', 'mal', 'youtube', 'xkcd']:
             if searchEngines not in serverSettings[serverID].keys():
                 serverSettings[serverID][searchEngines] = True
+        if oldserverSetting != serverSettings:
+            with open('serverSettings.yaml', 'w') as data:
+                yaml.dump(serverSettings, data, allow_unicode=True)
         
         return serverSettings
 
     @staticmethod
     def userSettingsCheck(userSettings, userID):
-        olduserSetting = userSettings
+        olduserSetting = copy.deepcopy(userSettings)
 
         if userID not in userSettings.keys():
             userSettings[userID] = {}
         if 'locale' not in userSettings[userID].keys():
             userSettings[userID]['locale'] = None
+        if 'downloadquota' not in userSettings[userID].keys():
+            userSettings[userID]['downloadquota'] = {
+                'updateTime': datetime.combine(date.today(), datetime.min.time()).isoformat(), 
+                'dailyDownload': 0,
+                'lifetimeDownload': 0}
+        if 'searchAlias' not in userSettings[userID].keys():
+            userSettings[userID]['searchAlias'] = None
+
+        if datetime.utcnow() - datetime.fromisoformat(userSettings[userID]['downloadquota']['updateTime']) > timedelta(hours=24):
+            userSettings[userID]['downloadquota']['lifetimeDownload'] += userSettings[userID]['downloadquota']['dailyDownload']
+            userSettings[userID]['downloadquota']['dailyDownload'] = 0
 
         if olduserSetting != userSettings:
             with open('userSettings.yaml', 'w') as data:
@@ -183,7 +199,7 @@ class Sudo:
     async def config(self, args):
         def check(reaction, user):
                 return user == self.ctx.author and str(reaction.emoji) in ['✅', '❌']
-        
+        UserCancel = KeyboardInterrupt
         try:    
             adminrole = self.serverSettings[self.ctx.guild.id]['adminrole']
             if adminrole != None:
@@ -202,7 +218,10 @@ class Sudo:
                     `     XKCD:` {'✅' if self.serverSettings[self.ctx.guild.id]['xkcd'] == True else '❌'}
                     `  Youtube:` {'✅' if self.serverSettings[self.ctx.guild.id]['youtube'] == True else '❌'}""")
                 embed.add_field(name="User Configuration", value=f"""
-                    `   Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}""")
+                    `             Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
+                    `              Alias:` {self.userSettings[self.ctx.author.id]['searchAlias'] if self.userSettings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}
+                    `   Daily Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['dailyDownload']}MB/50MB
+                    `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""")
 
                 embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
                 configMessage = await self.ctx.send(embed=embed)
@@ -259,7 +278,7 @@ class Sudo:
                         try: 
                             adminrole = self.ctx.guild.get_role(int(response))
                             self.serverSettings[self.ctx.guild.id]['adminrole'] = adminrole.id
-                            await self.ctx.send(f"'{adminrole.name}' is now the admin role")
+                            await self.ctx.send(f"`{adminrole.name}` is now the admin role")
                             break
                         except (ValueError, AttributeError) as e:
                             errorMsg = await self.ctx.send(f"{response} is not a valid roleID. Please edit your message or reply with a valid roleID.")
@@ -303,10 +322,9 @@ class Sudo:
                 else: response = args[1]
                 
                 self.serverSettings[self.ctx.guild.id]['commandprefix'] = response
-                await self.ctx.send(f"'{response}' is now the guild prefix")
+                await self.ctx.send(f"`{response}` is now the guild prefix")
             elif args[0].lower() == 'locale':
                 msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
-                UserCancel = KeyboardInterrupt
                 uuleDB = open('./src/cache/googleUULE.csv', 'r', encoding='utf-8-sig').read().split('\n')
                 fieldnames = uuleDB.pop(0).split(',')
                 uuleDB = [dict(zip(fieldnames, [string.replace('"','') for string in lines.split('",')])) for lines in uuleDB] #parses get request into list of dicts
@@ -405,6 +423,64 @@ class Sudo:
                             self.userSettings[self.ctx.author.id]['locale'] = result[cur_page-1][input]
                             await self.ctx.send(f'Locale successfully set to `{result[cur_page-1][input]}`')
                             break
+            elif args[0].lower() == 'alias':
+                if not args[1]:
+                    embed = discord.Embed(title='Alias', description=f"{self.serverSettings[self.ctx.guild.id]['commandprefix']}")
+                    embed.set_footer(text=f"Reply with the command that you want to set as alias")
+                    message = await self.ctx.send(embed=embed)
+
+                    try: 
+                        userresponse = await self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout=30)
+                        await userresponse.delete()
+                        await message.delete()
+                        response = userresponse.content
+
+                    except asyncio.TimeoutError as e:
+                        await message.delete()
+                else:
+                    response = ''.join(args[1])
+
+                errorCount = 0
+
+                while errorCount <= 1:
+                    try:
+                        getattr(dict(self.bot.cogs)['Search Engines'], response)
+                        await self.ctx.send(f"`{response}` is now your alias")
+                        self.userSettings[self.ctx.author.id]['searchAlias'] = response
+                        break
+                    except AttributeError:
+                        embed = discord.Embed(description="Sorry, `{i}` is an invalid command.\nPlease choose from:\n{j}".format(i=response, j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands())))
+                        errorMsg = await self.ctx.send(embed=embed)
+                        try:
+                            messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == self.ctx.author, timeout=60))
+                            reply = asyncio.create_task(self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout=60))
+                                    
+                            waiting = [messageEdit, reply]
+                            done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
+
+                            if messageEdit in done:
+                                reply.cancel()
+                                messageEdit = messageEdit.result()[1].content
+                                response = ''.join(messageEdit[14:])
+                            elif reply in done:
+                                messageEdit.cancel()
+                                reply = reply.result()
+                                await reply.delete()
+                                
+                                if reply.content == "cancel":
+                                    messageEdit.cancel()
+                                    reply.cancel()
+                                    break
+                                else: response = reply.content
+                            await errorMsg.delete()
+                            errorCount += 1
+                            continue
+                        except asyncio.TimeoutError as e:
+                            await errorMsg.edit(content='Sorry you took too long')
+                            asyncio.sleep(60)
+                            await errorMsg.delete()
+                            return
+                return
 
         except UserCancel:
             await self.ctx.send('Aborting')
@@ -515,10 +591,14 @@ class Log():
     async def logRequest(bot, ctx, serverSettings, userSettings):
         try:
             logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
-            
-            with open(f'./src/cache/{ctx.author}_userSettings.yaml') as file:
-                setting = userSettings[ctx.author.id]
-                yaml.dump(setting, file, allow_unicode=True)
+
+            with open('logs.csv', 'r', encoding='utf-8-sig') as file:
+                logList = [dict(row) for row in csv.DictReader(file) if datetime.utcnow()-datetime.fromisoformat(dict(row)['Time']) < timedelta(weeks=8)]
+
+            with open('logs.csv', 'w', encoding='utf-8-sig') as file:    
+                writer = csv.DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
+                writer.writeheader()
+                writer.writerows(logList)
 
             #if bot owner
             if await bot.is_owner(ctx.author):
@@ -529,14 +609,12 @@ class Log():
             #if guild owner/guild sudoer
             elif Sudo.isSudoer(bot, ctx, serverSettings):
                 filename = f'{ctx.guild}_guildLogs'
-                with open("logs.csv", 'r', encoding='utf-8-sig') as file: 
-                    line = [dict(row) for row in csv.DictReader(file) if int(row["Guild"]) == ctx.guild.id]
+                line = [row for row in logList if int(row["Guild"]) == ctx.guild.id]
             
             #else just bot user
             else:
                 filename = f'{ctx.author}_personalLogs'
-                with open("logs.csv", 'r', encoding='utf-8-sig') as file: 
-                    line = [dict(row) for row in csv.DictReader(file) if int(row["User"]) == ctx.author.id]
+                line = [row for row in logList if int(row["User"]) == ctx.author.id]
 
             with open(f"./src/cache/{filename}.csv", "w", newline='', encoding='utf-8-sig') as newFile:
                 writer = csv.DictWriter(newFile, fieldnames=logFieldnames, extrasaction='ignore')
@@ -547,6 +625,7 @@ class Log():
             await dm.send(file=discord.File(f"./src/cache/{filename}.csv"))
             await dm.send(file=discord.File(f'./src/cache/{ctx.author}_userSettings.yaml'))
             os.remove(f"./src/cache/{ctx.author}_personalLogs.csv")
+
         
         except Exception as e:
             await ErrorHandler(bot, ctx, e)
