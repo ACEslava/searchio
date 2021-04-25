@@ -221,7 +221,7 @@ class Sudo:
                     `             Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
                     `              Alias:` {self.userSettings[self.ctx.author.id]['searchAlias'] if self.userSettings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}
                     `   Daily Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['dailyDownload']}MB/50MB
-                    `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""")
+                    `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""", inline=False)
 
                 embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
                 configMessage = await self.ctx.send(embed=embed)

@@ -253,7 +253,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     else: raise asyncio.TimeoutError
                 
                 except asyncio.TimeoutError: #after a minute, everything cancels
-                    await message.clear_reactions()
                     messageEdit.cancel()
                     search.cancel()
                     continueLoop = False
@@ -443,8 +442,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 await message.add_reaction('🗑️')
                 reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                 if str(reaction.emoji) == '🗑️':
-                    await message.delete()
-            
+                    await message.delete()           
             else: 
                 try:
                     await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
@@ -455,7 +453,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
                         await message.delete()
-
         except asyncio.TimeoutError as e: 
                     await message.clear_reactions()
         except Exception as e:
