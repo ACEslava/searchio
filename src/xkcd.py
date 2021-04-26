@@ -5,9 +5,7 @@ from src.utils import Log, ErrorHandler
 from src.loadingmessage import LoadingMessage
 
 class xkcd:
-    def __init__(self, num = ''):
-        base_url = 'https://xkcd.com/'
-        
+    def __init__(self, num = ''): 
         if num.lower() == 'random':
             self.num = random.randrange(1, xkcd('').num)
         elif str(num).isnumeric() or num == '':
@@ -17,10 +15,9 @@ class xkcd:
         else:
             raise ValueError
         
-        self.url = base_url + str(self.num)
-        json_url = self.url + '/info.0.json'
-        
-        mdata = json.load(ureq.urlopen(json_url))
+        self.url = 'https://xkcd.com/' + str(self.num)
+      
+        mdata = json.load(ureq.urlopen(self.url + '/info.0.json'))
         self.date = datetime.datetime(int(mdata['year']), int(mdata['month']), int(mdata['day']))
         self.img_url = mdata['img']
         self.title = mdata['title']

@@ -224,7 +224,7 @@ class Sudo:
                 embed.add_field(name="User Configuration", value=f"""
                     `             Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
                     `              Alias:` {self.userSettings[self.ctx.author.id]['searchAlias'] if self.userSettings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}
-                    `   Daily Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['dailyDownload']}MB/50MB
+                    `   Daily Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
                     `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""", inline=False)
 
                 embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
@@ -428,9 +428,9 @@ class Sudo:
                             await self.ctx.send(f'Locale successfully set to `{result[cur_page-1][input]}`')
                             break
             elif args[0].lower() == 'alias':
-                if not args[1]:
+                if len(args) == 0:
                     embed = discord.Embed(title='Alias', description=f"{self.serverSettings[self.ctx.guild.id]['commandprefix']}")
-                    embed.set_footer(text=f"Reply with the command that you want to set as alias")
+                    embed.set_footer(text="Reply with the command that you want to set as alias. Choose from:\n{j}".format(j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands())))
                     message = await self.ctx.send(embed=embed)
 
                     try: 
@@ -451,7 +451,7 @@ class Sudo:
                         getattr(dict(self.bot.cogs)['Search Engines'], response)
                         await self.ctx.send(f"`{response}` is now your alias")
                         self.userSettings[self.ctx.author.id]['searchAlias'] = response
-                        break
+                        errorCount = 2
                     except AttributeError:
                         embed = discord.Embed(description="Sorry, `{i}` is an invalid command.\nPlease choose from:\n{j}".format(i=response, j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands())))
                         errorMsg = await self.ctx.send(embed=embed)

@@ -137,6 +137,10 @@ class GoogleSearch:
             Log.appendToLog(ctx, f"{ctx.command} results", url)
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
 
+            #Debug HTML
+            # with open('test.html', 'w') as file:
+            #    file.write(soup.prettify())
+
             #end div filtering
             googleSnippetResults = [googleSnippetResults[resultNumber] for resultNumber in range(3, len(googleSnippetResults)-2)]
             
