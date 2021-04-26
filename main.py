@@ -9,6 +9,7 @@ from src.utils import Sudo, Log, ErrorHandler
 from src.scholar import ScholarSearch
 from src.youtube import YoutubeSearch
 from src.xkcd import XKCDSearch
+from src.pornhub import PornhubSearch
 from dotenv import load_dotenv
 from discord.ext import commands
 from urllib3 import PoolManager
@@ -433,6 +434,60 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             if userquery is None: return
             await XKCDSearch.search(bot, ctx, userquery)
             return
+
+    @commands.command(
+        name='pornhub',
+        brief='Search through Pornhub',
+        usage='pornhub [query]',
+        help='Searches for Pornhub videos. Returns a maximum of 10 results'
+    )
+    async def pornhub(self, ctx, *args):
+        global serverSettings
+        global userSettings
+
+        userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+
+        UserCancel = KeyboardInterrupt
+        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
+        if (blacklist and serverSettings[ctx.guild.id]['pornhub'] != False and ctx.channel.nsfw) or Sudo.isSudoer(bot, ctx, serverSettings):
+            userquery = await searchQueryParse(ctx, args)
+            if userquery is None: return
+            continueLoop = True
+            
+            while continueLoop:
+                try:
+                    message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = asyncio.create_task(PornhubSearch.search(bot, ctx, userquery, message))
+                    
+                    #checks for message edit
+                    waiting = [messageEdit, search]
+                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+
+                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
+                        if type(messageEdit.exception()) == asyncio.TimeoutError:
+                            raise asyncio.TimeoutError
+                        await message.delete()
+                        messageEdit.cancel()
+                        search.cancel()
+
+                        messageEdit = messageEdit.result()
+                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}pornhub ', '')
+                        continue
+                    else: raise asyncio.TimeoutError
+                
+                except asyncio.TimeoutError: #after a minute, everything cancels
+                    messageEdit.cancel()
+                    search.cancel()
+                    continueLoop = False
+                    return
+                
+                except asyncio.CancelledError:
+                    pass
+                
+                except Exception as e:
+                    await ErrorHandler(bot, ctx, e, userquery)
+                    return
 
     @commands.command(
         name='s',

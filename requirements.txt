@@ -30,7 +30,9 @@ multidict==5.1.0
 packaging==20.9
 pep517==0.10.0
 pip-tools==6.0.1
+pornhub-api==0.2.0
 pycparser==2.20
+pydantic==1.8.1
 Pygments==2.8.1
 pyOpenSSL==20.0.1
 pyparsing==2.4.7

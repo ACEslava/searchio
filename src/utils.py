@@ -31,7 +31,7 @@ class Sudo:
             serverSettings[serverID]['sudoer'] = []
         if 'safesearch' not in serverSettings[serverID].keys():
             serverSettings[serverID]['safesearch'] = False
-        for searchEngines in ['wikipedia', 'scholar', 'google', 'mal', 'youtube', 'xkcd']:
+        for searchEngines in ['wikipedia', 'scholar', 'google', 'mal', 'youtube', 'xkcd', 'pornhub']:
             if searchEngines not in serverSettings[serverID].keys():
                 serverSettings[serverID][searchEngines] = True
         if oldserverSetting != serverSettings:
@@ -220,7 +220,8 @@ class Sudo:
                     `  Scholar:` {'✅' if self.serverSettings[self.ctx.guild.id]['scholar'] == True else '❌'}
                     `Wikipedia:` {'✅' if self.serverSettings[self.ctx.guild.id]['wikipedia'] == True else '❌'}
                     `     XKCD:` {'✅' if self.serverSettings[self.ctx.guild.id]['xkcd'] == True else '❌'}
-                    `  Youtube:` {'✅' if self.serverSettings[self.ctx.guild.id]['youtube'] == True else '❌'}""")
+                    `  Youtube:` {'✅' if self.serverSettings[self.ctx.guild.id]['youtube'] == True else '❌'}
+                    `  Pornhub:` {'✅' if self.serverSettings[self.ctx.guild.id]['pornhub'] == True else '❌'}""")
                 embed.add_field(name="User Configuration", value=f"""
                     `             Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
                     `              Alias:` {self.userSettings[self.ctx.author.id]['searchAlias'] if self.userSettings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}
@@ -237,8 +238,26 @@ class Sudo:
         
                 except asyncio.TimeoutError as e: 
                     await configMessage.clear_reactions()
-            elif args[0].lower() in ['wikipedia', 'scholar', 'google', 'myanimelist', 'youtube', 'safesearch', 'xkcd']:
-                if bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
+            elif args[0].lower() in ['wikipedia', 'scholar', 'google', 'myanimelist', 'youtube', 'safesearch', 'xkcd', 'pornhub']:
+                if len(args) == 1:
+                    embed = discord.Embed(title=args[0].capitalize(), description=f"{'✅' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else '❌'}")
+                    embed.set_footer(text=f"React with ✅/❌ to enable/disable")
+                    message = await self.ctx.send(embed=embed)
+                    try:
+                        await message.add_reaction('✅')
+                        await message.add_reaction('❌')
+
+                        reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
+                        if str(reaction.emoji) == '✅':
+                            self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
+                        elif str(reaction.emoji) == '❌':
+                            self.serverSettings[self.ctx.guild.id][args[0].lower()] = False
+                        await message.delete()
+                        return
+                    except asyncio.TimeoutError as e: 
+                        await message.clear_reactions()
+
+                elif bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
                     self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
                 elif bool(re.search('^disable', args[1].lower()) or re.search('^off', args[1].lower())):
                     self.serverSettings[self.ctx.guild.id][args[0].lower()] = False
@@ -259,7 +278,6 @@ class Sudo:
                         return
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
-                
                 await self.ctx.send(f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else 'disabled'}")
             elif args[0].lower() == 'adminrole':
                 if not args[1]:
