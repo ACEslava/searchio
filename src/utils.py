@@ -428,9 +428,10 @@ class Sudo:
                             await self.ctx.send(f'Locale successfully set to `{result[cur_page-1][input]}`')
                             break
             elif args[0].lower() == 'alias':
-                if len(args) == 0:
-                    embed = discord.Embed(title='Alias', description=f"{self.serverSettings[self.ctx.guild.id]['commandprefix']}")
-                    embed.set_footer(text="Reply with the command that you want to set as alias. Choose from:\n{j}".format(j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands())))
+                if len(args) == 1:
+                    embed = discord.Embed(
+                        title='Alias', 
+                        description="Reply with the command that you want to set as alias. Choose from:\n{j}".format(j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1])))
                     message = await self.ctx.send(embed=embed)
 
                     try: 
@@ -441,6 +442,7 @@ class Sudo:
 
                     except asyncio.TimeoutError as e:
                         await message.delete()
+                        return
                 else:
                     response = ''.join(args[1])
 
@@ -448,12 +450,18 @@ class Sudo:
 
                 while errorCount <= 1:
                     try:
-                        getattr(dict(self.bot.cogs)['Search Engines'], response)
-                        await self.ctx.send(f"`{response}` is now your alias")
-                        self.userSettings[self.ctx.author.id]['searchAlias'] = response
-                        errorCount = 2
+                        if response == 's':
+                            raise AttributeError
+                        elif response == 's':
+                            errorCount = 2
+                        else:
+                            getattr(dict(self.bot.cogs)['Search Engines'], response)
+                            await self.ctx.send(f"`{response}` is now your alias")
+                            self.userSettings[self.ctx.author.id]['searchAlias'] = response
+                            errorCount = 2
                     except AttributeError:
-                        embed = discord.Embed(description="Sorry, `{i}` is an invalid command.\nPlease choose from:\n{j}".format(i=response, j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands())))
+                        embed = discord.Embed(
+                            description="Sorry, `{i}` is an invalid command.\nPlease choose from:\n{j}\n or cancel to cancel".format(i=response, j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1])))
                         errorMsg = await self.ctx.send(embed=embed)
                         try:
                             messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == self.ctx.author, timeout=60))
@@ -473,7 +481,7 @@ class Sudo:
                                 
                                 if reply.content == "cancel":
                                     messageEdit.cancel()
-                                    reply.cancel()
+                                    await errorMsg.delete()
                                     break
                                 else: response = reply.content
                             await errorMsg.delete()
