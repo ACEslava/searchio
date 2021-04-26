@@ -356,6 +356,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         help='Searches through Youtube videos')
     async def youtube(self, ctx, *args):
         global serverSettings
+        global userSettings
+        
         UserCancel = Exception
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
         if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
@@ -366,7 +368,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                     messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = asyncio.create_task(YoutubeSearch.search(bot, ctx, message, userquery))
+                    search = asyncio.create_task(YoutubeSearch.search(bot, ctx, message, userquery, userSettings))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
@@ -382,7 +384,10 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         messageEdit = messageEdit.result()
                         userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}youtube ', '')
                         continue
-                    else: raise asyncio.TimeoutError
+                    else: 
+                        with open('userSettings.yaml', 'r') as data:
+                            userSettings = yaml.load(data)
+                        raise asyncio.TimeoutError
                 
                 except asyncio.TimeoutError: #after a minute, everything cancels
                     await message.clear_reactions()

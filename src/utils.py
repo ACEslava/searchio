@@ -57,8 +57,12 @@ class Sudo:
             userSettings[userID]['searchAlias'] = None
 
         if datetime.utcnow() - datetime.fromisoformat(userSettings[userID]['downloadquota']['updateTime']) > timedelta(hours=24):
+            userSettings[userID]['downloadquota']['updateTime'] = datetime.combine(date.today(), datetime.min.time()).isoformat()
+            
             userSettings[userID]['downloadquota']['lifetimeDownload'] += userSettings[userID]['downloadquota']['dailyDownload']
-            userSettings[userID]['downloadquota']['dailyDownload'] = 0
+            if userSettings[userID]['downloadquota']['dailyDownload'] > 50:
+                userSettings[userID]['downloadquota']['dailyDownload'] -= 50
+            else: userSettings[userID]['downloadquota']['dailyDownload'] = 0
 
         if olduserSetting != userSettings:
             with open('userSettings.yaml', 'w') as data:
