@@ -97,8 +97,9 @@ class YoutubeSearch:
                                 await message.add_reaction('⬇️')
                         
                         else:
-                            await downloadmessage.delete()
-                            await message.add_reaction('⬇️')
+                            embed = discord.Embed(
+                                description=f"""{user}, This download exceeds the maximum filesize of 100MB. It will not be processed.""")
+                            await downloadmessage.edit(content=None, embed=embed)
 
 
                     if curPage < 0:
