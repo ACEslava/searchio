@@ -56,44 +56,45 @@ class YoutubeSearch:
                         downloadmessage = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                         yt = YoutubeDownload(embeds[curPage].url)
                         download = yt.streams.filter(res='360p', file_extension='mp4', progressive=True).fmt_streams[0]
-
-                        embed = discord.Embed(
-                            description=f"""{user}, This download will use {round(download.filesize_approx/1000000, 2)}MB of your remaining {50-userSettings[user.id]["downloadquota"]["dailyDownload"]}MB daily quota
-                                            Do you want to continue?""")
-                        await downloadmessage.edit(content=None, embed=embed)
-                        await downloadmessage.add_reaction('👍')
-                        await downloadmessage.add_reaction('👎')
-                        dlreaction, dluser = await bot.wait_for("reaction_add", check=lambda dlreaction, dluser: all([dluser == user, str(dlreaction.emoji) in ['👍', '👎'], dlreaction.message == downloadmessage]), timeout=30)
-
-                        if str(dlreaction.emoji) == '👍':
-                            await downloadmessage.clear_reactions()
-                            await downloadmessage.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
-                            
-                            userSettings[user.id]['downloadquota']['dailyDownload'] += round(download.filesize_approx/1000000, 2)
-                            download.download(output_path='./src/cache')
-                            
-                            bestServer = requests.get(url='https://api.gofile.io/getServer').json()['data']['server']
-
-                            with open(f'{os.path.abspath(f"./src/cache/{download.default_filename}")}', 'rb') as f:
-                                url = f'https://{bestServer}.gofile.io/uploadFile'
-                                params = {'expire':round(datetime.timestamp(datetime.now()+timedelta(minutes=10)))}
-                                shareLink = requests.post(url=url, params=params, files={f'@{os.path.abspath(f"./src/cache/{download.default_filename}")}': f}).json()['data']['downloadPage']
-                            
-                            os.remove(f"./src/cache/{download.default_filename}")
+                        if round(download.filesize_approx/1000000, 2) < 100:
                             embed = discord.Embed(
-                                description=f"""{shareLink}\n\nHere is your download link.
-                                You now have {50-userSettings[user.id]['downloadquota']['dailyDownload']}MB left in your daily quota. 
-                                Negative values mean your daily quota for the next day will be subtracted."""
-                            )
-                            embed.set_footer(text=f'Requested by {user}')
-                            await downloadmessage.delete()
-                            await ctx.send(embed=embed, content=None)
+                                description=f"""{user}, This download will use {round(download.filesize_approx/1000000, 2)}MB of your remaining {50-userSettings[user.id]["downloadquota"]["dailyDownload"]}MB daily quota
+                                                Do you want to continue?""")
+                            await downloadmessage.edit(content=None, embed=embed)
+                            await downloadmessage.add_reaction('👍')
+                            await downloadmessage.add_reaction('👎')
+                            dlreaction, dluser = await bot.wait_for("reaction_add", check=lambda dlreaction, dluser: all([dluser == user, str(dlreaction.emoji) in ['👍', '👎'], dlreaction.message == downloadmessage]), timeout=30)
 
-                            with open('userSettings.yaml', 'w') as data:
-                                yaml.dump(userSettings, data, allow_unicode=True)
-                        elif str(dlreaction.emoji) == '👎':
-                            await downloadmessage.delete()
-                            await message.add_reaction('⬇️')
+                            if str(dlreaction.emoji) == '👍':
+                                await downloadmessage.clear_reactions()
+                                await downloadmessage.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+                                
+                                userSettings[user.id]['downloadquota']['dailyDownload'] += round(download.filesize_approx/1000000, 2)
+                                userSettings[user.id]['downloadquota']['lifetimeDownload'] += round(download.filesize_approx/1000000, 2)
+                                download.download(output_path='./src/cache')
+                                
+                                bestServer = requests.get(url='https://api.gofile.io/getServer').json()['data']['server']
+
+                                with open(f'{os.path.abspath(f"./src/cache/{download.default_filename}")}', 'rb') as f:
+                                    url = f'https://{bestServer}.gofile.io/uploadFile'
+                                    params = {'expire':round(datetime.timestamp(datetime.now()+timedelta(minutes=10)))}
+                                    shareLink = requests.post(url=url, params=params, files={f'@{os.path.abspath(f"./src/cache/{download.default_filename}")}': f}).json()['data']['downloadPage']
+                                
+                                os.remove(f"./src/cache/{download.default_filename}")
+                                embed = discord.Embed(
+                                    description=f"""{shareLink}\n\nHere is your download link.
+                                    You now have {50-userSettings[user.id]['downloadquota']['dailyDownload']}MB left in your daily quota. 
+                                    Negative values mean your daily quota for the next day will be subtracted."""
+                                )
+                                embed.set_footer(text=f'Requested by {user}')
+                                await downloadmessage.delete()
+                                await ctx.send(embed=embed, content=None)
+
+                                with open('userSettings.yaml', 'w') as data:
+                                    yaml.dump(userSettings, data, allow_unicode=True)
+                            elif str(dlreaction.emoji) == '👎':
+                                await downloadmessage.delete()
+                                await message.add_reaction('⬇️')
 
 
                     if curPage < 0:
