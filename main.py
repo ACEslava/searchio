@@ -124,7 +124,7 @@ async def on_connect():
     bot.owner_id = appInfo.owner.id
 
     for servers in bot.guilds:
-        serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id)
+        serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id, bot)
 
     with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
         lines = [dict(row) for row in csv.DictReader(file) if datetime.datetime.utcnow()-datetime.datetime.fromisoformat(row["Time"]) < datetime.timedelta(weeks=8)]
@@ -405,11 +405,11 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     return
 
     @commands.command(
-        name= 'anime',
+        name= 'mal',
         brief='Search through MyAnimeList',
-        usage='anime [query]',
+        usage='mal [query]',
         help='Searches through MyAnimeList')
-    async def anime(self, ctx, *args):
+    async def mal(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
         blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)

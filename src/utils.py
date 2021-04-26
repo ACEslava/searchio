@@ -16,7 +16,7 @@ class Sudo:
         self.userSettings = userSettings
 
     @staticmethod
-    def serverSettingsCheck(serverSettings, serverID):
+    def serverSettingsCheck(serverSettings, serverID, bot):
         oldserverSetting = copy.deepcopy(serverSettings)
 
         if serverID not in serverSettings.keys():
@@ -31,9 +31,20 @@ class Sudo:
             serverSettings[serverID]['sudoer'] = []
         if 'safesearch' not in serverSettings[serverID].keys():
             serverSettings[serverID]['safesearch'] = False
-        for searchEngines in ['wikipedia', 'scholar', 'google', 'mal', 'youtube', 'xkcd', 'pornhub']:
+        
+        commandList = [command.name for command in dict(bot.cogs)['Search Engines'].get_commands()[0:-1]]
+        #adds new search engines
+        for searchEngines in commandList:
             if searchEngines not in serverSettings[serverID].keys():
                 serverSettings[serverID][searchEngines] = True
+
+        #removes old search engines
+        deleteQueue = [keys for keys in serverSettings[serverID].keys() 
+            if keys not in commandList+['blacklist', 'commandprefix','adminrole','sudoer','safesearch']]
+        for keys in deleteQueue:
+            del serverSettings[serverID][keys]
+                
+        
         if oldserverSetting != serverSettings:
             with open('serverSettings.yaml', 'w') as data:
                 yaml.dump(serverSettings, data, allow_unicode=True)
@@ -209,28 +220,27 @@ class Sudo:
             if adminrole != None:
                 adminrole = self.ctx.guild.get_role(int(adminrole)) 
             if not args:
-                embed = discord.Embed(title="Configuration")
-                embed.add_field(name="Guild Administration", value=f"""
-                    ` Adminrole:` {adminrole.name if adminrole != None else 'None set'}
-                    `Safesearch:` {'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}
-                    `    Prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}""")
-                embed.add_field(name="Guild Search Engines", value=f"""
-                    `   Google:` {'✅' if self.serverSettings[self.ctx.guild.id]['google'] == True else '❌'}
-                    `      MAL:` {'✅' if self.serverSettings[self.ctx.guild.id]['mal'] == True else '❌'}
-                    `  Scholar:` {'✅' if self.serverSettings[self.ctx.guild.id]['scholar'] == True else '❌'}
-                    `Wikipedia:` {'✅' if self.serverSettings[self.ctx.guild.id]['wikipedia'] == True else '❌'}
-                    `     XKCD:` {'✅' if self.serverSettings[self.ctx.guild.id]['xkcd'] == True else '❌'}
-                    `  Youtube:` {'✅' if self.serverSettings[self.ctx.guild.id]['youtube'] == True else '❌'}
-                    `  Pornhub:` {'✅' if self.serverSettings[self.ctx.guild.id]['pornhub'] == True else '❌'}""")
-                embed.add_field(name="User Configuration", value=f"""
-                    `             Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
-                    `              Alias:` {self.userSettings[self.ctx.author.id]['searchAlias'] if self.userSettings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}
-                    `   Daily Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
-                    `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""", inline=False)
-
-                embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
-                configMessage = await self.ctx.send(embed=embed)
                 try:
+                    embed = discord.Embed(title="Configuration")
+                    
+                    embed.add_field(name="User Configuration", value=f"""
+                        `             Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
+                        `              Alias:` {self.userSettings[self.ctx.author.id]['searchAlias'] if self.userSettings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}
+                        `   Daily Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
+                        `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""", inline=False)
+
+                    embed.add_field(name="Guild Administration", value=f"""
+                        ` adminrole:` {adminrole.name if adminrole != None else 'None set'}
+                        `safesearch:` {'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}
+                        `    prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}""")
+                    
+                    embed.add_field(name="Guild Search Engines", 
+                        value='\n'.join([f'`{command:>10}:` {"✅" if self.serverSettings[self.ctx.guild.id][command] == True else "❌"}' 
+                            for command in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1]]]))
+
+                    embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
+                    configMessage = await self.ctx.send(embed=embed)
+
                     await configMessage.add_reaction('🗑️')
                     reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == configMessage]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
@@ -238,9 +248,12 @@ class Sudo:
         
                 except asyncio.TimeoutError as e: 
                     await configMessage.clear_reactions()
-            elif args[0].lower() in ['wikipedia', 'scholar', 'google', 'myanimelist', 'youtube', 'safesearch', 'xkcd', 'pornhub']:
+                except Exception as e:
+                    await ErrorHandler(self.bot, self.ctx, e)
+                finally: return
+            elif args[0].lower() in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1]]:
                 if len(args) == 1:
-                    embed = discord.Embed(title=args[0].capitalize(), description=f"{'✅' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else '❌'}")
+                    embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else '❌'}")
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
                     try:

@@ -2,7 +2,6 @@ from pornhub_api import PornhubApi
 from discord import Embed
 from src.utils import ErrorHandler
 import asyncio
-from pydantic import AnyHttpUrl
 
 class PornhubSearch():
     @staticmethod
