@@ -42,7 +42,7 @@ class YoutubeSearch:
             while doExit == False:
                 try:
                     await message.edit(content=None, embed=embeds[curPage])
-                    reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([str(reaction.emoji) in ["◀️", "▶️", "🗑️", "⬇️"], reaction.message == message]), timeout=60)
+                    reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([str(reaction.emoji) in ["◀️", "▶️", "🗑️", "⬇️"], reaction.message == message, not user.bot]), timeout=60)
                     await message.remove_reaction(reaction, user)
                     if str(reaction.emoji) == '🗑️':
                         await message.delete()
@@ -95,6 +95,10 @@ class YoutubeSearch:
                             elif str(dlreaction.emoji) == '👎':
                                 await downloadmessage.delete()
                                 await message.add_reaction('⬇️')
+                        
+                        else:
+                            await downloadmessage.delete()
+                            await message.add_reaction('⬇️')
 
 
                     if curPage < 0:
