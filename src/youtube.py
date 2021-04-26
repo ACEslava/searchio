@@ -96,7 +96,6 @@ class YoutubeSearch:
                             await message.add_reaction('⬇️')
 
 
-                    await message.remove_reaction(reaction, user)
                     if curPage < 0:
                         curPage = len(embeds)-1
                     elif curPage > len(embeds)-1:

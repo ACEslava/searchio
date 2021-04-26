@@ -15,99 +15,93 @@ class MyAnimeListSearch:
         self.ctx = ctx
     
     async def search(self):
+        def searchPages(result):
+            return discord.Embed(title=f"Titles matching '{self.searchQuery}'", description=
+                ''.join([f'[{index}]: {value.title}\n' for index, value in enumerate(result)]))
         try:
             msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
             await asyncio.sleep(random.uniform(0,1))
             search = AnimeSearch(self.searchQuery)
 
-            while True:
+            while 1:
                 result = [[anime for anime in search.results][x:x+10] for x in range(0, len([anime for anime in search.results]), 10)]
-                pages = len(result)
-                cur_page = 1
-                if len(result) != 1:
-                    embed=discord.Embed(title=f"Titles matching '{self.searchQuery}'\n Page {cur_page}/{pages}:", description=
-                        ''.join([f'[{index}]: {value.title}\n' for index, value in enumerate(result[cur_page-1])]))
-                    embed.set_footer(text=f"Requested by {self.ctx.author}")
-                    await msg[0].edit(content=None, embed=embed)
-                    await self.bot.wait_until_ready()
-                    await msg[-1].add_reaction('◀️')
-                    await msg[-1].add_reaction('▶️')
-                    msg.append(await self.ctx.send("Please choose option or cancel"))
-                
-                else:
-                    embed=discord.Embed(title=f"Titles matching '{self.searchQuery}':", description=
-                        ''.join([f'[{index}]: {value.title}\n' for index, value in enumerate(result[0])]))
-                    embed.set_footer(text=f"Requested by {self.ctx.author}")
-                    msg.append(await self.ctx.send(embed=embed))
-                    msg.append(await self.ctx.send("Please choose option or cancel"))
+                embeds = list(map(searchPages, result))
+                curPage = 0
 
-                while True:
-                    try: #checks for user input or reaction input.
-                        emojitask = asyncio.create_task(self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) in ["◀️", "▶️", "🗑️"], timeout=30))
+                for index, item in enumerate(embeds): 
+                    item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}')
+
+                await msg[0].add_reaction('🗑️')
+                if len(embeds) > 1:
+                    await msg[0].add_reaction('◀️')
+                    await msg[0].add_reaction('▶️')
+                msg.append(await self.ctx.send('Please choose option or cancel'))
+
+                while 1:
+                    try:
+                        await msg[0].edit(content=None, embed=embeds[curPage])
+                        emojitask = asyncio.create_task(self.bot.wait_for("reaction_add", 
+                            check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == msg[0]]), 
+                            timeout=60))
                         responsetask = asyncio.create_task(self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout=30))
-                        waiting = [emojitask,responsetask]
-                        done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
                         
-                        if emojitask in done: # if reaction input, change page
-                            reaction, user = emojitask.result()
-                            if str(reaction.emoji) == "▶️" and cur_page != pages:
-                                cur_page += 1
-                                embed=discord.Embed(title=f"Titles matching '{self.searchQuery}'\nPage {cur_page}/{pages}:", description=
-                                    ''.join([f'[{index}]: {value}\n' for index, value in enumerate(result[cur_page-1])]))
-                                embed.set_footer(text=f"Requested by {self.ctx.author}")
-                                await msg[-2].edit(embed=embed)
-                                await msg[-2].remove_reaction(reaction, user)
+                        waiting = [emojitask, responsetask]
+                        done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
+                        if emojitask in done: 
+                            reaction, user = emojitask.result()   
+                            await msg[0].remove_reaction(reaction, user)
                             
-                            elif str(reaction.emoji) == "◀️" and cur_page > 1:
-                                cur_page -= 1
-                                embed=discord.Embed(title=f"Titles matching '{self.searchQuery}'\n Page {cur_page}/{pages}:", description=
-                                    ''.join([f'[{index}]: {value}\n' for index, value in enumerate(result[cur_page-1])]))
-                                embed.set_footer(text=f"Requested by {self.ctx.author}")
-                                await msg[-2].edit(embed=embed)
-                                await msg[-2].remove_reaction(reaction, user)
-                            
-                            else:
-                                await msg[-2].remove_reaction(reaction, user)
-                                # removes reactions if the user tries to go forward on the last page or
-                                # backwards on the first page
+                            if str(reaction.emoji) == '🗑️':
+                                await msg[0].delete()
+                                return
+                            elif str(reaction.emoji) == '◀️':
+                                curPage-=1
+                            elif str(reaction.emoji) == '▶️':
+                                curPage+=1
+
+                            if curPage < 0:
+                                curPage = len(embeds)-1
+                            elif curPage > len(embeds)-1:
+                                curPage = 0
                         
                         elif responsetask in done:
-                            emojitask.cancel()
-                            input = responsetask.result() 
-                            await input.delete()
-                            if input.content == 'cancel':
-                                raise UserCancel
-                            elif input.content not in ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]:
-                                continue
-                            input = int(input.content)
-                            animeItem = result[cur_page-1][input]
-                            
-                            embed=discord.Embed(title=f'{animeItem.title}', 
-                                description=animeItem.synopsis, 
-                                url=animeItem.url) #Myanimelist data
-                                
-                            embed.add_field(name="MyAnimeListID", value=animeItem.mal_id, inline=True)
-                            embed.add_field(name="Rating", value=animeItem.score, inline=True)
-                            embed.add_field(name="Episodes", value=animeItem.episodes, inline=True)
-
-                            embed.set_thumbnail(url=animeItem.image_url)
-                            embed.set_footer(text=f"Requested by {self.ctx.author}")
-                            searchresult = await self.ctx.send(embed=embed)
-                            
-                            Log.appendToLog(self.ctx, f"{self.ctx.command} result", animeItem.title )
-                            for message in msg:
-                                await message.delete()
-                            
                             try:
+                                emojitask.cancel()
+                                input = responsetask.result() 
+                                await input.delete()
+                                if input.content.lower() == 'cancel':
+                                    raise UserCancel
+                                input = int(input.content)
+                                animeItem = result[curPage][input]
+                                
+                                embed=discord.Embed(title=f'{animeItem.title}', 
+                                    description=animeItem.synopsis, 
+                                    url=animeItem.url) #Myanimelist data
+                                    
+                                embed.add_field(name="MyAnimeListID", value=animeItem.mal_id, inline=True)
+                                embed.add_field(name="Rating", value=animeItem.score, inline=True)
+                                embed.add_field(name="Episodes", value=animeItem.episodes, inline=True)
+
+                                embed.set_thumbnail(url=animeItem.image_url)
+                                embed.set_footer(text=f"Requested by {self.ctx.author}")
+                                searchresult = await self.ctx.send(embed=embed)
+                                
+                                Log.appendToLog(self.ctx, f"{self.ctx.command} result", animeItem.title )
+                                for message in msg:
+                                    await message.delete()
+                            
                                 await searchresult.add_reaction('🗑️')
                                 reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) == "🗑️", timeout=60)
                                 if str(reaction.emoji) == '🗑️':
                                     await searchresult.delete()
+                                return
                             
+                            except ValueError or IndexError:
+                                await msg[-1].edit(content='Invalid choice. Please choose a number between 0-9 or cancel')
+                                continue
+
                             except asyncio.TimeoutError as e: 
                                 await searchresult.clear_reactions()
-                            
-                            finally: 
                                 return
                     
                     except UserCancel as e:
@@ -124,9 +118,6 @@ class MyAnimeListSearch:
                     except Exception as e:
                         for message in msg:
                             await message.delete()
-                    finally:
-                        return
-
         except Exception as e:
             await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
         finally: return

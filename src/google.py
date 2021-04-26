@@ -144,6 +144,7 @@ class GoogleSearch:
             googleSnippetResults = [result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings=='']
          
             #checks if user searched specifically for images
+            embeds = list(map(textEmbed, googleSnippetResults))
             if foundImage:
                for results in googleSnippetResults:
                   if 'Images' in results.strings: 
@@ -151,7 +152,6 @@ class GoogleSearch:
                      embeds = list(map(imageEmbed, images))
                      del embeds[-1]
                      break
-            else: embeds = list(map(textEmbed, googleSnippetResults))
                
             print(ctx.author.name + " searched for: "+searchQuery[:233])
        
