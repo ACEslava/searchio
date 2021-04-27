@@ -271,6 +271,7 @@ class GoogleSearch:
                raise
       
       except asyncio.TimeoutError: 
+         message.clear_reactions()
          raise
 
       except Exception as e:
