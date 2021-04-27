@@ -148,24 +148,29 @@ class GoogleSearch:
                
                embeds = [item for sublist in [definitionEmbed(word, response) for word in response['meanings']] for item in sublist]
                for index, item in enumerate(embeds): 
-                  item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
+                  item.set_footer(text=f'Page {index+1}/{len(embeds)}\nReact with 🔍 to search Google\nRequested by: {str(ctx.author)}')
                
                doExit, curPage = False, 0
                await message.add_reaction('🗑️')
+               await message.add_reaction('🔍')
                if len(embeds) > 1:
                   await message.add_reaction('◀️')
                   await message.add_reaction('▶️')
-               while doExit == False:
+               while 1:
                   try:
                      await message.edit(content=None, embed=embeds[curPage])
-                     reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == message]), timeout=60)
+                     reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️",'🔍'], reaction.message == message]), timeout=60)
                      if str(reaction.emoji) == '🗑️':
                         await message.delete()
-                        doExit = True
+                        return
                      elif str(reaction.emoji) == '◀️':
                         curPage-=1
                      elif str(reaction.emoji) == '▶️':
                         curPage+=1
+                     elif str(reaction.emoji) == '🔍':
+                        await message.clear_reactions()
+                        await message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+                        break
 
                      await message.remove_reaction(reaction, user)
                      if curPage < 0:
@@ -175,7 +180,6 @@ class GoogleSearch:
                   
                   except asyncio.TimeoutError: 
                      raise  
-               return
             else: pass
             
             hasFoundImage = False
