@@ -54,14 +54,6 @@ with open('userSettings.yaml', 'r') as data:
     userSettings = yaml.load(data)
     if userSettings is None: userSettings = {}
 
-def isAuthorizedCommand(bot, ctx):
-    global serverSettings
-    check = all([
-        ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'], 
-        not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles), 
-        serverSettings[ctx.guild.id]['searchEngines'][ctx.command.name] != False])
-    return any([check, Sudo.isSudoer(bot, ctx, serverSettings)])
-
 async def searchQueryParse(ctx, args):
     UserCancel = Exception
     global userSettings
@@ -174,7 +166,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         description='--lang [ISO Language Code]: Specifies a country code to search through Wikipedia. Use wikilang to see available codes.')
     async def wiki(self, ctx, *args):
         global serverSettings
-        if isAuthorizedCommand(bot, ctx):
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             UserCancel = Exception
             language = "en"
             if not args: #checks if search is empty
@@ -214,7 +206,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     ru: русский""")
     async def wikilang(self, ctx):
         global serverSettings
-        if isAuthorizedCommand(bot, ctx):
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             await WikipediaSearch(bot, ctx, "en").lang()
             return
 
@@ -227,13 +219,14 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             "Input automatically detects language unless specified with 'from [language]'", 
             "Defaults to output English OR user locale if set, unless explicitly specified with 'to [language]'",
             "Example Query: translate مرحبا from arabic to spanish",
-            "\n\nimage: Searches only for image results."]))
+            "\n\nimage: Searches only for image results.",
+            "\n\ndefine: Queries dictionaryapi.dev for an English definition of the word"]))
     async def google(self, ctx, *args):
         global serverSettings
         global userSettings
 
         UserCancel = KeyboardInterrupt
-        if isAuthorizedCommand(bot, ctx):
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             continueLoop = True
@@ -281,7 +274,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def image(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if isAuthorizedCommand(bot, ctx):
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
 
@@ -298,7 +291,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                          --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
     async def scholar(self, ctx, *args):
         global serverSettings
-        if isAuthorizedCommand(bot, ctx):
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             UserCancel = Exception
             if not args: #checks if search is empty
                 await ctx.send("Enter search query or cancel") #if empty, asks user for search query
@@ -365,7 +358,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global userSettings
         
         UserCancel = Exception
-        if isAuthorizedCommand(bot, ctx):
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             continueLoop = True 
@@ -416,7 +409,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def mal(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if isAuthorizedCommand(bot, ctx):
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             search = MyAnimeListSearch(bot, ctx, userquery)
@@ -431,7 +424,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def xkcd(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if isAuthorizedCommand(bot, ctx):
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             await XKCDSearch.search(bot, ctx, userquery)
@@ -449,7 +442,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
         UserCancel = KeyboardInterrupt
         
-        if isAuthorizedCommand(bot, ctx) and ctx.channel.nsfw:
+        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings) and ctx.channel.nsfw:
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             continueLoop = True
@@ -699,5 +692,4 @@ async def help(ctx, *args):
 
 bot.add_cog(SearchEngines(bot))
 bot.add_cog(Administration(bot))
-
 bot.run(DISCORD_TOKEN)

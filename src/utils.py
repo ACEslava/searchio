@@ -109,6 +109,15 @@ class Sudo:
             return '&'
         else: return serverSettings[ctx.guild.id]['commandprefix']
 
+    @staticmethod
+    def isAuthorizedCommand(bot, ctx, serverSettings):
+        check = all([
+            ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'], 
+            not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles), 
+            serverSettings[ctx.guild.id]['searchEngines'][ctx.command.name] != False])
+        return any([check, Sudo.isSudoer(bot, ctx, serverSettings)])
+
+
     async def userSearch(self, search):
         try:
             if search.isnumeric():

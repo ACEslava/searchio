@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from google_trans_new import google_translator
 from iso639 import languages as Languages
 from discord import Embed
-import asyncio, re, wikipedia, string, base64
+import asyncio, re, wikipedia, string, base64, requests
 
 class GoogleSearch:
    @staticmethod
@@ -116,17 +116,78 @@ class GoogleSearch:
                   await message.clear_reactions()
                   await message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
                   pass
-
+            
+            else: pass
+            hasFoundImage = False 
+         
          elif bool(re.search('image', searchQuery.lower())):
-            foundImage = True
-         else: foundImage = False        
+            hasFoundImage = True
+         
+         elif bool(re.search('define', searchQuery.lower())):
+            def definitionEmbed(word, response):
+               embed = []
+               for definition in word['definitions']:      
+                  embed.append(Embed( 
+                     title=f'Definition of: {response["word"]}',
+                     description='\n'.join([
+                        f'{response["word"]}',
+                        f'`{response["phonetics"][0]["text"]}`',
+                        '\n',
+                        f'{word["partOfSpeech"]}', 
+                        f'{definition["definition"]}', '\n'])
+                  ))
+                  embed[-1].add_field(name='Synonyms', value=", ".join(definition["synonyms"]) if "synonyms" in definition.keys() else "None")
+                  embed[-1].add_field(name='Example', value = definition["example"])
+                  embed[-1].add_field(name='Pronounciation Guide', value=response["phonetics"][0]["audio"], inline=False)
+                  embed[-1].url = f'https://www.merriam-webster.com/dictionary/{response["word"]}'
+               return embed
+            query = searchQuery.lower().split(' ')
+            if len(query) > 1:
+               response = requests.get(f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}')
+               response = response.json()[0]
+               
+               embeds = [item for sublist in [definitionEmbed(word, response) for word in response['meanings']] for item in sublist]
+               for index, item in enumerate(embeds): 
+                  item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
+               
+               doExit, curPage = False, 0
+               await message.add_reaction('🗑️')
+               if len(embeds) > 1:
+                  await message.add_reaction('◀️')
+                  await message.add_reaction('▶️')
+               while doExit == False:
+                  try:
+                     await message.edit(content=None, embed=embeds[curPage])
+                     reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == message]), timeout=60)
+                     if str(reaction.emoji) == '🗑️':
+                        await message.delete()
+                        doExit = True
+                     elif str(reaction.emoji) == '◀️':
+                        curPage-=1
+                     elif str(reaction.emoji) == '▶️':
+                        curPage+=1
+
+                     await message.remove_reaction(reaction, user)
+                     if curPage < 0:
+                        curPage = len(embeds)-1
+                     elif curPage > len(embeds)-1:
+                        curPage = 0
+                  
+                  except asyncio.TimeoutError: 
+                     raise  
+               return
+            else: pass
+            
+            hasFoundImage = False
+         
+         else: hasFoundImage = False        
          
          uuleParse = uule(userSettings[ctx.author.id]['locale']) if userSettings[ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
          url = (''.join(["https://google.com/search?pws=0&q=", 
-            searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if foundImage else ""}',
+            searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
             f"&uule={uuleParse}&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True and ctx.channel.nsfw == False else ''}"]))
-         response = http.request('GET', url)
-         soup = BeautifulSoup(response.data, features="lxml")
+         response = requests.get(url)
+         soup = BeautifulSoup(response.content, features="lxml")
          index = 3
          google_snippet_result = soup.find("div", {"id": "main"})
    
@@ -138,8 +199,8 @@ class GoogleSearch:
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
 
             #Debug HTML
-            # with open('test.html', 'w') as file:
-            #    file.write(soup.prettify())
+            with open('test.html', 'w', encoding='utf-8-sig') as file:
+               file.write(soup.prettify())
 
             #end div filtering
             googleSnippetResults = [googleSnippetResults[resultNumber] for resultNumber in range(3, len(googleSnippetResults)-2)]
@@ -149,7 +210,7 @@ class GoogleSearch:
          
             #checks if user searched specifically for images
             embeds = list(map(textEmbed, googleSnippetResults))
-            if foundImage:
+            if hasFoundImage:
                for results in googleSnippetResults:
                   if 'Images' in results.strings: 
                      images = results.findAll("img", recursive=True)
