@@ -269,7 +269,6 @@ class Sudo:
                         return
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
-
                 elif bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
                     self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = True
                 elif bool(re.search('^disable', args[1].lower()) or re.search('^off', args[1].lower())):
@@ -294,8 +293,50 @@ class Sudo:
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
                 await self.ctx.send(
-                    f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else 'disabled'}")
-            
+                    f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else 'disabled'}")          
+            elif args[0].lower() == 'safesearch':
+                if len(args) == 1:
+                    embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}")
+                    embed.set_footer(text=f"React with ✅/❌ to enable/disable")
+                    message = await self.ctx.send(embed=embed)
+                    try:
+                        await message.add_reaction('✅')
+                        await message.add_reaction('❌')
+
+                        reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
+                        if str(reaction.emoji) == '✅':
+                            self.serverSettings[self.ctx.guild.id]['safesearch'] = True
+                        elif str(reaction.emoji) == '❌':
+                            self.serverSettings[self.ctx.guild.id]['safesearch'] = False
+                        await message.delete()
+                        return
+                    except asyncio.TimeoutError as e: 
+                        await message.clear_reactions()
+                elif bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
+                    self.serverSettings[self.ctx.guild.id]['safesearch'] = True
+                elif bool(re.search('^disable', args[1].lower()) or re.search('^off', args[1].lower())):
+                    self.serverSettings[self.ctx.guild.id]['safesearch'] = False
+                else:
+                    embed = discord.Embed(title=args[0].capitalize(), 
+                                          description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}")
+                    embed.set_footer(text=f"React with ✅/❌ to enable/disable")
+                    message = await self.ctx.send(embed=embed)
+                    
+                    try:
+                        await message.add_reaction('✅')
+                        await message.add_reaction('❌')
+
+                        reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
+                        if str(reaction.emoji) == '✅':
+                            self.serverSettings[self.ctx.guild.id]['safesearch'] = True
+                        elif str(reaction.emoji) == '❌':
+                            self.serverSettings[self.ctx.guild.id]['safesearch'] = False
+                        await message.delete()
+                        return
+                    except asyncio.TimeoutError as e: 
+                        await message.clear_reactions()
+                await self.ctx.send(
+                    f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else 'disabled'}")
             elif args[0].lower() == 'adminrole':
                 if not args[1]:
                     embed = discord.Embed(title='Adminrole', description=f"{await self.ctx.guild.get_role(int(adminrole)) if adminrole != None else 'None set'}")
