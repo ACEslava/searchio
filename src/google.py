@@ -137,7 +137,7 @@ class GoogleSearch:
                         f'{definition["definition"]}', '\n'])
                   ))
                   embed[-1].add_field(name='Synonyms', value=", ".join(definition["synonyms"]) if "synonyms" in definition.keys() else "None")
-                  embed[-1].add_field(name='Example', value = definition["example"])
+                  embed[-1].add_field(name='Example', value = definition["example"] if "example" in definition.keys() else "None")
                   embed[-1].add_field(name='Pronounciation Guide', value=response["phonetics"][0]["audio"], inline=False)
                   embed[-1].url = f'https://www.merriam-webster.com/dictionary/{response["word"]}'
                return embed
