@@ -18,7 +18,7 @@ class Sudo:
     @staticmethod
     def serverSettingsCheck(serverSettings, serverID, bot):
         oldserverSetting = copy.deepcopy(serverSettings)
-
+        commandList = [command.name for command in dict(bot.cogs)['Search Engines'].get_commands()]
         if serverID not in serverSettings.keys():
             serverSettings[serverID] = {}
         if 'blacklist' not in serverSettings[serverID].keys():
@@ -31,18 +31,20 @@ class Sudo:
             serverSettings[serverID]['sudoer'] = []
         if 'safesearch' not in serverSettings[serverID].keys():
             serverSettings[serverID]['safesearch'] = False
+        if 'searchEngines' not in serverSettings[serverID].keys():
+            serverSettings[serverID]['searchEngines'] = {key:True for key in commandList}
         
-        commandList = [command.name for command in dict(bot.cogs)['Search Engines'].get_commands()[0:-1]]
         #adds new search engines
+
         for searchEngines in commandList:
-            if searchEngines not in serverSettings[serverID].keys():
-                serverSettings[serverID][searchEngines] = True
+            if searchEngines not in serverSettings[serverID]['searchEngines'].keys():
+                serverSettings[serverID]['searchEngines'][searchEngines] = True
 
         #removes old search engines
-        deleteQueue = [keys for keys in serverSettings[serverID].keys() 
-            if keys not in commandList+['blacklist', 'commandprefix','adminrole','sudoer','safesearch']]
+        deleteQueue = [keys for keys in serverSettings[serverID]['searchEngines'].keys() 
+            if keys not in commandList]
         for keys in deleteQueue:
-            del serverSettings[serverID][keys]
+            del serverSettings[serverID]['searchEngines'][keys]
                 
         
         if oldserverSetting != serverSettings:
@@ -69,7 +71,7 @@ class Sudo:
 
         if datetime.utcnow() - datetime.fromisoformat(userSettings[userID]['downloadquota']['updateTime']) > timedelta(hours=24):
             userSettings[userID]['downloadquota']['updateTime'] = datetime.combine(date.today(), datetime.min.time()).isoformat()
-            
+
             if userSettings[userID]['downloadquota']['dailyDownload'] > 50:
                 userSettings[userID]['downloadquota']['dailyDownload'] -= 50
             else: userSettings[userID]['downloadquota']['dailyDownload'] = 0
@@ -143,9 +145,6 @@ class Sudo:
     
     async def blacklist(self, args):
         try:
-            if 'blacklist' not in self.serverSettings[self.ctx.guild.id].keys():
-                self.serverSettings[self.ctx.guild.id]['blacklist'] = []
-
             if len(args) == 1:
                 user = await self.userSearch(' '.join(args))
                 role = self.ctx.guild.get_role(int(''.join(args)))
@@ -163,9 +162,6 @@ class Sudo:
     
     async def whitelist(self, args):
         try: 
-            if 'blacklist' not in self.serverSettings[self.ctx.guild.id].keys():
-                self.serverSettings[self.ctx.guild.id]['blacklist'] = []
-
             if len(args) == 1:
                 try:
                     user = await self.userSearch(' '.join(args))
@@ -234,14 +230,19 @@ class Sudo:
                         `    prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}""")
                     
                     embed.add_field(name="Guild Search Engines", 
-                        value='\n'.join([f'`{command:>10}:` {"✅" if self.serverSettings[self.ctx.guild.id][command] == True else "❌"}' 
-                            for command in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1]]]))
+                        value='\n'.join([f'`{command:>10}:` {"✅" if self.serverSettings[self.ctx.guild.id]["searchEngines"][command] == True else "❌"}' 
+                            for command in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()]]))
 
                     embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
                     configMessage = await self.ctx.send(embed=embed)
 
                     await configMessage.add_reaction('🗑️')
-                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == configMessage]), timeout=60)
+                    reaction, user = await self.bot.wait_for("reaction_add", 
+                        check=lambda reaction, user: all([user == self.ctx.author, 
+                                                        str(reaction.emoji) == "🗑️", 
+                                                        reaction.message == configMessage]), 
+                        timeout=60)
+                    
                     if str(reaction.emoji) == '🗑️':
                         await configMessage.delete()
         
@@ -250,9 +251,9 @@ class Sudo:
                 except Exception as e:
                     await ErrorHandler(self.bot, self.ctx, e)
                 finally: return
-            elif args[0].lower() in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1]]:
+            elif args[0].lower() in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()]:
                 if len(args) == 1:
-                    embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else '❌'}")
+                    embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else '❌'}")
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
                     try:
@@ -261,36 +262,40 @@ class Sudo:
 
                         reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
                         if str(reaction.emoji) == '✅':
-                            self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
+                            self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = True
                         elif str(reaction.emoji) == '❌':
-                            self.serverSettings[self.ctx.guild.id][args[0].lower()] = False
+                            self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = False
                         await message.delete()
                         return
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
 
                 elif bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
-                    self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
+                    self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = True
                 elif bool(re.search('^disable', args[1].lower()) or re.search('^off', args[1].lower())):
-                    self.serverSettings[self.ctx.guild.id][args[0].lower()] = False
+                    self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = False
                 else:
-                    embed = discord.Embed(title=args[0].capitalize(), description=f"{'✅' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else '❌'}")
+                    embed = discord.Embed(title=args[0].capitalize(), 
+                                          description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else '❌'}")
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
+                    
                     try:
                         await message.add_reaction('✅')
                         await message.add_reaction('❌')
 
                         reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
                         if str(reaction.emoji) == '✅':
-                            self.serverSettings[self.ctx.guild.id][args[0].lower()] = True
+                            self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = True
                         elif str(reaction.emoji) == '❌':
-                            self.serverSettings[self.ctx.guild.id][args[0].lower()] = False
+                            self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = False
                         await message.delete()
                         return
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
-                await self.ctx.send(f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id][args[0].lower()] == True else 'disabled'}")
+                await self.ctx.send(
+                    f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else 'disabled'}")
+            
             elif args[0].lower() == 'adminrole':
                 if not args[1]:
                     embed = discord.Embed(title='Adminrole', description=f"{await self.ctx.guild.get_role(int(adminrole)) if adminrole != None else 'None set'}")

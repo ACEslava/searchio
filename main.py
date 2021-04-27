@@ -54,6 +54,14 @@ with open('userSettings.yaml', 'r') as data:
     userSettings = yaml.load(data)
     if userSettings is None: userSettings = {}
 
+def isAuthorizedCommand(bot, ctx):
+    global serverSettings
+    check = all([
+        ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'], 
+        not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles), 
+        serverSettings[ctx.guild.id]['searchEngines'][ctx.command.name] != False])
+    return any([check, Sudo.isSudoer(bot, ctx, serverSettings)])
+
 async def searchQueryParse(ctx, args):
     UserCancel = Exception
     global userSettings
@@ -151,7 +159,11 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def cog_before_invoke(self, ctx):
         global userSettings
         userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
-        Log.appendToLog(ctx)
+        if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
+            Log.appendToLog(ctx, userSettings[ctx.author.id]['searchAlias'])
+        elif ctx.command.name == 's':
+            Log.appendToLog(ctx, 's', 'Not set')
+        else: Log.appendToLog(ctx)
         return
 
     @commands.command(
@@ -162,8 +174,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         description='--lang [ISO Language Code]: Specifies a country code to search through Wikipedia. Use wikilang to see available codes.')
     async def wiki(self, ctx, *args):
         global serverSettings
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['wikipedia'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if isAuthorizedCommand(bot, ctx):
             UserCancel = Exception
             language = "en"
             if not args: #checks if search is empty
@@ -203,8 +214,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     ru: русский""")
     async def wikilang(self, ctx):
         global serverSettings
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['wikipedia'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if isAuthorizedCommand(bot, ctx):
             await WikipediaSearch(bot, ctx, "en").lang()
             return
 
@@ -222,11 +232,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         global userSettings
 
-        userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
-
         UserCancel = KeyboardInterrupt
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if isAuthorizedCommand(bot, ctx):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             continueLoop = True
@@ -274,8 +281,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def image(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if isAuthorizedCommand(bot, ctx):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
 
@@ -292,8 +298,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                          --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
     async def scholar(self, ctx, *args):
         global serverSettings
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['scholar'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if isAuthorizedCommand(bot, ctx):
             UserCancel = Exception
             if not args: #checks if search is empty
                 await ctx.send("Enter search query or cancel") #if empty, asks user for search query
@@ -360,8 +365,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global userSettings
         
         UserCancel = Exception
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['google'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if isAuthorizedCommand(bot, ctx):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             continueLoop = True 
@@ -412,8 +416,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def mal(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['mal'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if isAuthorizedCommand(bot, ctx):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             search = MyAnimeListSearch(bot, ctx, userquery)
@@ -428,8 +431,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def xkcd(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['xkcd'] != False) or Sudo.isSudoer(bot, ctx, serverSettings):
+        if isAuthorizedCommand(bot, ctx):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             await XKCDSearch.search(bot, ctx, userquery)
@@ -439,17 +441,15 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         name='pornhub',
         brief='Search through Pornhub',
         usage='pornhub [query]',
-        help='Searches for Pornhub videos. Returns a maximum of 10 results'
-    )
+        help='Searches for Pornhub videos. Returns a maximum of 10 results')
     async def pornhub(self, ctx, *args):
         global serverSettings
         global userSettings
 
         userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
-
         UserCancel = KeyboardInterrupt
-        blacklist = ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'] and not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles)
-        if (blacklist and serverSettings[ctx.guild.id]['pornhub'] != False and ctx.channel.nsfw) or Sudo.isSudoer(bot, ctx, serverSettings):
+        
+        if isAuthorizedCommand(bot, ctx) and ctx.channel.nsfw:
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             continueLoop = True
@@ -489,6 +489,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     await ErrorHandler(bot, ctx, e, userquery)
                     return
 
+    #alias command (always last)
     @commands.command(
         name='s',
         brief='A shortcut search function',
@@ -650,17 +651,12 @@ async def help(ctx, *args):
         
         embed.add_field(name="Administration", inline=False, value="\n".join([f'`{command.name:>{maxAdminCommandStrLength}}:` {command.brief}' for command in adminCog.get_commands()]))
         
-        embed.add_field(name="Search Engines", inline=False, value=textwrap.dedent(f"""\
-            {f"`     wiki:` {searchEngineCog.wiki.brief}" if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
-            {f"` wikilang:` {searchEngineCog.wikilang.brief}" if serverSettings[ctx.guild.id]['wikipedia'] == True else ''}
-            {f"`   google:` {searchEngineCog.google.brief}" if serverSettings[ctx.guild.id]['google'] == True else ''}
-            {f"`    image:` {searchEngineCog.image.brief}" if serverSettings[ctx.guild.id]['google'] == True else ''}
-            {f"`  scholar:` {searchEngineCog.scholar.brief}" if serverSettings[ctx.guild.id]['scholar'] == True else ''}
-            {f"`  youtube:` {searchEngineCog.youtube.brief}" if serverSettings[ctx.guild.id]['youtube'] == True else ''}
-            {f"`    anime:` {searchEngineCog.anime.brief}" if serverSettings[ctx.guild.id]['mal'] == True else ''}
-            {f"`     xkcd:` {searchEngineCog.xkcd.brief}" if serverSettings[ctx.guild.id]['xkcd'] == True else ''}
-            {f"`        s:` {searchEngineCog.s.brief}"}
-        """))
+        embed.add_field(
+            name="Search Engines", 
+            inline=False, 
+            value='\n'.join([f"`{command.name:>10}:` {command.brief}" 
+                for command in searchEngineCog.get_commands() if serverSettings[ctx.guild.id]['searchEngines'][command.name] == True]))
+
         embed.set_footer(text=f"Do {commandPrefix}help [command] for more information")
 
         if args:

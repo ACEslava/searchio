@@ -98,7 +98,7 @@ class YoutubeSearch:
                         
                         else:
                             embed = discord.Embed(
-                                description=f"""{user}, this download is {round(download.filesize_approx/1000000, 2)}, which exceeds the maximum filesize of 100MB. It will not be processed.""")
+                                description=f"""{user}, this download is {round(download.filesize_approx/1000000, 2)}MB, which exceeds the maximum filesize of 100MB. It will not be processed.""")
                             await downloadmessage.edit(content=None, embed=embed)
 
 
