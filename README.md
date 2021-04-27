@@ -62,7 +62,7 @@ Run main.py
           xkcd: bool
           youtube: bool
   ```
-  * The userSettings.yaml (and by extension userSettings dict) are structured as follows (in json syntax):
+  * The userSettings.yaml (and by extension userSettings dict) are structured as follows:
   ```
     userID=int:
       downloadquota:
