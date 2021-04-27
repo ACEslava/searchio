@@ -39,23 +39,36 @@ Run main.py
   * Optional instance attributes are:
   ```
     searchSettings=dict
+    userSettings=dict
   ```
 
-  * The serverSettings.json (and by extension searchSettings attrib) are structured as follows:
+  * The serverSettings.yaml (and by extension searchSettings dict) are structured as follows:
   ```
-    {
-    guildID=int: {
-        "adminrole": roleID=int OR None,
-        "blacklist": [userID=int],
-        "sudoer": [userID=int],
-        "safesearch": bool,
-        "wikipedia": bool,
-        "scholar": bool,
-        "google": bool,
-        "mal": bool,
-        "youtube": bool,
-        "commandprefix": char
-      }
-    }
-    
+    guildID=int:
+        adminrole: roleID=int OR null,
+        blacklist: [userID=int],
+        sudoer: [userID=int],
+        safesearch: bool,
+        commandprefix: char,
+        searchEngines:
+          google: bool,
+          image: bool,
+          mal: bool,
+          pornhub: bool,
+          s: bool,
+          scholar: bool
+          wiki: bool
+          wikilang: bool
+          xkcd: bool
+          youtube: bool
+  ```
+  * The userSettings.yaml (and by extension userSettings dict) are structured as follows (in json syntax):
+  ```
+    userID=int:
+      downloadquota:
+        dailyDownload: float
+        lifetimeDownload: float
+        updateTime: ISO-8601 datetime str
+      locale: str OR null
+      searchAlias: str OR null
   ```
