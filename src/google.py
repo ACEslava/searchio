@@ -9,7 +9,8 @@ import asyncio, re, wikipedia, string, base64, requests
 class GoogleSearch:
    @staticmethod
    async def search(http, bot, ctx, serverSettings, userSettings, message, searchQuery=None):
-      def imageEmbed(image):
+      #region embed creation functions
+      def imageEmbed(image): #embed creation for image embeds
          try:
             resultEmbed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}')
             imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
@@ -22,7 +23,7 @@ class GoogleSearch:
             resultEmbed.description = 'Image failed to load'
          finally: return resultEmbed
             
-      def textEmbed(result):
+      def textEmbed(result): #embed creation for text embeds
          resultEmbed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}') 
          
          divs = [d for d in result.findAll('div') if not d.find('div')]
@@ -61,23 +62,27 @@ class GoogleSearch:
             pass
          
          return resultEmbed
-                
-      def linkUnicodeParse(link: str):
+      #endregion          
+      
+      #region utility functions
+      def linkUnicodeParse(link: str): #translates unicode codes in links
          return re.sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
       
-      def uule_secret(length: int) -> str:
+      def uule_secret(length: int) -> str: #creates a uule secret for use in locales
          #Creates UULE secret
          secret_list = list(string.ascii_uppercase) + \
             list(string.ascii_lowercase) + list(string.digits) + ["-", "_"]
          return secret_list[length % len(secret_list)]
 
-      def uule(city: str) -> str:
+      def uule(city: str) -> str: #formats uule strings for use in locales
          #Creates UULE code
          secret = uule_secret(len(city))
          hashed = base64.standard_b64encode(city.encode()).decode().strip("=")
          return f"w+CAIQICI{secret}{hashed}"
+      #endregion
       
       try:
+         #region sub-commands
          if bool(re.search('translate', searchQuery.lower())):
             query = searchQuery.lower().split(' ')
             if len(query) > 1:
@@ -185,6 +190,7 @@ class GoogleSearch:
             hasFoundImage = False
          
          else: hasFoundImage = False        
+         #endregion
          
          uuleParse = uule(userSettings[ctx.author.id]['locale']) if userSettings[ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
          url = (''.join(["https://google.com/search?pws=0&q=", 
@@ -203,8 +209,8 @@ class GoogleSearch:
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
 
             #Debug HTML
-            with open('test.html', 'w', encoding='utf-8-sig') as file:
-               file.write(soup.prettify())
+            # with open('test.html', 'w', encoding='utf-8-sig') as file:
+            #    file.write(soup.prettify())
 
             #end div filtering
             googleSnippetResults = [googleSnippetResults[resultNumber] for resultNumber in range(3, len(googleSnippetResults)-2)]

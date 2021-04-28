@@ -1,5 +1,3 @@
-import discord, os, asyncio, json, yaml, textwrap, csv, datetime, requests
-from discord.ext.commands.core import before_invoke
 from src.wikipedia import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
@@ -13,14 +11,41 @@ from src.pornhub import PornhubSearch
 from dotenv import load_dotenv
 from discord.ext import commands
 from urllib3 import PoolManager
+import discord, os, asyncio, yaml, csv, datetime, requests
 
-def prefix(bot, message):
+#region utility functions
+def prefix(bot, message): #handler for individual guild prefixes
     try:
         commandprefix = serverSettings[message.guild.id]['commandprefix']
     except Exception:
         commandprefix = '&'
     finally: return commandprefix
 
+async def searchQueryParse(ctx, args): #handler for bot search queries
+    UserCancel = KeyboardInterrupt
+    global userSettings
+    userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+
+    if not args: #checks if search is empty
+        await ctx.send("Enter search query or cancel") #if empty, asks user for search query
+        try:
+            userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
+            userquery = userquery.content
+            if userquery.lower() == 'cancel': raise UserCancel
+        
+        except asyncio.TimeoutError:
+            await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
+
+        except UserCancel:
+            await ctx.send('Aborting')
+            return
+    else: 
+        userquery = ' '.join(list(args)).strip() #turns multiword search into single string.
+
+    return userquery
+#endregion
+
+#region onlaunch code
 intents = discord.Intents.default()
 intents.members = True
 intents.presences = True
@@ -53,29 +78,7 @@ with open('serverSettings.yaml', 'r') as data:
 with open('userSettings.yaml', 'r') as data:
     userSettings = yaml.load(data)
     if userSettings is None: userSettings = {}
-
-async def searchQueryParse(ctx, args):
-    UserCancel = Exception
-    global userSettings
-    userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
-
-    if not args: #checks if search is empty
-        await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-        try:
-            userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-            userquery = userquery.content
-            if userquery.lower() == 'cancel': raise UserCancel
-        
-        except asyncio.TimeoutError:
-            await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-        except UserCancel:
-            await ctx.send('Aborting')
-            return
-    else: 
-        userquery = ' '.join(list(args)).strip() #turns multiword search into single string.
-
-    return userquery
+#endregion
 
 @bot.event
 async def on_guild_join(guild):
