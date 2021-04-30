@@ -15,6 +15,7 @@ class Sudo:
         self.serverSettings = serverSettings
         self.userSettings = userSettings
 
+    #region database correction/query code
     @staticmethod
     def serverSettingsCheck(serverSettings, serverID, bot):
         oldserverSetting = copy.deepcopy(serverSettings)
@@ -117,7 +118,6 @@ class Sudo:
             serverSettings[ctx.guild.id]['searchEngines'][ctx.command.name] != False])
         return any([check, Sudo.isSudoer(bot, ctx, serverSettings)])
 
-
     async def userSearch(self, search):
         try:
             if search.isnumeric():
@@ -131,7 +131,9 @@ class Sudo:
         
         except Exception as e:
             raise
-
+    #endregion
+    
+    #region sudo functions
     async def echo(self, args):
         try:
             if "--channel" in args:
@@ -214,15 +216,71 @@ class Sudo:
         except Exception as e:
             raise
         finally: return
+    #endregion
+    
+    async def sudo(self, args):
+        try:
+            if args:
+                command = args.pop(0)
+                if command == 'echo':
+                    await self.echo(args)
+                elif command == 'blacklist':
+                    await self.blacklist(args)
+                elif command == 'whitelist':
+                    await self.whitelist(args)
+                elif command == 'sudoer':
+                    await self.sudoer(args)
+                elif command == 'unsudoer':
+                    await self.unsudoer(args)
+                else:
+                    await self.ctx.send(f"'{command}' is not a valid command.")
+            else:
+                embed = discord.Embed(title="Sudo", description=f"Admin commands. Server owner has sudo privilege by default.\nUsage: {self.printPrefix(self.ctx)}sudo [command] [args]")
+                embed.add_field(name="Commands", inline=False, value=
+                    f"""`     echo:` Have the bot say something. 
+                        Args: message 
+                        Optional flag: --channel [channelID]
+
+                        `blacklist:` Block a user from using the bot. 
+                        Args: userName OR userID 
+
+                        `whitelist:` Unblock a user from using the bot. 
+                        Args: userName OR userID
+
+                        `   sudoer:` Add a user to the sudo list. Only guild owners can do this. 
+                        Args: userName OR userID  
+
+                        ` unsudoer:` Remove a user from the sudo list. Only guild owners can do this. 
+                        Args: userName OR userID""")
+
+                helpMessage = await self.ctx.send(embed=embed)
+                try:
+                    await helpMessage.add_reaction('🗑️')
+                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                    if str(reaction.emoji) == '🗑️':
+                        await helpMessage.delete()
+        
+                except asyncio.TimeoutError as e: 
+                    await helpMessage.clear_reactions()
+
+        except Exception as e:
+            args = args if len(args) > 0 else None
+            await ErrorHandler(self.bot, self.ctx, e, args)
+        finally: 
+            if command in ['blacklist', 'whitelist', 'sudoer', 'unsudoer']:
+                with open('serverSettings.yaml', 'w') as data:
+                    yaml.dump(self.serverSettings, data, allow_unicode=True)
+
+                with open('userSettings.yaml', 'w') as data:
+                    yaml.dump(self.userSettings, data, allow_unicode=True)
+            return self.serverSettings, self.userSettings
     
     async def config(self, args):
         def check(reaction, user):
                 return user == self.ctx.author and str(reaction.emoji) in ['✅', '❌']
         UserCancel = KeyboardInterrupt
         try:    
-            adminrole = self.serverSettings[self.ctx.guild.id]['adminrole']
-            if adminrole != None:
-                adminrole = self.ctx.guild.get_role(int(adminrole)) 
+            #region config menu
             if not args:
                 try:
                     embed = discord.Embed(title="Configuration")
@@ -234,7 +292,7 @@ class Sudo:
                         `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""", inline=False)
 
                     embed.add_field(name="Guild Administration", value=f"""
-                        ` adminrole:` {adminrole.name if adminrole != None else 'None set'}
+                        ` adminrole:` {self.serverSettings[self.ctx.guild.id]['adminrole'] if self.serverSettings[self.ctx.guild.id]['adminrole'] != None else 'None set'}
                         `safesearch:` {'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}
                         `    prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}""")
                     
@@ -260,6 +318,11 @@ class Sudo:
                 except Exception as e:
                     await ErrorHandler(self.bot, self.ctx, e)
                 finally: return
+            #endregion
+            
+            #region config settings changers
+            
+            #region server config settings
             elif args[0].lower() in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()]:
                 if len(args) == 1:
                     embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else '❌'}")
@@ -347,8 +410,12 @@ class Sudo:
                 await self.ctx.send(
                     f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else 'disabled'}")
             elif args[0].lower() == 'adminrole':
-                if not args[1]:
-                    embed = discord.Embed(title='Adminrole', description=f"{await self.ctx.guild.get_role(int(adminrole)) if adminrole != None else 'None set'}")
+                if len(args) == 1:
+                    adminroleID = self.serverSettings[self.ctx.guild.id]['adminrole']
+                    
+                    embed = discord.Embed(
+                        title='Adminrole', 
+                        description=f"{self.ctx.guild.get_role(int(adminroleID)) if adminroleID != None else 'None set'}")
                     embed.set_footer(text=f"Reply with the roleID of the role you want to set")
                     message = await self.ctx.send(embed=embed)
 
@@ -360,40 +427,41 @@ class Sudo:
                     except asyncio.TimeoutError as e:
                         return
                 else: 
-                    errorCount = 0
-                    errorMsg = None
                     response = args[1]
-                    while errorCount <= 1:
-                        try: 
-                            adminrole = self.ctx.guild.get_role(int(response))
-                            self.serverSettings[self.ctx.guild.id]['adminrole'] = adminrole.id
-                            await self.ctx.send(f"`{adminrole.name}` is now the admin role")
-                            break
-                        except (ValueError, AttributeError) as e:
-                            errorMsg = await self.ctx.send(f"{response} is not a valid roleID. Please edit your message or reply with a valid roleID.")
-                            messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == self.ctx.author, timeout=60))
-                            reply = asyncio.create_task(self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout=60))
-                            
-                            waiting = [messageEdit, reply]
-                            done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
+                
+                errorCount = 0
+                errorMsg = None
+                while errorCount <= 1:
+                    try: 
+                        adminrole = self.ctx.guild.get_role(int(response))
+                        self.serverSettings[self.ctx.guild.id]['adminrole'] = adminrole.id
+                        await self.ctx.send(f"`{adminrole.name}` is now the admin role")
+                        break
+                    except (ValueError, AttributeError) as e:
+                        errorMsg = await self.ctx.send(f"{response} is not a valid roleID. Please edit your message or reply with a valid roleID.")
+                        messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == self.ctx.author, timeout=60))
+                        reply = asyncio.create_task(self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout=60))
+                        
+                        waiting = [messageEdit, reply]
+                        done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
 
-                            if messageEdit in done:
-                                reply.cancel()
-                                messageEdit = messageEdit.result()
-                                response = ''.join([li for li in difflib.ndiff(messageEdit[0].content, messageEdit[1].content) if '+' in li]).replace('+ ', '')
-                            elif reply in done:
+                        if messageEdit in done:
+                            reply.cancel()
+                            messageEdit = messageEdit.result()
+                            response = ''.join([li for li in difflib.ndiff(messageEdit[0].content, messageEdit[1].content) if '+' in li]).replace('+ ', '')
+                        elif reply in done:
+                            messageEdit.cancel()
+                            reply = reply.result()
+                            await reply.delete()
+                            
+                            if reply.content == "cancel":
                                 messageEdit.cancel()
-                                reply = reply.result()
-                                await reply.delete()
-                                
-                                if reply.content == "cancel":
-                                    messageEdit.cancel()
-                                    reply.cancel()
-                                    break
-                                else: response = reply.content
-                            await errorMsg.delete()
-                            errorCount += 1
-                            pass
+                                reply.cancel()
+                                break
+                            else: response = reply.content
+                        await errorMsg.delete()
+                        errorCount += 1
+                        pass
             elif args[0].lower() == 'prefix':
                 if not args[1]:
                     embed = discord.Embed(title='Prefix', description=f"{self.serverSettings[self.ctx.guild.id]['commandprefix']}")
@@ -412,6 +480,9 @@ class Sudo:
                 
                 self.serverSettings[self.ctx.guild.id]['commandprefix'] = response
                 await self.ctx.send(f"`{response}` is now the guild prefix")
+            #endregion
+            
+            #region user config settings
             elif args[0].lower() == 'locale':
                 msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
                 uuleDB = open('./src/cache/googleUULE.csv', 'r', encoding='utf-8-sig').read().split('\n')
@@ -578,7 +649,10 @@ class Sudo:
                             await errorMsg.delete()
                             return
                 return
-
+            #endregion
+            
+            #endregion
+        
         except UserCancel:
             await self.ctx.send('Aborting')
             if msg:
@@ -599,63 +673,6 @@ class Sudo:
                 Log.appendToLog(self.ctx, "config", args)
             return self.serverSettings, self.userSettings
                               
-    async def sudo(self, args):
-        try:
-            if args:
-                command = args.pop(0)
-                if command == 'echo':
-                    await self.echo(args)
-                elif command == 'blacklist':
-                    await self.blacklist(args)
-                elif command == 'whitelist':
-                    await self.whitelist(args)
-                elif command == 'sudoer':
-                    await self.sudoer(args)
-                elif command == 'unsudoer':
-                    await self.unsudoer(args)
-                else:
-                    await self.ctx.send(f"'{command}' is not a valid command.")
-            else:
-                embed = discord.Embed(title="Sudo", description=f"Admin commands. Server owner has sudo privilege by default.\nUsage: {self.printPrefix(self.ctx)}sudo [command] [args]")
-                embed.add_field(name="Commands", inline=False, value=
-                    f"""`     echo:` Have the bot say something. 
-                        Args: message 
-                        Optional flag: --channel [channelID]
-
-                        `blacklist:` Block a user from using the bot. 
-                        Args: userName OR userID 
-
-                        `whitelist:` Unblock a user from using the bot. 
-                        Args: userName OR userID
-
-                        `   sudoer:` Add a user to the sudo list. Only guild owners can do this. 
-                        Args: userName OR userID  
-
-                        ` unsudoer:` Remove a user from the sudo list. Only guild owners can do this. 
-                        Args: userName OR userID""")
-
-                helpMessage = await self.ctx.send(embed=embed)
-                try:
-                    await helpMessage.add_reaction('🗑️')
-                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
-                    if str(reaction.emoji) == '🗑️':
-                        await helpMessage.delete()
-        
-                except asyncio.TimeoutError as e: 
-                    await helpMessage.clear_reactions()
-
-        except Exception as e:
-            args = args if len(args) > 0 else None
-            await ErrorHandler(self.bot, self.ctx, e, args)
-        finally: 
-            if command in ['blacklist', 'whitelist', 'sudoer', 'unsudoer']:
-                with open('serverSettings.yaml', 'w') as data:
-                    yaml.dump(self.serverSettings, data, allow_unicode=True)
-
-                with open('userSettings.yaml', 'w') as data:
-                    yaml.dump(self.userSettings, data, allow_unicode=True)
-            return self.serverSettings, self.userSettings
-
 class Log():
     @staticmethod
     def appendToLog(ctx, optcommand=None, args=None):     

@@ -5,6 +5,7 @@ import discord, asyncio, random
 class ScholarSearch:   
     @staticmethod
     async def search(bot, ctx, message, args, searchQuery):
+        #region various embed types creation
         def publicationEmbeds(result):
             embed=discord.Embed(title=result['bib']['title'], 
                             description=result['bib']['abstract'], 
@@ -41,8 +42,10 @@ class ScholarSearch:
                 url=result['eprint_url'] if 'eprint_url' in result.keys() else result['pub_url'])
             embed.set_footer(text=f"Requested by {ctx.author}")
             return embed    
+        #endregion
         
         try:
+            #region user flags processing
             await asyncio.sleep(random.uniform(0,2))
             if 'author' in args:
                 results = scholarly.search_pubs(searchQuery)
@@ -55,6 +58,7 @@ class ScholarSearch:
             else:
                 results = [next(scholarly.search_pubs(searchQuery)) for _ in range(5)]
                 embeds = list(map(publicationEmbeds, results))
+            #endregion
 
             doExit, curPage = False, 0
             await message.add_reaction('🗑️')

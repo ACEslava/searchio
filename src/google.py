@@ -202,6 +202,7 @@ class GoogleSearch:
          google_snippet_result = soup.find("div", {"id": "main"})
    
          if google_snippet_result is not None:
+            #region html processing
             google_snippet_result = google_snippet_result.contents[index]
             wrongFirstResults = ["Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >']
 
@@ -217,7 +218,8 @@ class GoogleSearch:
             
             #bad result filtering
             googleSnippetResults = [result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings=='']
-         
+            #endregion
+
             #checks if user searched specifically for images
             embeds = list(map(textEmbed, googleSnippetResults))
             if hasFoundImage:
@@ -229,7 +231,7 @@ class GoogleSearch:
                      break
                
             print(ctx.author.name + " searched for: "+searchQuery[:233])
-       
+
             for index, item in enumerate(embeds): 
                item.url = url
                item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
@@ -258,7 +260,8 @@ class GoogleSearch:
                   elif curPage > len(embeds)-1:
                      curPage = 0
                
-               except asyncio.TimeoutError: 
+               except asyncio.TimeoutError:
+                  await message.clear_reactions() 
                   raise
 
          else:
@@ -277,7 +280,6 @@ class GoogleSearch:
                raise
       
       except asyncio.TimeoutError: 
-         message.clear_reactions()
          raise
 
       except Exception as e:

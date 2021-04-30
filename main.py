@@ -219,11 +219,11 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         usage='google [query]',
         help='Google search. If a keyword is detected in [query], a special function will activate',
         description=''.join(["translate: Uses Google Translate API to translate languages.",
-            "Input automatically detects language unless specified with 'from [language]'", 
-            "Defaults to output English OR user locale if set, unless explicitly specified with 'to [language]'",
-            "Example Query: translate مرحبا from arabic to spanish",
-            "\n\nimage: Searches only for image results.",
-            "\n\ndefine: Queries dictionaryapi.dev for an English definition of the word"]))
+            "\n\n     Input auto detects language unless specified with 'from [language]'", 
+            "\n\n     Defaults to output English OR user locale if set, unless explicitly specified with 'to [language]'",
+            "\n\n     Example Query: translate مرحبا from arabic to spanish",
+            "\n\n\nimage: Searches only for image results.",
+            "\n\n\ndefine: Queries dictionaryapi.dev for an English definition of the word"]))
     async def google(self, ctx, *args):
         global serverSettings
         global userSettings
