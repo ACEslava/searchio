@@ -7,12 +7,20 @@ from discord import Embed
 import asyncio, re, wikipedia, string, base64, requests
 
 class GoogleSearch:
-   @staticmethod
-   async def search(http, bot, ctx, serverSettings, userSettings, message, searchQuery=None):
+   def __init__(self, bot, ctx, serverSettings, userSettings, message, searchQuery):
+      self.bot = bot
+      self.ctx = ctx
+      self.serverSettings = serverSettings
+      self.userSettings = userSettings
+      self.message = message
+      self.searchQuery = searchQuery
+      return
+
+   async def search(self):
       #region embed creation functions
       def imageEmbed(image): #embed creation for image embeds
          try:
-            resultEmbed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}')
+            resultEmbed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}')
             imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
             if "encrypted" in imgurl:
                   imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
@@ -24,7 +32,7 @@ class GoogleSearch:
          finally: return resultEmbed
             
       def textEmbed(result): #embed creation for text embeds
-         resultEmbed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}') 
+         resultEmbed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}') 
          
          divs = [d for d in result.findAll('div') if not d.find('div')]
          lines = [' '.join([string if string != 'View all' else '' for string in div.stripped_strings]) for div in divs]
@@ -82,120 +90,15 @@ class GoogleSearch:
       #endregion
       
       try:
-         #region sub-commands
-         if bool(re.search('translate', searchQuery.lower())):
-            query = searchQuery.lower().split(' ')
-            if len(query) > 1:
-               del query[0]
-               if "to" in query:
-                  destLanguage = Languages.get(name=query[query.index('to')+1].lower().capitalize()).alpha2
-                  del query[query.index('to')+1]
-                  del query[query.index('to')]
-               else: destLanguage = 'en'
-
-               if "from" in query:
-                  srcLanguage = Languages.get(name=query[query.index('from')+1].lower().capitalize()).alpha2
-                  del query[query.index('from')+1]
-                  del query[query.index('from')]
-               else: srcLanguage = None
-               
-               query = ' '.join(query)
-               translator = google_translator()
-               result = translator.translate(query, lang_src=f'{srcLanguage if srcLanguage != None else "auto"}' , lang_tgt=destLanguage)
-               
-               if isinstance(result, list): result = '\n'.join(result)
-               embed = Embed(title=f"{Languages.get(alpha2=srcLanguage).name if srcLanguage != None else translator.detect(query)[1].capitalize()} " +
-                  f"to {Languages.get(part1=destLanguage).name} Translation", 
-                  description = result + '\n\nReact with 🔍 to search Google')
-               embed.set_footer(text=f"Requested by {ctx.author}")
-               await message.edit(content=None, embed=embed)
-               await message.add_reaction('🗑️')
-               await message.add_reaction('🔍')
-               reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and str(reaction.emoji) in ["🔍", "🗑️"], timeout=60)
-               
-               if str(reaction.emoji) == '🗑️':
-                  await message.delete()
-                  return
-               
-               elif str(reaction.emoji) == '🔍':
-                  await message.clear_reactions()
-                  await message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
-                  pass
-            
-            else: pass
-            hasFoundImage = False 
-         
-         elif bool(re.search('image', searchQuery.lower())):
+         #checks if image is in search query     
+         if bool(re.search('image', self.searchQuery.lower())):
             hasFoundImage = True
-         
-         elif bool(re.search('define', searchQuery.lower())):
-            def definitionEmbed(word, response):
-               embed = []
-               for definition in word['definitions']:      
-                  embed.append(Embed( 
-                     title=f'Definition of: {response["word"]}',
-                     description='\n'.join([
-                        f'{response["word"]}',
-                        f'`{response["phonetics"][0]["text"]}`',
-                        '\n',
-                        f'{word["partOfSpeech"]}', 
-                        f'{definition["definition"]}', '\n'])
-                  ))
-                  embed[-1].add_field(name='Synonyms', value=", ".join(definition["synonyms"]) if "synonyms" in definition.keys() else "None")
-                  embed[-1].add_field(name='Example', value = definition["example"] if "example" in definition.keys() else "None")
-                  embed[-1].add_field(name='Pronounciation Guide', value=response["phonetics"][0]["audio"], inline=False)
-                  embed[-1].url = f'https://www.merriam-webster.com/dictionary/{response["word"]}'
-               return embed
-            query = searchQuery.lower().split(' ')
-            if len(query) > 1:
-               response = requests.get(f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}')
-               response = response.json()[0]
-               
-               embeds = [item for sublist in [definitionEmbed(word, response) for word in response['meanings']] for item in sublist]
-               for index, item in enumerate(embeds): 
-                  item.set_footer(text=f'Page {index+1}/{len(embeds)}\nReact with 🔍 to search Google\nRequested by: {str(ctx.author)}')
-               
-               doExit, curPage = False, 0
-               await message.add_reaction('🗑️')
-               await message.add_reaction('🔍')
-               if len(embeds) > 1:
-                  await message.add_reaction('◀️')
-                  await message.add_reaction('▶️')
-               while 1:
-                  try:
-                     await message.edit(content=None, embed=embeds[curPage])
-                     reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️",'🔍'], reaction.message == message]), timeout=60)
-                     if str(reaction.emoji) == '🗑️':
-                        await message.delete()
-                        return
-                     elif str(reaction.emoji) == '◀️':
-                        curPage-=1
-                     elif str(reaction.emoji) == '▶️':
-                        curPage+=1
-                     elif str(reaction.emoji) == '🔍':
-                        await message.clear_reactions()
-                        await message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
-                        break
-
-                     await message.remove_reaction(reaction, user)
-                     if curPage < 0:
-                        curPage = len(embeds)-1
-                     elif curPage > len(embeds)-1:
-                        curPage = 0
-                  
-                  except asyncio.TimeoutError: 
-                     raise  
-            else: pass
-            
-            hasFoundImage = False
-         
          else: hasFoundImage = False        
-         #endregion
          
-         uuleParse = uule(userSettings[ctx.author.id]['locale']) if userSettings[ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
+         uuleParse = uule(self.userSettings[self.ctx.author.id]['locale']) if self.userSettings[self.ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
          url = (''.join(["https://google.com/search?pws=0&q=", 
-            searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
-            f"&uule={uuleParse}&num=5{'&safe=active' if serverSettings[ctx.guild.id]['safesearch'] == True and ctx.channel.nsfw == False else ''}"]))
+            self.searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
+            f"&uule={uuleParse}&num=5{'&safe=active' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True and self.ctx.channel.nsfw == False else ''}"]))
          response = requests.get(url)
          soup = BeautifulSoup(response.content, features="lxml")
          index = 3
@@ -206,7 +109,7 @@ class GoogleSearch:
             google_snippet_result = google_snippet_result.contents[index]
             wrongFirstResults = ["Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >']
 
-            Log.appendToLog(ctx, f"{ctx.command} results", url)
+            Log.appendToLog(self.ctx, f"{self.ctx.command} results", url)
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
 
             #Debug HTML
@@ -230,51 +133,47 @@ class GoogleSearch:
                      del embeds[-1]
                      break
                
-            print(ctx.author.name + " searched for: "+searchQuery[:233])
+            print(self.ctx.author.name + " searched for: "+self.searchQuery[:233])
 
             for index, item in enumerate(embeds): 
                item.url = url
-               item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}')
+               item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}')
             
             doExit, curPage = False, 0
-            await message.add_reaction('🗑️')
+            await self.message.add_reaction('🗑️')
             if len(embeds) > 1:
-               await message.add_reaction('◀️')
-               await message.add_reaction('▶️')
+               await self.message.add_reaction('◀️')
+               await self.message.add_reaction('▶️')
             
             while doExit == False:
                try:
-                  await message.edit(content=None, embed=embeds[curPage])
-                  reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == message]), timeout=60)
+                  await self.message.edit(content=None, embed=embeds[curPage%len(embeds)])
+                  reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == self.message]), timeout=60)
+                  await self.message.remove_reaction(reaction, user)
+
                   if str(reaction.emoji) == '🗑️':
-                     await message.delete()
+                     await self.message.delete()
                      doExit = True
                   elif str(reaction.emoji) == '◀️':
                      curPage-=1
                   elif str(reaction.emoji) == '▶️':
                      curPage+=1
-
-                  await message.remove_reaction(reaction, user)
-                  if curPage < 0:
-                     curPage = len(embeds)-1
-                  elif curPage > len(embeds)-1:
-                     curPage = 0
-               
+         
                except asyncio.TimeoutError:
-                  await message.clear_reactions() 
+                  await self.message.clear_reactions() 
                   raise
 
          else:
-            embed = Embed(title=f'Search results for: {searchQuery[:233]}{"..." if len(searchQuery) > 233 else ""}',
+            embed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}',
                description = 'No results found')
          
-            embed.set_footer(text=f"Requested by {ctx.author}")
-            await message.edit(content=None, embed=embed)
+            embed.set_footer(text=f"Requested by {self.ctx.author}")
+            await self.message.edit(content=None, embed=embed)
             try:
-               await message.add_reaction('🗑️')
-               reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and reaction.message == message and str(reaction.emoji) == "🗑️", timeout=60)
+               await self.message.add_reaction('🗑️')
+               reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and reaction.message == self.message and str(reaction.emoji) == "🗑️", timeout=60)
                if str(reaction.emoji) == '🗑️':
-                  await message.delete()
+                  await self.message.delete()
                   
             except asyncio.TimeoutError: 
                raise
@@ -283,9 +182,135 @@ class GoogleSearch:
          raise
 
       except Exception as e:
-         await message.delete()
-         await ErrorHandler(bot, ctx, e, searchQuery)
+         await self.message.delete()
+         await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
       finally: return
 
-class UserCancel(Exception):
-   pass
+   async def translate(self):
+      try:
+         query = self.searchQuery.lower().split(' ')
+         if len(query) > 1:
+
+            #processes keywords in query for language options
+            del query[0]
+            if "to" in query:
+               destLanguage = Languages.get(name=query[query.index('to')+1].lower().capitalize()).alpha2
+               del query[query.index('to')+1]
+               del query[query.index('to')]
+            else: destLanguage = 'en'
+
+            if "from" in query:
+               srcLanguage = Languages.get(name=query[query.index('from')+1].lower().capitalize()).alpha2
+               del query[query.index('from')+1]
+               del query[query.index('from')]
+            else: srcLanguage = None
+            
+            #queries Google Translate for translations
+            query = ' '.join(query)
+            translator = google_translator()
+            result = translator.translate(query, lang_src=f'{srcLanguage if srcLanguage != None else "auto"}' , lang_tgt=destLanguage)
+            
+            #creates and sends embed
+            if isinstance(result, list): result = '\n'.join(result)
+            embed = Embed(title=f"{Languages.get(alpha2=srcLanguage).name if srcLanguage != None else translator.detect(query)[1].capitalize()} " +
+               f"to {Languages.get(part1=destLanguage).name} Translation", 
+               description = result + '\n\nReact with 🔍 to search Google')
+            embed.set_footer(text=f"Requested by {self.ctx.author}")
+            await self.message.edit(content=None, embed=embed)
+            
+            #waits for user reaction options
+            await self.message.add_reaction('🗑️')
+            await self.message.add_reaction('🔍')
+            reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: user == self.ctx.author and str(reaction.emoji) in ["🔍", "🗑️"], timeout=60)
+            
+            if str(reaction.emoji) == '🗑️':
+               await self.message.delete()
+               return
+            
+            elif str(reaction.emoji) == '🔍':
+               await self.message.clear_reactions()
+               await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+               await self.search()
+               pass
+         
+         else: pass
+
+      except asyncio.TimeoutError: 
+         raise
+
+      except Exception as e:
+         await self.message.delete()
+         await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
+      
+      finally: return
+
+   async def define(self):
+      try:
+         #creates the embed for each definition result
+         def definitionEmbed(word, response):
+               embed = []
+               for definition in word['definitions']:      
+                  embed.append(Embed( 
+                     title=f'Definition of: {response["word"]}',
+                     description='\n'.join([
+                        f'{response["word"]}',
+                        f'`{response["phonetics"][0]["text"]}`',
+                        '\n',
+                        f'{word["partOfSpeech"]}', 
+                        f'{definition["definition"]}', '\n'])
+                  ))
+                  embed[-1].add_field(name='Synonyms', value=", ".join(definition["synonyms"]) if "synonyms" in definition.keys() else "None")
+                  embed[-1].add_field(name='Example', value = definition["example"] if "example" in definition.keys() else "None")
+                  embed[-1].add_field(name='Pronounciation Guide', value=response["phonetics"][0]["audio"], inline=False)
+                  embed[-1].url = f'https://www.merriam-webster.com/dictionary/{response["word"]}'
+               return embed
+
+         query = self.searchQuery.lower().split(' ')
+         if len(query) > 1:
+            #queries dictionary
+            response = requests.get(f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}')
+            response = response.json()[0]
+            
+            #creates embed
+            embeds = [item for sublist in [definitionEmbed(word, response) for word in response['meanings']] for item in sublist]
+            for index, item in enumerate(embeds): 
+               item.set_footer(text=f'Page {index+1}/{len(embeds)}\nReact with 🔍 to search Google\nRequested by: {str(self.ctx.author)}')
+
+            #user react option system
+            doExit, curPage = False, 0
+            await self.message.add_reaction('🗑️')
+            await self.message.add_reaction('🔍')
+            if len(embeds) > 1:
+               await self.message.add_reaction('◀️')
+               await self.message.add_reaction('▶️')
+            
+            #while loop b/c multipage 
+            while 1:
+               await self.message.edit(content=None, embed=embeds[curPage%len(embeds)])
+               reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️",'🔍'], reaction.message == self.message]), timeout=60)
+               await self.message.remove_reaction(reaction, user)
+
+               if str(reaction.emoji) == '🗑️':
+                  await self.message.delete()
+                  return
+               elif str(reaction.emoji) == '◀️':
+                  curPage-=1
+               elif str(reaction.emoji) == '▶️':
+                  curPage+=1
+               elif str(reaction.emoji) == '🔍':
+                  await self.message.clear_reactions()
+                  await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+                  await self.search()
+                  break
+
+         else: pass
+         
+
+      except asyncio.TimeoutError: 
+         raise
+
+      except Exception as e:
+         await self.message.delete()
+         await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
+      
+      finally: return

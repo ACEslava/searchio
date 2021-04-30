@@ -10,8 +10,7 @@ from src.xkcd import XKCDSearch
 from src.pornhub import PornhubSearch
 from dotenv import load_dotenv
 from discord.ext import commands
-from urllib3 import PoolManager
-import discord, os, asyncio, yaml, csv, datetime, requests
+import discord, os, asyncio, yaml, csv, datetime, requests, re
 
 #region utility functions
 def prefix(bot, message): #handler for individual guild prefixes
@@ -54,7 +53,6 @@ load_dotenv()
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 
 bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
-http = PoolManager()
 
 #checks if serverSettings.json exists
 if not os.path.exists('logs.csv'):
@@ -228,17 +226,23 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         global userSettings
 
-        UserCancel = KeyboardInterrupt
         if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
             userquery = await searchQueryParse(ctx, args)
             if userquery is None: return
             continueLoop = True
-            
             while continueLoop:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+                    searchClass = GoogleSearch(bot, ctx, serverSettings, userSettings, message, userquery)
+
                     messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = asyncio.create_task(GoogleSearch.search(http, bot, ctx, serverSettings, userSettings, message, userquery))
+                    if bool(re.search('translate', userquery.lower())): 
+                        search = asyncio.create_task(searchClass.translate())
+                    
+                    elif bool(re.search('define', userquery.lower())):
+                        search = asyncio.create_task(searchClass.define())
+                    
+                    else: search = asyncio.create_task(searchClass.search())
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
@@ -252,7 +256,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}google ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}google ', '') #finds the new user query
                         continue
                     else: raise asyncio.TimeoutError
                 
@@ -266,6 +270,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
+                    await message.delete()
                     await ErrorHandler(bot, ctx, e, userquery)
                     return
 
@@ -515,6 +520,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         except Exception as e:
             await ErrorHandler(bot, ctx, e, args)
         finally: return
+
 class Administration(commands.Cog, name="Administration"):
     def __init__(self, bot):
         self.bot = bot
