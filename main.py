@@ -624,8 +624,14 @@ class Administration(commands.Cog, name="Administration"):
         help="Sends SearchIO's DiscordAPI connection latency")
     async def ping(self, ctx):
         try:
-            Log.appendToLog(ctx)
-            await ctx.send(f'Response in {round(bot.latency, 3)}ms')
+            beforeTime = datetime.datetime.now()
+            message = await ctx.send('Testing')
+            serverLatency = datetime.datetime.now() - beforeTime
+            embed = discord.Embed(description='\n'.join(
+                            [f'Message Send Time: `{round(serverLatency.total_seconds()*1000, 2)}ms`',
+                            f'API Heartbeat: `{round(bot.latency, 2)}ms`']))
+            embed.set_footer(text=f'Requested by {ctx.author}')
+            await message.edit(content=None, embed=embed)
         except Exception as e:
             await ErrorHandler(bot, ctx, e)
         finally: return
