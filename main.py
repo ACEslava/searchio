@@ -10,7 +10,13 @@ from src.xkcd import XKCDSearch
 from src.pornhub import PornhubSearch
 from dotenv import load_dotenv
 from discord.ext import commands
-import discord, os, asyncio, yaml, csv, datetime, requests, re
+from os import getenv, path
+from asyncio import TimeoutError, create_task, wait
+from yaml import load, dump
+from csv import DictReader, DictWriter
+from datetime import datetime, timedelta
+from requests import get
+import discord, asyncio, re
 
 #region utility functions
 def prefix(bot, message): #handler for individual guild prefixes
@@ -32,7 +38,7 @@ async def searchQueryParse(ctx, args): #handler for bot search queries
             userquery = userquery.content
             if userquery.lower() == 'cancel': raise UserCancel
         
-        except asyncio.TimeoutError:
+        except TimeoutError:
             await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
 
         except UserCancel:
@@ -50,31 +56,31 @@ intents.members = True
 intents.presences = True
 
 load_dotenv()
-DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
+DISCORD_TOKEN = getenv("DISCORD_TOKEN")
 
 bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
 
 #checks if serverSettings.json exists
-if not os.path.exists('logs.csv'):
+if not path.exists('logs.csv'):
     with open('logs.csv', 'w') as file:
         file.write('')
 
-if not os.path.exists('serverSettings.yaml'):
+if not path.exists('serverSettings.yaml'):
     with open('serverSettings.yaml', 'w') as file:
         file.write('')
 
-if not os.path.exists('userSettings.yaml'):
+if not path.exists('userSettings.yaml'):
     with open('userSettings.yaml', 'w') as file:
         file.write('')
 
 #loads serverSettings
 with open('serverSettings.yaml', 'r') as data:
-    serverSettings = yaml.load(data)
+    serverSettings = load(data)
     if serverSettings is None: serverSettings = {}
 
 #loads userSettings
 with open('userSettings.yaml', 'r') as data:
-    userSettings = yaml.load(data)
+    userSettings = load(data)
     if userSettings is None: userSettings = {}
 #endregion
 
@@ -113,7 +119,7 @@ async def on_guild_remove(guild):
     del serverSettings[guild.id]
     
     with open('serverSettings.yaml', 'w') as data:
-        yaml.dump(serverSettings, data, allow_unicode=True)
+        dump(serverSettings, data, allow_unicode=True)
     return
 
 @bot.event
@@ -128,21 +134,21 @@ async def on_connect():
         serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id, bot)
 
     with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
-        lines = [dict(row) for row in csv.DictReader(file) if datetime.datetime.utcnow()-datetime.datetime.fromisoformat(row["Time"]) < datetime.timedelta(weeks=8)]
+        lines = [dict(row) for row in DictReader(file) if datetime.utcnow()-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
         
     with open("logs.csv", "w", newline='', encoding='utf-8-sig') as file:
         logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
-        writer = csv.DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
+        writer = DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
         writer.writeheader()
         writer.writerows(lines)
 
     with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
-        file.write(requests.get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)         
+        file.write(get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)         
     return
 
 @bot.event
 async def on_command_error(ctx, error):
-    if isinstance(error, discord.ext.commands.errors.CommandNotFound):
+    if isinstance(error, commands.errors.CommandNotFound):
         await ctx.send(f"Command not found. Do {Sudo.printPrefix(serverSettings, ctx)}help for available commands")
 
 class SearchEngines(commands.Cog, name="Search Engines"):
@@ -177,7 +183,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     userquery = userquery.content
                     if userquery.lower() == 'cancel': raise UserCancel
                 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
 
                 except UserCancel:
@@ -235,22 +241,22 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                     searchClass = GoogleSearch(bot, ctx, serverSettings, userSettings, message, userquery)
 
-                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     if bool(re.search('translate', userquery.lower())): 
-                        search = asyncio.create_task(searchClass.translate())
+                        search = create_task(searchClass.translate())
                     
                     elif bool(re.search('define', userquery.lower())):
-                        search = asyncio.create_task(searchClass.define())
+                        search = create_task(searchClass.define())
                     
-                    else: search = asyncio.create_task(searchClass.search())
+                    else: search = create_task(searchClass.search())
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
-                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
 
                     if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
-                        if type(messageEdit.exception()) == asyncio.TimeoutError:
-                            raise asyncio.TimeoutError
+                        if type(messageEdit.exception()) == TimeoutError:
+                            raise TimeoutError
                         await message.delete()
                         messageEdit.cancel()
                         search.cancel()
@@ -258,9 +264,9 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         messageEdit = messageEdit.result()
                         userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}google ', '') #finds the new user query
                         continue
-                    else: raise asyncio.TimeoutError
+                    else: raise TimeoutError
                 
-                except asyncio.TimeoutError: #after a minute, everything cancels
+                except TimeoutError: #after a minute, everything cancels
                     messageEdit.cancel()
                     search.cancel()
                     continueLoop = False
@@ -308,7 +314,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     userquery = userquery.content
                     if userquery.lower() == 'cancel': raise UserCancel
                 
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
 
                 except UserCancel:
@@ -323,16 +329,16 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             while continueLoop:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
-                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = asyncio.create_task(ScholarSearch.search(bot, ctx, message, args, userquery))
+                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = create_task(ScholarSearch.search(bot, ctx, message, args, userquery))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
-                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
 
                     if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
-                        if type(messageEdit.exception()) == asyncio.TimeoutError:
-                            raise asyncio.TimeoutError
+                        if type(messageEdit.exception()) == TimeoutError:
+                            raise TimeoutError
                         await message.delete()
                         messageEdit.cancel()
                         search.cancel()
@@ -340,9 +346,9 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         messageEdit = messageEdit.result()
                         userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}scholar ', '')
                         continue
-                    else: raise asyncio.TimeoutError
+                    else: raise TimeoutError
                 
-                except asyncio.TimeoutError: #after a minute, everything cancels
+                except TimeoutError: #after a minute, everything cancels
                     await message.clear_reactions()
                     messageEdit.cancel()
                     search.cancel()
@@ -373,16 +379,16 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             while continueLoop:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
-                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = asyncio.create_task(YoutubeSearch.search(bot, ctx, message, userquery, userSettings))
+                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = create_task(YoutubeSearch.search(bot, ctx, message, userquery, userSettings))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
-                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
 
                     if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
-                        if type(messageEdit.exception()) == asyncio.TimeoutError:
-                            raise asyncio.TimeoutError
+                        if type(messageEdit.exception()) == TimeoutError:
+                            raise TimeoutError
                         await message.delete()
                         messageEdit.cancel()
                         search.cancel()
@@ -392,10 +398,10 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         continue
                     else: 
                         with open('userSettings.yaml', 'r') as data:
-                            userSettings = yaml.load(data)
-                        raise asyncio.TimeoutError
+                            userSettings = load(data)
+                        raise TimeoutError
                 
-                except asyncio.TimeoutError: #after a minute, everything cancels
+                except TimeoutError: #after a minute, everything cancels
                     await message.clear_reactions()
                     messageEdit.cancel()
                     search.cancel()
@@ -458,16 +464,16 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             while continueLoop:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
-                    messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = asyncio.create_task(PornhubSearch.search(bot, ctx, userquery, message))
+                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = create_task(PornhubSearch.search(bot, ctx, userquery, message))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
-                    done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
 
                     if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
-                        if type(messageEdit.exception()) == asyncio.TimeoutError:
-                            raise asyncio.TimeoutError
+                        if type(messageEdit.exception()) == TimeoutError:
+                            raise TimeoutError
                         await message.delete()
                         messageEdit.cancel()
                         search.cancel()
@@ -475,9 +481,9 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         messageEdit = messageEdit.result()
                         userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}pornhub ', '')
                         continue
-                    else: raise asyncio.TimeoutError
+                    else: raise TimeoutError
                 
-                except asyncio.TimeoutError: #after a minute, everything cancels
+                except TimeoutError: #after a minute, everything cancels
                     messageEdit.cancel()
                     search.cancel()
                     continueLoop = False
@@ -515,7 +521,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
                         await message.delete()
-        except asyncio.TimeoutError as e: 
+        except TimeoutError as e: 
                     await message.clear_reactions()
         except Exception as e:
             await ErrorHandler(bot, ctx, e, args)
@@ -630,9 +636,9 @@ class Administration(commands.Cog, name="Administration"):
         help="Sends SearchIO's DiscordAPI connection latency")
     async def ping(self, ctx):
         try:
-            beforeTime = datetime.datetime.now()
+            beforeTime = datetime.now()
             message = await ctx.send('Testing')
-            serverLatency = datetime.datetime.now() - beforeTime
+            serverLatency = datetime.now() - beforeTime
             embed = discord.Embed(description='\n'.join(
                             [f'Message Send Time: `{round(serverLatency.total_seconds()*1000, 2)}ms`',
                             f'API Heartbeat: `{round(bot.latency, 2)}ms`']))
@@ -690,7 +696,7 @@ async def help(ctx, *args):
                         await helpMessage.delete()
                         return
                 
-                except asyncio.TimeoutError as e: 
+                except TimeoutError as e: 
                     await helpMessage.clear_reactions()
             else: pass
         else:

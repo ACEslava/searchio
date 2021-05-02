@@ -256,7 +256,7 @@ class Sudo:
                 helpMessage = await self.ctx.send(embed=embed)
                 try:
                     await helpMessage.add_reaction('🗑️')
-                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == helpMessage]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
                         await helpMessage.delete()
         

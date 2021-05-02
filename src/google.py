@@ -4,7 +4,11 @@ from bs4 import BeautifulSoup
 from google_trans_new import google_translator
 from iso639 import languages as Languages
 from discord import Embed
-import asyncio, re, wikipedia, string, base64, requests, timeit
+from base64 import standard_b64encode
+from requests import get
+from asyncio import TimeoutError, gather
+from string import ascii_uppercase, ascii_lowercase, digits
+from re import findall, sub, search
 
 class GoogleSearch:
    def __init__(self, bot, ctx, serverSettings, userSettings, message, searchQuery):
@@ -21,10 +25,10 @@ class GoogleSearch:
       def imageEmbed(image): #embed creation for image embeds
          try:
             resultEmbed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}')
-            imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
+            imgurl = linkUnicodeParse(findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
             if "encrypted" in imgurl:
-                  imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
-            # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
+                  imgurl = findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
+            # imgurl = findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
             print(" image: " + imgurl)
             resultEmbed.set_image(url=imgurl)
          except: 
@@ -34,24 +38,19 @@ class GoogleSearch:
       def textEmbed(result): #embed creation for text embeds
          resultEmbed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}') 
          
-         divs = [d for d in result.findAll('div') if not d.find('div')]
-         lines = [' '.join([string if string != 'View all' else '' for string in div.stripped_strings]) for div in divs]
+         resultFind = result.findAll('div')
+         divs = tuple(d for d in resultFind if not d.find('div'))
+         lines = tuple(' '.join([string if string != 'View all' else '' for string in div.stripped_strings]) for div in divs)
          printstring = '\n'.join(lines)
          
-         resultEmbed.description = re.sub("\n\n+", "\n\n", printstring)
+         resultEmbed.description = sub("\n\n+", "\n\n", printstring)
       
          # tries to add a link to the embed
-         link_list = [a for a in result.findAll("a", href_="") if not a.find("img")] 
+         findLink = result.findAll("a", href_="")
+         link_list = tuple(a for a in findLink if not a.find("img")) 
          if len(link_list) != 0: 
             try:
-               link = linkUnicodeParse(re.findall("(?<=url\?q=).*(?=&sa)", link_list[0]["href"])[0])
-               
-               if 'wikipedia' in link:
-                  page = wikipedia.WikipediaPage(title=link.split('/')[-1])
-                  summary = page.summary
-                  summary = summary[:233] + f'{"..." if len(summary) > 233 else ""}'
-                  resultEmbed.description = f'Wikipedia: {link.split("/")[-1]}\n {summary}' #outputs wikipedia article
-
+               link = linkUnicodeParse(findall("(?<=url\?q=).*(?=&sa)", link_list[0]["href"])[0])
                resultEmbed.add_field(name="Relevant Link", value=link)
                print(" link: " + link)
             except:
@@ -60,46 +59,45 @@ class GoogleSearch:
          # tries to add an image to the embed
          image = result.find("img")
          try:
-            imgurl = linkUnicodeParse(re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
+            imgurl = linkUnicodeParse(findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
             if "encrypted" in imgurl:
-                  imgurl = re.findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
-            # imgurl = re.findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
+                  imgurl = findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
+            # imgurl = findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
             print(" image: " + imgurl)
             resultEmbed.set_image(url=imgurl)
          except: 
             pass
-         
          return resultEmbed
       #endregion          
       
       #region utility functions
       def linkUnicodeParse(link: str): #translates unicode codes in links
-         return re.sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
+         return sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
       
       def uule_secret(length: int) -> str: #creates a uule secret for use in locales
          #Creates UULE secret
-         secret_list = list(string.ascii_uppercase) + \
-            list(string.ascii_lowercase) + list(string.digits) + ["-", "_"]
+         secret_list = list(ascii_uppercase) + \
+            list(ascii_lowercase) + list(digits) + ["-", "_"]
          return secret_list[length % len(secret_list)]
 
       def uule(city: str) -> str: #formats uule strings for use in locales
          #Creates UULE code
          secret = uule_secret(len(city))
-         hashed = base64.standard_b64encode(city.encode()).decode().strip("=")
+         hashed = standard_b64encode(city.encode()).decode().strip("=")
          return f"w+CAIQICI{secret}{hashed}"
       #endregion
       
       try:
          #checks if image is in search query     
-         if bool(re.search('image', self.searchQuery.lower())):
+         if bool(search('image', self.searchQuery.lower())):
             hasFoundImage = True
          else: hasFoundImage = False 
-         
+
          uuleParse = uule(self.userSettings[self.ctx.author.id]['locale']) if self.userSettings[self.ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
          url = (''.join(["https://google.com/search?pws=0&q=", 
             self.searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
             f"&uule={uuleParse}&num=5{'&safe=active' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True and self.ctx.channel.nsfw == False else ''}"]))
-         response = requests.get(url)
+         response = get(url)
          soup = BeautifulSoup(response.text, features="lxml")
          index = 3
          google_snippet_result = soup.find("div", {"id": "main"})
@@ -122,7 +120,7 @@ class GoogleSearch:
             #bad result filtering
             googleSnippetResults = {result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings==''}
             #endregion
-
+            
             #checks if user searched specifically for images
             if hasFoundImage:
                for results in googleSnippetResults:
@@ -130,23 +128,25 @@ class GoogleSearch:
                      images = results.findAll("img", recursive=True)
                      embeds = list(map(imageEmbed, images))
                      del embeds[-1]
-                     break
+                     break  
             else:
                embeds = list(map(textEmbed, googleSnippetResults))
-               
+            
             print(self.ctx.author.name + " searched for: "+self.searchQuery[:233])
             for index, item in enumerate(embeds): 
                item.url = url
                item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}')
-            doExit, curPage = False, 0
-            await self.message.add_reaction('🗑️')
-            if len(embeds) > 1:
-               await self.message.add_reaction('◀️')
-               await self.message.add_reaction('▶️')
             
+            doExit, curPage = False, 0
+            if len(embeds) > 1:
+               await gather(self.message.add_reaction('🗑️'), self.message.add_reaction('◀️'), self.message.add_reaction('▶️'))
+            else: 
+               await self.message.add_reaction('🗑️')
+
             while doExit == False:
                try:
                   await self.message.edit(content=None, embed=embeds[curPage%len(embeds)])
+                     
                   reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == self.message]), timeout=60)
                   await self.message.remove_reaction(reaction, user)
                   
@@ -158,7 +158,7 @@ class GoogleSearch:
                   elif str(reaction.emoji) == '▶️':
                      curPage+=1
          
-               except asyncio.TimeoutError:
+               except TimeoutError:
                   await self.message.clear_reactions() 
                   raise
 
@@ -174,10 +174,10 @@ class GoogleSearch:
                if str(reaction.emoji) == '🗑️':
                   await self.message.delete()
                   
-            except asyncio.TimeoutError: 
+            except TimeoutError: 
                raise
       
-      except asyncio.TimeoutError: 
+      except TimeoutError: 
          raise
 
       except Exception as e:
@@ -234,7 +234,7 @@ class GoogleSearch:
          
          else: pass
 
-      except asyncio.TimeoutError: 
+      except TimeoutError: 
          raise
 
       except Exception as e:
@@ -267,7 +267,7 @@ class GoogleSearch:
          query = self.searchQuery.lower().split(' ')
          if len(query) > 1:
             #queries dictionary
-            response = requests.get(f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}')
+            response = get(f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}')
             response = response.json()[0]
             
             #creates embed
@@ -305,7 +305,7 @@ class GoogleSearch:
          else: pass
          
 
-      except asyncio.TimeoutError: 
+      except TimeoutError: 
          raise
 
       except Exception as e:
