@@ -4,7 +4,7 @@ from bs4 import BeautifulSoup
 from google_trans_new import google_translator
 from iso639 import languages as Languages
 from discord import Embed
-import asyncio, re, wikipedia, string, base64, requests
+import asyncio, re, wikipedia, string, base64, requests, timeit
 
 class GoogleSearch:
    def __init__(self, bot, ctx, serverSettings, userSettings, message, searchQuery):
@@ -93,25 +93,25 @@ class GoogleSearch:
          #checks if image is in search query     
          if bool(re.search('image', self.searchQuery.lower())):
             hasFoundImage = True
-         else: hasFoundImage = False        
+         else: hasFoundImage = False 
          
          uuleParse = uule(self.userSettings[self.ctx.author.id]['locale']) if self.userSettings[self.ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
          url = (''.join(["https://google.com/search?pws=0&q=", 
             self.searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
             f"&uule={uuleParse}&num=5{'&safe=active' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True and self.ctx.channel.nsfw == False else ''}"]))
          response = requests.get(url)
-         soup = BeautifulSoup(response.content, features="lxml")
+         soup = BeautifulSoup(response.text, features="lxml")
          index = 3
          google_snippet_result = soup.find("div", {"id": "main"})
-   
+
          if google_snippet_result is not None:
             #region html processing
             google_snippet_result = google_snippet_result.contents[index]
-            wrongFirstResults = ["Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >']
+            wrongFirstResults = {"Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >'}
 
             Log.appendToLog(self.ctx, f"{self.ctx.command} results", url)
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
-
+            
             #Debug HTML
             # with open('test.html', 'w', encoding='utf-8-sig') as file:
             #    file.write(soup.prettify())
@@ -120,11 +120,10 @@ class GoogleSearch:
             googleSnippetResults = [googleSnippetResults[resultNumber] for resultNumber in range(3, len(googleSnippetResults)-2)]
             
             #bad result filtering
-            googleSnippetResults = [result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings=='']
+            googleSnippetResults = {result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings==''}
             #endregion
 
             #checks if user searched specifically for images
-            embeds = list(map(textEmbed, googleSnippetResults))
             if hasFoundImage:
                for results in googleSnippetResults:
                   if 'Images' in results.strings: 
@@ -132,13 +131,13 @@ class GoogleSearch:
                      embeds = list(map(imageEmbed, images))
                      del embeds[-1]
                      break
+            else:
+               embeds = list(map(textEmbed, googleSnippetResults))
                
             print(self.ctx.author.name + " searched for: "+self.searchQuery[:233])
-
             for index, item in enumerate(embeds): 
                item.url = url
                item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}')
-            
             doExit, curPage = False, 0
             await self.message.add_reaction('🗑️')
             if len(embeds) > 1:

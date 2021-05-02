@@ -91,7 +91,7 @@ async def on_guild_join(guild):
             description = f"""
         Search.io is a bot that searches through multiple search engines/APIs.
         The activation command is '&', and a list of various commands can be found using '&help'.
-                
+        
         A list of admin commands can be found by using '&help sudo'. These commands may need ID numbers, which requires Developer Mode.
         To turn on Developer Mode, go to Settings > Appearances > Advanced > Developer Mode. Then right click on users, roles, channels, or guilds to copy their ID.
         If you need to block a specific user from using Search.io, do '&sudo blacklist [userID]'. Unblock with '&sudo whitelist [userID]'
