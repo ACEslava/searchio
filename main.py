@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from discord.ext import commands
 from os import getenv, path
 from asyncio import TimeoutError, create_task, wait
-from yaml import load, dump
+from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta
 from requests import get
@@ -75,12 +75,12 @@ if not path.exists('userSettings.yaml'):
 
 #loads serverSettings
 with open('serverSettings.yaml', 'r') as data:
-    serverSettings = load(data)
+    serverSettings = load(data, FullLoader)
     if serverSettings is None: serverSettings = {}
 
 #loads userSettings
 with open('userSettings.yaml', 'r') as data:
-    userSettings = load(data)
+    userSettings = load(data, FullLoader)
     if userSettings is None: userSettings = {}
 #endregion
 
@@ -569,13 +569,13 @@ class Administration(commands.Cog, name="Administration"):
         global serverSettings
         global userSettings
 
-        if Sudo.isSudoer(bot, ctx, serverSettings) == False:
+        if Sudo.isSudoer(bot, ctx, serverSettings):
+            Log.appendToLog(ctx, None, args)
+            command = Sudo(bot, ctx, serverSettings, userSettings)
+            serverSettings = await command.sudo(list(args))
+        else:
             await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
             Log.appendToLog(ctx, None, 'unauthorised')
-        else:
-            Log.appendToLog(ctx, None, args)
-            command = Sudo(bot, ctx, serverSettings)
-            serverSettings = await command.sudo(list(args))
 
     @commands.command(
         name='config',
@@ -607,7 +607,7 @@ class Administration(commands.Cog, name="Administration"):
             localSetting = args[0] in ['locale', 'alias']
         else: localSetting = False
         
-        if Sudo.isSudoer(bot, ctx, serverSettings) == True or localSetting:
+        if Sudo.isSudoer(bot, ctx, serverSettings) or localSetting:
             serverSettings, userSettings = await command.config(args)
         
         else: serverSettings, userSettings = await command.config([])

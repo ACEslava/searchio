@@ -22,17 +22,19 @@ class Sudo:
         commandList = [command.name for command in dict(bot.cogs)['Search Engines'].get_commands()]
         if serverID not in serverSettings.keys():
             serverSettings[serverID] = {}
-        if 'blacklist' not in serverSettings[serverID].keys():
+
+        keys = serverSettings[serverID].keys()
+        if 'blacklist' not in keys:
             serverSettings[serverID]['blacklist'] = []
-        if 'commandprefix' not in serverSettings[serverID].keys():
+        if 'commandprefix' not in keys:
             serverSettings[serverID]['commandprefix'] = '&'
-        if 'adminrole' not in serverSettings[serverID].keys():
+        if 'adminrole' not in keys:
             serverSettings[serverID]['adminrole'] = None
-        if 'sudoer' not in serverSettings[serverID].keys():
+        if 'sudoer' not in keys:
             serverSettings[serverID]['sudoer'] = []
-        if 'safesearch' not in serverSettings[serverID].keys():
+        if 'safesearch' not in keys:
             serverSettings[serverID]['safesearch'] = False
-        if 'searchEngines' not in serverSettings[serverID].keys():
+        if 'searchEngines' not in keys:
             serverSettings[serverID]['searchEngines'] = {key:True for key in commandList}
         
         #adds new search engines
@@ -57,17 +59,17 @@ class Sudo:
     @staticmethod
     def userSettingsCheck(userSettings, userID):
         olduserSetting = copy.deepcopy(userSettings)
-
+        keys = userSettings[userID].keys()
         if userID not in userSettings.keys():
             userSettings[userID] = {}
-        if 'locale' not in userSettings[userID].keys():
+        if 'locale' not in keys:
             userSettings[userID]['locale'] = None
-        if 'downloadquota' not in userSettings[userID].keys():
+        if 'downloadquota' not in keys:
             userSettings[userID]['downloadquota'] = {
                 'updateTime': datetime.combine(date.today(), datetime.min.time()).isoformat(), 
                 'dailyDownload': 0,
                 'lifetimeDownload': 0}
-        if 'searchAlias' not in userSettings[userID].keys():
+        if 'searchAlias' not in keys:
             userSettings[userID]['searchAlias'] = None
 
         if datetime.utcnow() - datetime.fromisoformat(userSettings[userID]['downloadquota']['updateTime']) > timedelta(hours=24):
@@ -86,8 +88,8 @@ class Sudo:
     @staticmethod
     def isSudoer(bot, ctx, serverSettings=None):
         if serverSettings == None:
-            with open('serverSettings.yaml', 'w') as data:
-                yaml.dump(serverSettings, data, allow_unicode=True)
+            with open('serverSettings.yaml', 'r') as data:
+                serverSettings = yaml.load(data, yaml.FullLoader)
 
         #Checks if sudoer is owner
         isOwner = ctx.author.id == bot.owner_id
@@ -99,8 +101,8 @@ class Sudo:
 
         #Checks if sudoer has the designated adminrole or is a sudoer
         try:
-            hasAdmin = True if serverSettings[ctx.guild.id]['adminrole'] in [role.id for role in ctx.author.roles] else False
-            isSudoer = True if ctx.author.id in serverSettings[ctx.guild.id]['sudoer'] else False
+            hasAdmin = serverSettings[ctx.guild.id]['adminrole'] in [role.id for role in ctx.author.roles]
+            isSudoer = ctx.author.id in serverSettings[ctx.guild.id]['sudoer']
         except: pass
         finally: return any([isOwner, isServerOwner, hasAdmin, isSudoer])
 
@@ -292,7 +294,7 @@ class Sudo:
                         `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""", inline=False)
 
                     embed.add_field(name="Guild Administration", value=f"""
-                        ` adminrole:` {self.serverSettings[self.ctx.guild.id]['adminrole'] if self.serverSettings[self.ctx.guild.id]['adminrole'] != None else 'None set'}
+                        ` adminrole:` {self.ctx.guild.get_role(self.serverSettings[self.ctx.guild.id]['adminrole']) if self.serverSettings[self.ctx.guild.id]['adminrole'] != None else 'None set'}
                         `safesearch:` {'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}
                         `    prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}""")
                     
@@ -714,36 +716,41 @@ class Log():
                 writer.writeheader()
                 writer.writerows(logList)
 
+            with open(f'./src/cache/{ctx.author}_userSettings.yaml', 'w') as file:
+                yaml.dump(userSettings[ctx.author.id], file, allow_unicode=True)
+
             #if bot owner
             if await bot.is_owner(ctx.author):
                 dm = await ctx.author.create_dm()
                 await dm.send(file=discord.File(r'logs.csv'))
-                return
-
-            #if guild owner/guild sudoer
-            elif Sudo.isSudoer(bot, ctx, serverSettings):
-                filename = f'{ctx.guild}_guildLogs'
-                line = [row for row in logList if int(row["Guild"]) == ctx.guild.id]
-            
-            #else just bot user
+                await dm.send(file=discord.File(f'./src/cache/{ctx.author}_userSettings.yaml'))
             else:
-                filename = f'{ctx.author}_personalLogs'
-                line = [row for row in logList if int(row["User"]) == ctx.author.id]
+                #if guild owner/guild sudoer
+                if Sudo.isSudoer(bot, ctx, serverSettings):
+                    filename = f'{ctx.guild}_guildLogs'
+                    line = [row for row in logList if int(row["Guild"]) == ctx.guild.id]
+                
+                #else just bot user
+                else:
+                    filename = f'{ctx.author}_personalLogs'
+                    line = [row for row in logList if int(row["User"]) == ctx.author.id]
 
-            with open(f"./src/cache/{filename}.csv", "w", newline='', encoding='utf-8-sig') as newFile:
-                writer = csv.DictWriter(newFile, fieldnames=logFieldnames, extrasaction='ignore')
-                writer.writeheader()
-                writer.writerows(line)
-            
-            dm = await ctx.author.create_dm()
-            await dm.send(file=discord.File(f"./src/cache/{filename}.csv"))
-            await dm.send(file=discord.File(f'./src/cache/{ctx.author}_userSettings.yaml'))
-            os.remove(f"./src/cache/{ctx.author}_personalLogs.csv")
+                with open(f"./src/cache/{filename}.csv", "w", newline='', encoding='utf-8-sig') as newFile:
+                    writer = csv.DictWriter(newFile, fieldnames=logFieldnames, extrasaction='ignore')
+                    writer.writeheader()
+                    writer.writerows(line)
+                
 
-        
+                dm = await ctx.author.create_dm()
+                await dm.send(file=discord.File(f"./src/cache/{filename}.csv"))
+                await dm.send(file=discord.File(f'./src/cache/{ctx.author}_userSettings.yaml'))
+                os.remove(f"./src/cache/{ctx.author}_personalLogs.csv")
+     
         except Exception as e:
             await ErrorHandler(bot, ctx, e)
-        finally: return
+        finally: 
+            os.remove(f"./src/cache/{ctx.author}_userSettings.yaml")
+            return
 
 async def ErrorHandler(bot, ctx, error, args=None):
     if args is None: 
