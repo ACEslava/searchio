@@ -118,13 +118,17 @@ class GoogleSearch:
             #endregion
             
             #checks if user searched specifically for images
+            images = None
             if hasFoundImage:
                for results in googleSnippetResults:
                   if 'Images' in results.strings: 
                      images = results.findAll("img", recursive=True)
                      embeds = list(map(imageEmbed, images))
                      del embeds[-1]
-                     break  
+                     break
+                 
+            if images is not None:
+               embeds = list(map(imageEmbed, images))
             else:
                embeds = list(map(textEmbed, googleSnippetResults))
             
