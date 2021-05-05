@@ -20,7 +20,19 @@ class GoogleSearch:
       self.searchQuery = searchQuery
       return
 
-   async def search(self):
+   async def search(self):      
+      #region utility functions
+      def linkUnicodeParse(link: str): #translates unicode codes in links
+         return sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
+
+      def uule(city: str) -> str: #formats uule strings for use in locales
+         secret_list = list(ascii_uppercase) + \
+            list(ascii_lowercase) + list(digits) + ["-", "_"]
+
+         secret = secret_list[len(city) % len(secret_list)]
+         hashed = standard_b64encode(city.encode()).decode().strip("=")
+         return f"w+CAIQICI{secret}{hashed}"
+      #endregion
       #region embed creation functions
       def imageEmbed(image): #embed creation for image embeds
          try:
@@ -31,20 +43,21 @@ class GoogleSearch:
             # imgurl = findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
             print(" image: " + imgurl)
             resultEmbed.set_image(url=imgurl)
+            resultEmbed.url = url
          except: 
             resultEmbed.description = 'Image failed to load'
          finally: return resultEmbed
-            
+
       def textEmbed(result): #embed creation for text embeds
          resultEmbed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}') 
-         
+
          resultFind = result.findAll('div')
          divs = tuple(d for d in resultFind if not d.find('div'))
          lines = tuple(' '.join([string if string != 'View all' else '' for string in div.stripped_strings]) for div in divs)
          printstring = '\n'.join(lines)
-         
+
          resultEmbed.description = sub("\n\n+", "\n\n", printstring)
-      
+
          # tries to add a link to the embed
          findLink = result.findAll("a", href_="")
          link_list = tuple(a for a in findLink if not a.find("img")) 
@@ -67,26 +80,9 @@ class GoogleSearch:
             resultEmbed.set_image(url=imgurl)
          except: 
             pass
+         resultEmbed.url = url
          return resultEmbed
-      #endregion          
-      
-      #region utility functions
-      def linkUnicodeParse(link: str): #translates unicode codes in links
-         return sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
-      
-      def uule_secret(length: int) -> str: #creates a uule secret for use in locales
-         #Creates UULE secret
-         secret_list = list(ascii_uppercase) + \
-            list(ascii_lowercase) + list(digits) + ["-", "_"]
-         return secret_list[length % len(secret_list)]
-
-      def uule(city: str) -> str: #formats uule strings for use in locales
-         #Creates UULE code
-         secret = uule_secret(len(city))
-         hashed = standard_b64encode(city.encode()).decode().strip("=")
-         return f"w+CAIQICI{secret}{hashed}"
-      #endregion
-      
+      #endregion 
       try:
          #checks if image is in search query     
          if bool(search('image', self.searchQuery.lower())):
@@ -132,12 +128,12 @@ class GoogleSearch:
             else:
                embeds = list(map(textEmbed, googleSnippetResults))
             
-            print(self.ctx.author.name + " searched for: "+self.searchQuery[:233])
-            for index, item in enumerate(embeds): 
-               item.url = url
-               item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}')
+            print(self.ctx.author.name + " searched for: "+self.searchQuery[:233]) 
+            for index, item in enumerate(embeds):
+               item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}') 
             
             doExit, curPage = False, 0
+
             if len(embeds) > 1:
                await gather(self.message.add_reaction('🗑️'), self.message.add_reaction('◀️'), self.message.add_reaction('▶️'))
             else: 

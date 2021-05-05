@@ -67,8 +67,10 @@ class ScholarSearch:
                await message.add_reaction('▶️')
             
             while doExit == False:
-                await message.edit(content=None, embed=embeds[curPage])
+                await message.edit(content=None, embed=embeds[curPage%len(embeds)])
                 reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == message]), timeout=60)
+                await message.remove_reaction(reaction, user)
+                
                 if str(reaction.emoji) == '🗑️':
                     await message.delete()
                     doExit = True
@@ -76,12 +78,6 @@ class ScholarSearch:
                     curPage-=1
                 elif str(reaction.emoji) == '▶️':
                     curPage+=1
-
-                await message.remove_reaction(reaction, user)
-                if curPage < 0:
-                    curPage = len(embeds)-1
-                elif curPage > len(embeds)-1:
-                    curPage = 0
                
         except asyncio.TimeoutError: 
             raise

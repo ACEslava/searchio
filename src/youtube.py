@@ -41,7 +41,7 @@ class YoutubeSearch:
                 return
             while doExit == False:
                 try:
-                    await message.edit(content=None, embed=embeds[curPage])
+                    await message.edit(content=None, embed=embeds[curPage%len(embeds)])
                     reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([str(reaction.emoji) in ["◀️", "▶️", "🗑️", "⬇️"], reaction.message == message, not user.bot]), timeout=60)
                     await message.remove_reaction(reaction, user)
                     if str(reaction.emoji) == '🗑️':
@@ -100,12 +100,7 @@ class YoutubeSearch:
                             embed = discord.Embed(
                                 description=f"""{user}, this download is {round(download.filesize_approx/1000000, 2)}MB, which exceeds the maximum filesize of 100MB. It will not be processed.""")
                             await downloadmessage.edit(content=None, embed=embed)
-
-
-                    if curPage < 0:
-                        curPage = len(embeds)-1
-                    elif curPage > len(embeds)-1:
-                        curPage = 0
+                            
                 except asyncio.TimeoutError:
                     await message.clear_reactions()
         

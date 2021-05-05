@@ -16,6 +16,7 @@ from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta
 from requests import get
+from time import sleep
 import discord, asyncio, re
 
 #region utility functions
@@ -26,7 +27,7 @@ def prefix(bot, message): #handler for individual guild prefixes
         commandprefix = '&'
     finally: return commandprefix
 
-async def searchQueryParse(ctx, args): #handler for bot search queries
+async def searchQueryParse(ctx, args, bot): #handler for bot search queries
     UserCancel = KeyboardInterrupt
     global userSettings
     userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
@@ -37,7 +38,7 @@ async def searchQueryParse(ctx, args): #handler for bot search queries
             userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
             userquery = userquery.content
             if userquery.lower() == 'cancel': raise UserCancel
-        
+
         except TimeoutError:
             await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
 
@@ -50,107 +51,176 @@ async def searchQueryParse(ctx, args): #handler for bot search queries
     return userquery
 #endregion
 
-#region onlaunch code
-intents = discord.Intents.default()
-intents.members = True
-intents.presences = True
+def main():
+    global serverSettings, userSettings
+    #region onlaunch code
+    intents = discord.Intents.default()
+    intents.members = True
+    intents.presences = True
 
-load_dotenv()
-DISCORD_TOKEN = getenv("DISCORD_TOKEN")
+    bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
 
-bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
+    #checks if serverSettings.json exists
+    if not path.exists('logs.csv'):
+        with open('logs.csv', 'w') as file:
+            file.write('')
 
-#checks if serverSettings.json exists
-if not path.exists('logs.csv'):
-    with open('logs.csv', 'w') as file:
-        file.write('')
+    if not path.exists('serverSettings.yaml'):
+        with open('serverSettings.yaml', 'w') as file:
+            file.write('')
 
-if not path.exists('serverSettings.yaml'):
-    with open('serverSettings.yaml', 'w') as file:
-        file.write('')
+    if not path.exists('userSettings.yaml'):
+        with open('userSettings.yaml', 'w') as file:
+            file.write('')
 
-if not path.exists('userSettings.yaml'):
-    with open('userSettings.yaml', 'w') as file:
-        file.write('')
+    #loads serverSettings
+    with open('serverSettings.yaml', 'r') as data:
+        serverSettings = load(data, FullLoader)
+        if serverSettings is None: serverSettings = {}
 
-#loads serverSettings
-with open('serverSettings.yaml', 'r') as data:
-    serverSettings = load(data, FullLoader)
-    if serverSettings is None: serverSettings = {}
+    #loads userSettings
+    with open('userSettings.yaml', 'r') as data:
+        userSettings = load(data, FullLoader)
+        if userSettings is None: userSettings = {}
+    #endregion
 
-#loads userSettings
-with open('userSettings.yaml', 'r') as data:
-    userSettings = load(data, FullLoader)
-    if userSettings is None: userSettings = {}
-#endregion
+    @bot.event
+    async def on_guild_join(guild):
+        #Reads settings of server
+        Sudo.settingsCheck(serverSettings, guild.id)
 
-@bot.event
-async def on_guild_join(guild):
-    #Reads settings of server
-    Sudo.settingsCheck(serverSettings, guild.id)
+        owner = await bot.fetch_user(guild.owner_id)
+        dm = await owner.create_dm()
+        appInfo = await bot.application_info()
+        try:
+            embed = discord.Embed(title=f"Search.io was added to your server: '{guild.name}'.", 
+                description = f"""
+            Search.io is a bot that searches through multiple search engines/APIs.
+            The activation command is '&', and a list of various commands can be found using '&help'.
+            
+            A list of admin commands can be found by using '&help sudo'. These commands may need ID numbers, which requires Developer Mode.
+            To turn on Developer Mode, go to Settings > Appearances > Advanced > Developer Mode. Then right click on users, roles, channels, or guilds to copy their ID.
+            If you need to block a specific user from using Search.io, do '&sudo blacklist [userID]'. Unblock with '&sudo whitelist [userID]'
 
-    owner = await bot.fetch_user(guild.owner_id)
-    dm = await owner.create_dm()
-    appInfo = await bot.application_info()
-    try:
-        embed = discord.Embed(title=f"Search.io was added to your server: '{guild.name}'.", 
-            description = f"""
-        Search.io is a bot that searches through multiple search engines/APIs.
-        The activation command is '&', and a list of various commands can be found using '&help'.
+            Guild-specific settings can be accessed with '&config'
+            As a start, it is suggested to designate an administrator role that can use Search.io's sudo commands. Do '&config adminrole [roleID]' to designate an admin role.
+            You can change the command prefix with '&config prefix [character]'
+            You can also block or unblock specific commands with '&config [command]'
+            It is also suggested to turn on Safe Search, if needed. Do '&config safesearch'. The default is off. 
+
+            If you have any problems with Search.io, DM {str(appInfo.owner)}""")
+            await dm.send(embed=embed)
+        except discord.errors.Forbidden:
+            pass
+        finally: return
+
+    @bot.event
+    async def on_guild_remove(guild):
+        del serverSettings[guild.id]
         
-        A list of admin commands can be found by using '&help sudo'. These commands may need ID numbers, which requires Developer Mode.
-        To turn on Developer Mode, go to Settings > Appearances > Advanced > Developer Mode. Then right click on users, roles, channels, or guilds to copy their ID.
-        If you need to block a specific user from using Search.io, do '&sudo blacklist [userID]'. Unblock with '&sudo whitelist [userID]'
+        with open('serverSettings.yaml', 'w') as data:
+            dump(serverSettings, data, allow_unicode=True)
+        return
 
-        Guild-specific settings can be accessed with '&config'
-        As a start, it is suggested to designate an administrator role that can use Search.io's sudo commands. Do '&config adminrole [roleID]' to designate an admin role.
-        You can change the command prefix with '&config prefix [character]'
-        You can also block or unblock specific commands with '&config [command]'
-        It is also suggested to turn on Safe Search, if needed. Do '&config safesearch'. The default is off. 
+    @bot.event
+    async def on_connect():
+        global serverSettings
+        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="command prefix '&'"))
 
-        If you have any problems with Search.io, DM {str(appInfo.owner)}""")
-        await dm.send(embed=embed)
-    except discord.errors.Forbidden:
-        pass
-    finally: return
+        appInfo = await bot.application_info()
+        bot.owner_id = appInfo.owner.id
 
-@bot.event
-async def on_guild_remove(guild):
-    del serverSettings[guild.id]
-    
-    with open('serverSettings.yaml', 'w') as data:
-        dump(serverSettings, data, allow_unicode=True)
-    return
+        for servers in bot.guilds:
+            serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id, bot)
 
-@bot.event
-async def on_connect():
-    global serverSettings
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="command prefix '&'"))
+        with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
+            lines = [dict(row) for row in DictReader(file) if datetime.utcnow()-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
+            
+        with open("logs.csv", "w", newline='', encoding='utf-8-sig') as file:
+            logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
+            writer = DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
+            writer.writeheader()
+            writer.writerows(lines)
 
-    appInfo = await bot.application_info()
-    bot.owner_id = appInfo.owner.id
+        with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
+            file.write(get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)         
+        return
 
-    for servers in bot.guilds:
-        serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id, bot)
+    @bot.event
+    async def on_command_error(ctx, error):
+        if isinstance(error, commands.errors.CommandNotFound):
+            await ctx.send(f"Command not found. Do {Sudo.printPrefix(serverSettings, ctx)}help for available commands")
 
-    with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
-        lines = [dict(row) for row in DictReader(file) if datetime.utcnow()-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
-        
-    with open("logs.csv", "w", newline='', encoding='utf-8-sig') as file:
-        logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
-        writer = DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
-        writer.writeheader()
-        writer.writerows(lines)
+    @bot.command()
+    async def help(ctx, *args):
+        try:
+            def check(reaction, user):
+                return user == ctx.author and str(reaction.emoji) in ["🗑️"]
+            commandPrefix = Sudo.printPrefix(ctx)
+            searchEngineCog = dict(bot.cogs)['Search Engines']
+            adminCog = dict(bot.cogs)['Administration']
 
-    with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
-        file.write(get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)         
-    return
+            maxAdminCommandStrLength = len(max([command.name for command in adminCog.get_commands()], key=len))
+            args = list(args)
 
-@bot.event
-async def on_command_error(ctx, error):
-    if isinstance(error, commands.errors.CommandNotFound):
-        await ctx.send(f"Command not found. Do {Sudo.printPrefix(serverSettings, ctx)}help for available commands")
+            embed = discord.Embed(title="SearchIO", 
+                description="Search.io is a bot that searches through multiple search engines/APIs.\nIt is developed by ACEslava#9735, K1NG#6219, and Nanu#3294")
 
+            embed.add_field(name="Administration", inline=False, value="\n".join([f'`{command.name:>{maxAdminCommandStrLength}}:` {command.brief}' for command in adminCog.get_commands()]))
+
+            embed.add_field(
+                name="Search Engines", 
+                inline=False, 
+                value='\n'.join([f"`{command.name:>10}:` {command.brief}" 
+                    for command in searchEngineCog.get_commands() if serverSettings[ctx.guild.id]['searchEngines'][command.name] == True]))
+
+            embed.set_footer(text=f"Do {commandPrefix}help [command] for more information")
+
+            if args:
+                try:
+                    command = getattr(searchEngineCog, args[0].lower())
+                except AttributeError:
+                    try: command = getattr(adminCog, args[0].lower())
+                    except AttributeError: command = None
+
+                if command is not None:
+                    embed = discord.Embed(title=command.name, 
+                        description=f"""
+                        {command.help}
+                        Usage:
+                        ```{command.usage}```
+                        {'Optionals:```'+command.description+'```' if command.description != '' else ''}""")
+                    embed.set_footer(text=f"Requested by {ctx.author}")
+                    helpMessage = await ctx.send(embed=embed)
+                    try:
+                        await helpMessage.add_reaction('🗑️')
+                        reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
+                        if str(reaction.emoji) == '🗑️':
+                            await helpMessage.delete()
+                            return
+
+                    except TimeoutError as e: 
+                        await helpMessage.clear_reactions()
+                else: pass
+            else:
+                dm = await ctx.author.create_dm()
+                await dm.send(embed=embed)
+                await dm.send('\n'.join(['If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ',
+                'Want to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot']))
+
+        except discord.errors.Forbidden:
+            await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
+        except Exception as e:
+            await ErrorHandler(bot, ctx, e)
+        finally: return
+
+    load_dotenv()
+    DISCORD_TOKEN = getenv("DISCORD_TOKEN")
+
+    bot.add_cog(SearchEngines(bot))
+    bot.add_cog(Administration(bot))
+
+    bot.run(DISCORD_TOKEN)
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
         self.bot = bot
@@ -173,13 +243,13 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         description='--lang [ISO Language Code]: Specifies a country code to search through Wikipedia. Use wikilang to see available codes.')
     async def wiki(self, ctx, *args):
         global serverSettings
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
             UserCancel = Exception
             language = "en"
             if not args: #checks if search is empty
                 await ctx.send("Enter search query or cancel") #if empty, asks user for search query
                 try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
+                    userquery = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
                     userquery = userquery.content
                     if userquery.lower() == 'cancel': raise UserCancel
                 
@@ -195,7 +265,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     del args[args.index('--lang'):]
                 userquery = ' '.join(args).strip() #turns multiword search into single string
 
-            search = WikipediaSearch(bot, ctx, language, userquery)
+            search = WikipediaSearch(self.bot, ctx, language, userquery)
             await search.search()
             return
     
@@ -213,8 +283,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     ru: русский""")
     async def wikilang(self, ctx):
         global serverSettings
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
-            await WikipediaSearch(bot, ctx, "en").lang()
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+            await WikipediaSearch(self.bot, ctx, "en").lang()
             return
 
     @commands.command(
@@ -232,14 +302,14 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         global userSettings
 
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args)
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+            userquery = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
             while continueLoop:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
-                    searchClass = GoogleSearch(bot, ctx, serverSettings, userSettings, message, userquery)
+                    searchClass = GoogleSearch(self.bot, ctx, serverSettings, userSettings, message, userquery)
 
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     if bool(re.search('translate', userquery.lower())): 
@@ -262,7 +332,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}google ', '') #finds the new user query
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}google ', '') #finds the new user query
                         continue
                     else: raise TimeoutError
                 
@@ -277,7 +347,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 
                 except Exception as e:
                     await message.delete()
-                    await ErrorHandler(bot, ctx, e, userquery)
+                    await ErrorHandler(self.bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -288,11 +358,11 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def image(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args)
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+            userquery = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
 
-            search = ImageSearch(bot, ctx, userquery)
+            search = ImageSearch(self.bot, ctx, userquery)
             await search.search()
             return
 
@@ -302,15 +372,15 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         usage='scholar [query] [flags]',
         help='Google Scholar search',
         description="""--author: Use [query] to search for a specific author. Cannot be used with --cite
-                         --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
+                        --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
     async def scholar(self, ctx, *args):
         global serverSettings
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
             UserCancel = Exception
             if not args: #checks if search is empty
                 await ctx.send("Enter search query or cancel") #if empty, asks user for search query
                 try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
+                    userquery = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
                     userquery = userquery.content
                     if userquery.lower() == 'cancel': raise UserCancel
                 
@@ -330,7 +400,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = create_task(ScholarSearch.search(bot, ctx, message, args, userquery))
+                    search = create_task(ScholarSearch.search(self.bot, ctx, message, args, userquery))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
@@ -344,7 +414,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}scholar ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}scholar ', '')
                         continue
                     else: raise TimeoutError
                 
@@ -359,7 +429,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(bot, ctx, e, userquery)
+                    await ErrorHandler(self.bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -372,15 +442,15 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global userSettings
         
         UserCancel = Exception
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args)
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+            userquery = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True 
             while continueLoop:
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = create_task(YoutubeSearch.search(bot, ctx, message, userquery, userSettings))
+                    search = create_task(YoutubeSearch.search(self.bot, ctx, message, userquery, userSettings))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
@@ -394,7 +464,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}youtube ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}youtube ', '')
                         continue
                     else: 
                         with open('userSettings.yaml', 'r') as data:
@@ -412,7 +482,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(bot, ctx, e, userquery)
+                    await ErrorHandler(self.bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -423,10 +493,10 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def mal(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args)
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+            userquery = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
-            search = MyAnimeListSearch(bot, ctx, userquery)
+            search = MyAnimeListSearch(self.bot, ctx, userquery)
             await search.search()
             return
 
@@ -438,10 +508,10 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def xkcd(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args)
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+            userquery = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
-            await XKCDSearch.search(bot, ctx, userquery)
+            await XKCDSearch.search(self.bot, ctx, userquery)
             return
 
     @commands.command(
@@ -456,8 +526,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
         UserCancel = KeyboardInterrupt
         
-        if Sudo.isAuthorizedCommand(bot, ctx, serverSettings) and ctx.channel.nsfw:
-            userquery = await searchQueryParse(ctx, args)
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
+            userquery = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
             
@@ -465,7 +535,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 try:
                     message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = create_task(PornhubSearch.search(bot, ctx, userquery, message))
+                    search = create_task(PornhubSearch.search(self.bot, ctx, userquery, message))
                     
                     #checks for message edit
                     waiting = [messageEdit, search]
@@ -479,7 +549,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}pornhub ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}pornhub ', '')
                         continue
                     else: raise TimeoutError
                 
@@ -493,7 +563,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(bot, ctx, e, userquery)
+                    await ErrorHandler(self.bot, ctx, e, userquery)
                     return
 
     #alias command (always last)
@@ -508,7 +578,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 embed = discord.Embed(description=f'Your shortcut is not set. Set it with {Sudo.printPrefix(serverSettings, ctx)}config alias [Search Engine]')
                 message = await ctx.send(embed=embed)
                 await message.add_reaction('🗑️')
-                reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                 if str(reaction.emoji) == '🗑️':
                     await message.delete()           
             else: 
@@ -518,13 +588,13 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.printPrefix(serverSettings, ctx)}help')
                     message = ctx.send(embed=embed)
                     await message.add_reaction('🗑️')
-                    reaction, user = await bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
                         await message.delete()
         except TimeoutError as e: 
                     await message.clear_reactions()
         except Exception as e:
-            await ErrorHandler(bot, ctx, e, args)
+            await ErrorHandler(self.bot, ctx, e, args)
         finally: return
 
 class Administration(commands.Cog, name="Administration"):
@@ -541,7 +611,7 @@ class Administration(commands.Cog, name="Administration"):
         brief='DMs a .csv file of all the logs that the bot has for your username or guild if a sudoer.',
         usage='log')
     async def logging(self, ctx): 
-        await Log.logRequest(bot, ctx, serverSettings, userSettings)
+        await Log.logRequest(self.bot, ctx, serverSettings, userSettings)
         return
 
     @commands.command(
@@ -556,22 +626,22 @@ class Administration(commands.Cog, name="Administration"):
 
                 blacklist: Block a user/role from using the bot. 
                 Args: userName OR userID OR roleID
- 
+
                 whitelist: Unblock a user/role from using the bot. 
                 Args: userName OR userID OR roleID
- 
+
                 sudoer: Add a user to the sudo list. Only guild owners can do this. 
                 Args: userName OR userID  
- 
+
                 unsudoer: Remove a user from the sudo list. Only guild owners can do this. 
                 Args: userName OR userID""")
     async def sudo(self, ctx, *args):
         global serverSettings
         global userSettings
 
-        if Sudo.isSudoer(bot, ctx, serverSettings):
+        if Sudo.isSudoer(self.bot, ctx, serverSettings):
             Log.appendToLog(ctx, None, args)
-            command = Sudo(bot, ctx, serverSettings, userSettings)
+            command = Sudo(self.bot, ctx, serverSettings, userSettings)
             serverSettings = await command.sudo(list(args))
         else:
             await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
@@ -602,12 +672,12 @@ class Administration(commands.Cog, name="Administration"):
         global serverSettings
         global userSettings
 
-        command = Sudo(bot, ctx, serverSettings, userSettings)
+        command = Sudo(self.bot, ctx, serverSettings, userSettings)
         if len(args) > 0:
             localSetting = args[0] in ['locale', 'alias']
         else: localSetting = False
         
-        if Sudo.isSudoer(bot, ctx, serverSettings) or localSetting:
+        if Sudo.isSudoer(self.bot, ctx, serverSettings) or localSetting:
             serverSettings, userSettings = await command.config(args)
         
         else: serverSettings, userSettings = await command.config([])
@@ -648,69 +718,9 @@ class Administration(commands.Cog, name="Administration"):
             await ErrorHandler(bot, ctx, e)
         finally: return
 
-@bot.command()
-async def help(ctx, *args):
+while 1:
     try:
-        def check(reaction, user):
-            return user == ctx.author and str(reaction.emoji) in ["🗑️"]
-        commandPrefix = Sudo.printPrefix(ctx)
-        searchEngineCog = dict(bot.cogs)['Search Engines']
-        adminCog = dict(bot.cogs)['Administration']
-
-        maxAdminCommandStrLength = len(max([command.name for command in adminCog.get_commands()], key=len))
-        args = list(args)
-        
-        embed = discord.Embed(title="SearchIO", 
-            description="Search.io is a bot that searches through multiple search engines/APIs.\nIt is developed by ACEslava#9735, K1NG#6219, and Nanu#3294")
-        
-        embed.add_field(name="Administration", inline=False, value="\n".join([f'`{command.name:>{maxAdminCommandStrLength}}:` {command.brief}' for command in adminCog.get_commands()]))
-        
-        embed.add_field(
-            name="Search Engines", 
-            inline=False, 
-            value='\n'.join([f"`{command.name:>10}:` {command.brief}" 
-                for command in searchEngineCog.get_commands() if serverSettings[ctx.guild.id]['searchEngines'][command.name] == True]))
-
-        embed.set_footer(text=f"Do {commandPrefix}help [command] for more information")
-
-        if args:
-            try:
-                command = getattr(searchEngineCog, args[0].lower())
-            except AttributeError:
-                try: command = getattr(adminCog, args[0].lower())
-                except AttributeError: command = None
-            
-            if command is not None:
-                embed = discord.Embed(title=command.name, 
-                    description=f"""
-                    {command.help}
-                    Usage:
-                    ```{command.usage}```
-                    {'Optionals:```'+command.description+'```' if command.description != '' else ''}""")
-                embed.set_footer(text=f"Requested by {ctx.author}")
-                helpMessage = await ctx.send(embed=embed)
-                try:
-                    await helpMessage.add_reaction('🗑️')
-                    reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
-                    if str(reaction.emoji) == '🗑️':
-                        await helpMessage.delete()
-                        return
-                
-                except TimeoutError as e: 
-                    await helpMessage.clear_reactions()
-            else: pass
-        else:
-            dm = await ctx.author.create_dm()
-            await dm.send(embed=embed)
-            await dm.send('\n'.join(['If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ',
-            'Want to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot']))
-    
-    except discord.errors.Forbidden:
-        await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
-    except Exception as e:
-        await ErrorHandler(bot, ctx, e)
-    finally: return
-
-bot.add_cog(SearchEngines(bot))
-bot.add_cog(Administration(bot))
-bot.run(DISCORD_TOKEN)
+        main()
+    except Exception:
+        sleep(30)
+        continue

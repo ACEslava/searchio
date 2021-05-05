@@ -39,7 +39,7 @@ class MyAnimeListSearch:
 
                 while 1:
                     try:
-                        await msg[0].edit(content=None, embed=embeds[curPage])
+                        await msg[0].edit(content=None, embed=embeds[curPage%len(embeds)])
                         emojitask = asyncio.create_task(self.bot.wait_for("reaction_add", 
                             check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == msg[0]]), 
                             timeout=60))
@@ -58,11 +58,6 @@ class MyAnimeListSearch:
                                 curPage-=1
                             elif str(reaction.emoji) == '▶️':
                                 curPage+=1
-
-                            if curPage < 0:
-                                curPage = len(embeds)-1
-                            elif curPage > len(embeds)-1:
-                                curPage = 0
                         
                         elif responsetask in done:
                             try:

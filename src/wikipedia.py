@@ -42,7 +42,7 @@ class WikipediaSearch:
 
                 while 1:
                     try:
-                        await msg[0].edit(content=None, embed=embeds[curPage])
+                        await msg[0].edit(content=None, embed=embeds[curPage%len(embeds)])
                         emojitask = asyncio.create_task(self.bot.wait_for("reaction_add", 
                             check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == msg[0]]), 
                             timeout=60))
@@ -51,7 +51,9 @@ class WikipediaSearch:
                         waiting = [emojitask, responsetask]
                         done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
                         if emojitask in done: 
-                            reaction, user = emojitask.result()   
+                            reaction, user = emojitask.result()  
+                            await msg[0].remove_reaction(reaction, user)
+
                             if str(reaction.emoji) == '🗑️':
                                 await msg[0].delete()
                                 return
@@ -59,12 +61,6 @@ class WikipediaSearch:
                                 curPage-=1
                             elif str(reaction.emoji) == '▶️':
                                 curPage+=1
-
-                            await msg[0].remove_reaction(reaction, user)
-                            if curPage < 0:
-                                curPage = len(embeds)-1
-                            elif curPage > len(embeds)-1:
-                                curPage = 0
 
                         elif responsetask in done:
                             try:
