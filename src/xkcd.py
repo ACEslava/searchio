@@ -26,8 +26,7 @@ class xkcd:
 
 class XKCDSearch:
     @staticmethod
-    async def search(bot, ctx, searchQuery):
-        message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+    async def search(bot, ctx, searchQuery, message):
         errorCount = 0
         while errorCount <= 1:
             try:

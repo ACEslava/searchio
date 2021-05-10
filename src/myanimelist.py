@@ -8,18 +8,20 @@ class MyAnimeListSearch:
         self,
         bot,
         ctx,
+        message,
         searchQuery = None):
 
         self.searchQuery = searchQuery
         self.bot = bot
         self.ctx = ctx
+        self.message = message
     
     async def search(self):
         def searchPages(result):
             return discord.Embed(title=f"Titles matching '{self.searchQuery}'", description=
                 ''.join([f'[{index}]: {value.title}\n' for index, value in enumerate(result)]))
         try:
-            msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
+            msg = [self.message]
             await asyncio.sleep(random.uniform(0,1))
             search = AnimeSearch(self.searchQuery)
 

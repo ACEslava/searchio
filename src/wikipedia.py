@@ -7,13 +7,18 @@ class WikipediaSearch:
         self,
         bot,
         ctx,
-        language,
+        args,
         searchQuery = None):
 
         self.searchQuery = searchQuery
         self.bot = bot
         self.ctx = ctx
-        wikipedia.set_lang(language)
+
+        if args is None:
+            wikipedia.set_lang('en')
+        elif any('lang' in i for i in args):
+            language = args[[idx for idx, s in enumerate(args) if 'lang' in s][0]].replace('lang ', '')
+            wikipedia.set_lang(language)
     
     async def search(self):
         def searchPages(result):

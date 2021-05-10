@@ -22,17 +22,12 @@ class ScholarSearch:
             return embed
         
         def authorEmbeds(result):
-            embed=discord.Embed(title=result['bib']['title'], 
-                            description=result['bib']['abstract'], 
-                            url=result['eprint_url'] if 'eprint_url' in result.keys() else result['pub_url'])
-            embed.add_field(name="Authors", value=', '.join(result['bib']['author']).strip(), inline=True) 
-            
-            embed.add_field(name="Publisher", value=result['bib']['venue'], inline=True)                
-            embed.add_field(name="Publication Year", value=result['bib']['pub_year'], inline=True)
-            embed.add_field(name="Cited By", value=result['num_citations'] if 'num_citations' in result.keys() else '0', inline=True)
-            
-            embed.add_field(name="Related Articles", value=f'https://scholar.google.com{result["url_related_articles"]}', inline=True)
-
+            embed=discord.Embed(title=result['name'])     
+            embed.add_field(name="Cited By", value=f"{result['citedby']} articles", inline=True)                
+            embed.add_field(name="Scholar ID", value=result['scholar_id'], inline=True)
+            embed.add_field(name="Affiliation", value=result['affiliation'] if 'affiliation' in result.keys() else 'None', inline=True)
+            embed.add_field(name="Interests", value=f"{', '.join(result['interests']) if 'interests' in result.keys() else 'None'}", inline=True)
+            embed.set_image(url=result['url_picture']) 
             embed.set_footer(text=f"Requested by {ctx.author}")
             return embed
         

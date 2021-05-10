@@ -59,9 +59,10 @@ class Sudo:
     @staticmethod
     def userSettingsCheck(userSettings, userID):
         olduserSetting = copy.deepcopy(userSettings)
-        keys = userSettings[userID].keys()
         if userID not in userSettings.keys():
             userSettings[userID] = {}
+
+        keys = userSettings[userID].keys()
         if 'locale' not in keys:
             userSettings[userID]['locale'] = None
         if 'downloadquota' not in keys:
@@ -103,7 +104,8 @@ class Sudo:
         try:
             hasAdmin = serverSettings[ctx.guild.id]['adminrole'] in [role.id for role in ctx.author.roles]
             isSudoer = ctx.author.id in serverSettings[ctx.guild.id]['sudoer']
-        except: pass
+        except Exception as e:
+            print(e)
         finally: return any([isOwner, isServerOwner, hasAdmin, isSudoer])
 
     @staticmethod

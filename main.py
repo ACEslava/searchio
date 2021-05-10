@@ -1,7 +1,6 @@
 from src.wikipedia import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
-from src.googlereverseimages import ImageSearch
 from src.loadingmessage import LoadingMessage
 from src.utils import Sudo, Log, ErrorHandler
 from src.scholar import ScholarSearch
@@ -46,9 +45,15 @@ async def searchQueryParse(ctx, args, bot): #handler for bot search queries
             await ctx.send('Aborting')
             return
     else: 
-        userquery = ' '.join(list(args)).strip() #turns multiword search into single string.
+        userquery = ' '.join([query.strip() for query in list(args)]).split('--') #turns multiword search into single string.
 
-    return userquery
+    if len(userquery) > 1:
+        flags = userquery[1:]
+    else:
+        flags = None
+    
+    userquery = userquery[0]
+    return userquery, flags
 #endregion
 
 def main():
@@ -245,27 +250,10 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
             UserCancel = Exception
-            language = "en"
-            if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    userquery = userquery.content
-                    if userquery.lower() == 'cancel': raise UserCancel
-                
-                except TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
+            userquery, args = await searchQueryParse(ctx, args, self.bot)
+            if userquery is None: return
 
-                except UserCancel:
-                    await ctx.send('Aborting')
-            else: 
-                args = list(args)
-                if '--lang' in args:
-                    language = args[args.index('--lang')+1]
-                    del args[args.index('--lang'):]
-                userquery = ' '.join(args).strip() #turns multiword search into single string
-
-            search = WikipediaSearch(self.bot, ctx, language, userquery)
+            search = WikipediaSearch(self.bot, ctx, args, userquery)
             await search.search()
             return
     
@@ -299,11 +287,10 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             "\n\n\nimage: Searches only for image results.",
             "\n\n\ndefine: Queries dictionaryapi.dev for an English definition of the word"]))
     async def google(self, ctx, *args):
-        global serverSettings
-        global userSettings
+        global serverSettings, userSettings
 
         if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args, self.bot)
+            userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
             while continueLoop:
@@ -351,22 +338,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     return
 
     @commands.command(
-        name='image',
-        brief="Google's Reverse Image Search with an image URL or image reply",
-        usage='image [imageURL] OR reply to an image in the chat',
-        help="Uses Google's Reverse Image search to output URLs that contain the image")
-    async def image(self, ctx, *args):
-        global serverSettings
-        UserCancel = Exception
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args, self.bot)
-            if userquery is None: return
-
-            search = ImageSearch(self.bot, ctx, userquery)
-            await search.search()
-            return
-
-    @commands.command(
         name= 'scholar',
         brief='Search through Google Scholar',
         usage='scholar [query] [flags]',
@@ -377,23 +348,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
             UserCancel = Exception
-            if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    userquery = userquery.content
-                    if userquery.lower() == 'cancel': raise UserCancel
-                
-                except TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-                except UserCancel:
-                    await ctx.send('Aborting')
-                    return
-            else:
-                args = ' '.join(list(args)).strip().split('--') #turns entire command into list split by flag operator
-                userquery = args[0].strip()
-                del args[0]
+            userquery, args = await searchQueryParse(ctx, args, self.bot)
+            if userquery is None: return
 
             continueLoop = True 
             while continueLoop:
@@ -438,12 +394,11 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         usage='youtube [query]',
         help='Searches through Youtube videos')
     async def youtube(self, ctx, *args):
-        global serverSettings
-        global userSettings
-        
+        global serverSettings, userSettings
+
         UserCancel = Exception
         if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args, self.bot)
+            userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True 
             while continueLoop:
@@ -493,12 +448,47 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def mal(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args, self.bot)
+
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
+            userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
-            search = MyAnimeListSearch(self.bot, ctx, userquery)
-            await search.search()
-            return
+            continueLoop = True
+
+            while continueLoop:
+                try:
+                    message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+                    searchEngine = MyAnimeListSearch(self.bot, ctx, message, userquery)
+                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = create_task(searchEngine.search())
+
+                    #checks for message edit
+                    waiting = [messageEdit, search]
+                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+
+                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
+                        if type(messageEdit.exception()) == TimeoutError:
+                            raise TimeoutError
+                        await message.delete()
+                        messageEdit.cancel()
+                        search.cancel()
+
+                        messageEdit = messageEdit.result()
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}pornhub ', '')
+                        continue
+                    else: raise TimeoutError
+
+                except TimeoutError: #after a minute, everything cancels
+                    messageEdit.cancel()
+                    search.cancel()
+                    continueLoop = False
+                    return
+
+                except asyncio.CancelledError:
+                    pass
+
+                except Exception as e:
+                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    return
 
     @commands.command(
         name='xkcd',
@@ -508,11 +498,46 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def xkcd(self, ctx, *args):
         global serverSettings
         UserCancel = Exception
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
-            userquery = await searchQueryParse(ctx, args, self.bot)
+
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
+            userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
-            await XKCDSearch.search(self.bot, ctx, userquery)
-            return
+            continueLoop = True
+
+            while continueLoop:
+                try:
+                    message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = create_task(XKCDSearch.search(self.bot, ctx, userquery))
+
+                    #checks for message edit
+                    waiting = [messageEdit, search]
+                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+
+                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
+                        if type(messageEdit.exception()) == TimeoutError:
+                            raise TimeoutError
+                        await message.delete()
+                        messageEdit.cancel()
+                        search.cancel()
+
+                        messageEdit = messageEdit.result()
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}pornhub ', '')
+                        continue
+                    else: raise TimeoutError
+
+                except TimeoutError: #after a minute, everything cancels
+                    messageEdit.cancel()
+                    search.cancel()
+                    continueLoop = False
+                    return
+
+                except asyncio.CancelledError:
+                    pass
+
+                except Exception as e:
+                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    return
 
     @commands.command(
         name='pornhub',
@@ -527,7 +552,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         UserCancel = KeyboardInterrupt
         
         if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
-            userquery = await searchQueryParse(ctx, args, self.bot)
+            userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
             
@@ -696,7 +721,7 @@ class Administration(commands.Cog, name="Administration"):
         except discord.errors.Forbidden:
             await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
         except Exception as e:
-            await ErrorHandler(bot, ctx, e)
+            await ErrorHandler(self.bot, ctx, e)
         finally: return
 
     @commands.command(
