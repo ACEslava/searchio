@@ -738,8 +738,8 @@ class Log():
             else:
                 #if guild owner/guild sudoer
                 if Sudo.isSudoer(bot, ctx, serverSettings):
-                    filename = f'{ctx.guild}_guildLogs'
-                    line = [row for row in logList if int(row["Guild"]) == ctx.guild.id]
+                    filename = f'{str(ctx.guild).replace(" ", "")}_guildLogs'
+                    line = [row for row in logList if int(row["Guild"] if row["Guild"] != 'DM' else '0') == ctx.guild.id]
                 
                 #else just bot user
                 else:
@@ -757,7 +757,7 @@ class Log():
                 await dm.send(file=discord.File(f'./src/cache/{ctx.author}_userSettings.yaml'))
                 os.remove(f"./src/cache/{ctx.author}_userSettings.yaml")
                 os.remove(f"./src/cache/{filename}.csv")
-     
+        
         except Exception as e:
             await ErrorHandler(bot, ctx, e)
         finally: 
