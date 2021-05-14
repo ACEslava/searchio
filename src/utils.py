@@ -293,26 +293,35 @@ class Sudo:
                         `             Locale:` {self.userSettings[self.ctx.author.id]['locale'] if self.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
                         `              Alias:` {self.userSettings[self.ctx.author.id]['searchAlias'] if self.userSettings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}
                         `   Daily Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
-                        `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""", inline=False)
+                        `Lifetime Downloaded:` {self.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""", inline=False
+                    )
 
                     embed.add_field(name="Guild Administration", value=f"""
                         ` adminrole:` {self.ctx.guild.get_role(self.serverSettings[self.ctx.guild.id]['adminrole']) if self.serverSettings[self.ctx.guild.id]['adminrole'] != None else 'None set'}
                         `safesearch:` {'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}
-                        `    prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}""")
+                        `    prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}"""
+                    )
                     
                     embed.add_field(name="Guild Search Engines", 
                         value='\n'.join([f'`{command:>10}:` {"✅" if self.serverSettings[self.ctx.guild.id]["searchEngines"][command] == True else "❌"}' 
-                            for command in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()]]))
+                            for command in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()]
+                        ])
+                    )
 
                     embed.set_footer(text=f"Do {self.printPrefix(self.serverSettings)}config [setting] to change a specific setting")
                     configMessage = await self.ctx.send(embed=embed)
 
                     await configMessage.add_reaction('🗑️')
-                    reaction, user = await self.bot.wait_for("reaction_add", 
-                        check=lambda reaction, user: all([user == self.ctx.author, 
-                                                        str(reaction.emoji) == "🗑️", 
-                                                        reaction.message == configMessage]), 
-                        timeout=60)
+                    reaction, user = await self.bot.wait_for(
+                                "reaction_add", 
+                                check=lambda reaction, user: 
+                                            all([
+                                                user == self.ctx.author, 
+                                                str(reaction.emoji) == "🗑️", 
+                                                reaction.message == configMessage
+                                            ]), 
+                                timeout=60
+                    )
                     
                     if str(reaction.emoji) == '🗑️':
                         await configMessage.delete()
@@ -746,12 +755,12 @@ class Log():
                 dm = await ctx.author.create_dm()
                 await dm.send(file=discord.File(f"./src/cache/{filename}.csv"))
                 await dm.send(file=discord.File(f'./src/cache/{ctx.author}_userSettings.yaml'))
-                os.remove(f"./src/cache/{ctx.author}_personalLogs.csv")
+                os.remove(f"./src/cache/{ctx.author}_userSettings.yaml")
+                os.remove(f"./src/cache/{filename}.csv")
      
         except Exception as e:
             await ErrorHandler(bot, ctx, e)
         finally: 
-            os.remove(f"./src/cache/{ctx.author}_userSettings.yaml")
             return
 
 async def ErrorHandler(bot, ctx, error, args=None):

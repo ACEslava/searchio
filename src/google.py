@@ -90,23 +90,23 @@ class GoogleSearch:
          else: hasFoundImage = False 
 
          uuleParse = uule(self.userSettings[self.ctx.author.id]['locale']) if self.userSettings[self.ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
-         url = (''.join(["https://google.com/search?pws=0&q=", 
-            self.searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
-            f"&uule={uuleParse}&num=5{'&safe=active' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True and self.ctx.channel.nsfw == False else ''}"]))
+         url = (''.join([
+               "https://google.com/search?pws=0&q=", 
+               self.searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
+               f"&uule={uuleParse}&num=5{'&safe=active' if self.serverSettings[self.ctx.guild.id]['safesearch']and not self.ctx.channel.nsfw else ''}"
+            ])
+         )
          response = get(url)
-         soup = BeautifulSoup(response.text, features="lxml")
-         index = 3
-         google_snippet_result = soup.find("div", {"id": "main"})
+         soup, index = BeautifulSoup(response.text, features="lxml"), 3
 
-         if google_snippet_result is not None:
+         if soup.find("div", {"id": "main"}) is not None:
             #region html processing
-            google_snippet_result = google_snippet_result.contents[index]
             wrongFirstResults = {"Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >'}
 
             Log.appendToLog(self.ctx, f"{self.ctx.command} results", url)
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
             
-            #Debug HTML
+            #Debug HTML output
             # with open('test.html', 'w', encoding='utf-8-sig') as file:
             #    file.write(soup.prettify())
 
@@ -139,7 +139,12 @@ class GoogleSearch:
             doExit, curPage = False, 0
 
             if len(embeds) > 1:
-               await gather(self.message.add_reaction('🗑️'), self.message.add_reaction('◀️'), self.message.add_reaction('▶️'))
+               await gather(
+                  self.message.add_reaction('🗑️'), 
+                  self.message.add_reaction('◀️'), 
+                  self.message.add_reaction('▶️')
+               )
+
             else: 
                await self.message.add_reaction('🗑️')
 
@@ -147,7 +152,17 @@ class GoogleSearch:
                try:
                   await self.message.edit(content=None, embed=embeds[curPage%len(embeds)])
                      
-                  reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️"], reaction.message == self.message]), timeout=60)
+                  reaction, user = await self.bot.wait_for(
+                           "reaction_add", 
+                           check=lambda reaction, user: 
+                                    all([
+                                       user == self.ctx.author, 
+                                       str(reaction.emoji) in ["◀️", "▶️", "🗑️"], 
+                                       reaction.message == self.message
+                                    ]), 
+                           timeout=60
+                  )
+
                   await self.message.remove_reaction(reaction, user)
                   
                   if str(reaction.emoji) == '🗑️':

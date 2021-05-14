@@ -35,8 +35,8 @@ async def searchQueryParse(ctx, args, bot): #handler for bot search queries
         await ctx.send("Enter search query or cancel") #if empty, asks user for search query
         try:
             userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-            userquery = userquery.content
-            if userquery.lower() == 'cancel': raise UserCancel
+            if userquery.content.lower() == 'cancel': raise UserCancel
+            else: userquery = userquery.content.split('--')
 
         except TimeoutError:
             await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
