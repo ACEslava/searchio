@@ -135,14 +135,6 @@ def main():
         appInfo = await bot.application_info()
         bot.owner_id = appInfo.owner.id
 
-        temp = list(serverSettings.keys())
-        for setting in temp:
-            if isinstance(setting, int):
-                serverSettings[hex(setting)] = serverSettings[setting]
-                del serverSettings[setting]
-        with open('serverSettings.yaml', 'w') as data:
-            yaml.dump(serverSettings, data, allow_unicode=True)
-
         for servers in bot.guilds:
             serverSettings = Sudo.serverSettingsCheck(serverSettings, hex(servers.id), bot)
 
