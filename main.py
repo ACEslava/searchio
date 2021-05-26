@@ -16,12 +16,12 @@ from csv import DictReader, DictWriter
 from datetime import datetime, timedelta
 from requests import get
 from time import sleep
-import discord, asyncio, re
+import discord, asyncio, re, yaml
 
 #region utility functions
 def prefix(bot, message): #handler for individual guild prefixes
     try:
-        commandprefix = serverSettings[message.guild.id]['commandprefix']
+        commandprefix = serverSettings[hex(message.guild.id)]['commandprefix']
     except Exception:
         commandprefix = '&'
     finally: return commandprefix
@@ -92,7 +92,7 @@ def main():
     @bot.event
     async def on_guild_join(guild):
         #Reads settings of server
-        Sudo.settingsCheck(serverSettings, guild.id)
+        Sudo.settingsCheck(serverSettings, hex(guild.id))
 
         owner = await bot.fetch_user(guild.owner_id)
         dm = await owner.create_dm()
@@ -121,7 +121,7 @@ def main():
 
     @bot.event
     async def on_guild_remove(guild):
-        del serverSettings[guild.id]
+        del serverSettings[hex(guild.id)]
         
         with open('serverSettings.yaml', 'w') as data:
             dump(serverSettings, data, allow_unicode=True)
@@ -135,8 +135,16 @@ def main():
         appInfo = await bot.application_info()
         bot.owner_id = appInfo.owner.id
 
+        temp = list(serverSettings.keys())
+        for setting in temp:
+            if isinstance(setting, int):
+                serverSettings[hex(setting)] = serverSettings[setting]
+                del serverSettings[setting]
+        with open('serverSettings.yaml', 'w') as data:
+            yaml.dump(serverSettings, data, allow_unicode=True)
+
         for servers in bot.guilds:
-            serverSettings = Sudo.serverSettingsCheck(serverSettings, servers.id, bot)
+            serverSettings = Sudo.serverSettingsCheck(serverSettings, hex(servers.id), bot)
 
         with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
             lines = [dict(row) for row in DictReader(file) if datetime.utcnow()-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
@@ -177,7 +185,7 @@ def main():
                 name="Search Engines", 
                 inline=False, 
                 value='\n'.join([f"`{command.name:>10}:` {command.brief}" 
-                    for command in searchEngineCog.get_commands() if serverSettings[ctx.guild.id]['searchEngines'][command.name] == True]))
+                    for command in searchEngineCog.get_commands() if serverSettings[hex(ctx.guild.id)]['searchEngines'][command.name] == True]))
 
             embed.set_footer(text=f"Do {commandPrefix}help [command] for more information")
 

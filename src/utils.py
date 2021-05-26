@@ -102,8 +102,8 @@ class Sudo:
 
         #Checks if sudoer has the designated adminrole or is a sudoer
         try:
-            hasAdmin = serverSettings[ctx.guild.id]['adminrole'] in [role.id for role in ctx.author.roles]
-            isSudoer = ctx.author.id in serverSettings[ctx.guild.id]['sudoer']
+            hasAdmin = serverSettings[hex(ctx.guild.id)]['adminrole'] in [role.id for role in ctx.author.roles]
+            isSudoer = ctx.author.id in serverSettings[hex(ctx.guild.id)]['sudoer']
         except Exception as e:
             print(e)
         finally: return any([isOwner, isServerOwner, hasAdmin, isSudoer])
@@ -112,14 +112,14 @@ class Sudo:
     def printPrefix(serverSettings, ctx=None):
         if ctx == None or ctx.guild == None:
             return '&'
-        else: return serverSettings[ctx.guild.id]['commandprefix']
+        else: return serverSettings[hex(ctx.guild.id)]['commandprefix']
 
     @staticmethod
     def isAuthorizedCommand(bot, ctx, serverSettings):
         check = all([
-            ctx.author.id not in serverSettings[ctx.guild.id]['blacklist'], 
-            not any(role.id in serverSettings[ctx.guild.id]['blacklist'] for role in ctx.author.roles), 
-            serverSettings[ctx.guild.id]['searchEngines'][ctx.command.name] != False])
+            ctx.author.id not in serverSettings[hex(ctx.guild.id)]['blacklist'], 
+            not any(role.id in serverSettings[hex(ctx.guild.id)]['blacklist'] for role in ctx.author.roles), 
+            serverSettings[hex(ctx.guild.id)]['searchEngines'][ctx.command.name] != False])
         return any([check, Sudo.isSudoer(bot, ctx, serverSettings)])
 
     async def userSearch(self, search):
@@ -164,10 +164,10 @@ class Sudo:
                 user = await self.userSearch(' '.join(args))
                 role = self.ctx.guild.get_role(int(''.join(args)))
                 if user is not None:
-                    self.serverSettings[self.ctx.guild.id]['blacklist'].append(user.id)
+                    self.serverSettings[hex(self.ctx.guild.id)]['blacklist'].append(user.id)
                     await self.ctx.send(f"`{str(user)}` blacklisted")
                 elif role is not None:
-                    self.serverSettings[self.ctx.guild.id]['blacklist'].append(role.id)
+                    self.serverSettings[hex(self.ctx.guild.id)]['blacklist'].append(role.id)
                     await self.ctx.send(f"'{role.name}' is now blacklisted")
                 else: 
                     await self.ctx.send(f"No user/role named `{''.join(args)}` was found in the guild")
@@ -182,10 +182,10 @@ class Sudo:
                     user = await self.userSearch(' '.join(args))
                     role = self.ctx.guild.get_role(int(''.join(args)))
                     if user is not None:
-                        self.serverSettings[self.ctx.guild.id]['blacklist'].remove(user.id)
+                        self.serverSettings[hex(self.ctx.guild.id)]['blacklist'].remove(user.id)
                         await self.ctx.send(f"`{str(user)}` removed from blacklist")
                     elif role is not None:
-                        self.serverSettings[self.ctx.guild.id]['blacklist'].remove(role.id)
+                        self.serverSettings[hex(self.ctx.guild.id)]['blacklist'].remove(role.id)
                         await self.ctx.send(f"'{role.name}' removed from blacklist")
                     else: 
                         await self.ctx.send(f"No user/role with the ID `{''.join(args)}` was found in the guild")
@@ -199,8 +199,8 @@ class Sudo:
         try:
             if self.ctx.author.id == self.bot.owner_id or self.ctx.author.id == self.ctx.guild.owner_id:
                 user = await self.userSearch(' '.join(args))
-                if user.id not in self.serverSettings[self.ctx.guild.id]['sudoer']:
-                    self.serverSettings[self.ctx.guild.id]['sudoer'].append(user.id)
+                if user.id not in self.serverSettings[hex(self.ctx.guild.id)]['sudoer']:
+                    self.serverSettings[hex(self.ctx.guild.id)]['sudoer'].append(user.id)
                     await self.ctx.send(f"`{str(user)}` is now a sudoer")
                 else: 
                     await self.ctx.send(f"`{str(user)}` is already a sudoer")
@@ -212,8 +212,8 @@ class Sudo:
         try:
             if self.ctx.author.id == self.bot.owner_id or self.ctx.author.id == self.ctx.guild.owner_id:
                 user = await self.userSearch(' '.join(args))
-                if user.id in self.serverSettings[self.ctx.guild.id]['sudoer']:
-                    self.serverSettings[self.ctx.guild.id]['sudoer'].remove(user.id)
+                if user.id in self.serverSettings[hex(self.ctx.guild.id)]['sudoer']:
+                    self.serverSettings[hex(self.ctx.guild.id)]['sudoer'].remove(user.id)
                     await self.ctx.send(f"`{str(user)}` has been removed from sudo")
                 else: 
                     await self.ctx.send(f"`{str(user)}` is not a sudoer")
@@ -297,13 +297,13 @@ class Sudo:
                     )
 
                     embed.add_field(name="Guild Administration", value=f"""
-                        ` adminrole:` {self.ctx.guild.get_role(self.serverSettings[self.ctx.guild.id]['adminrole']) if self.serverSettings[self.ctx.guild.id]['adminrole'] != None else 'None set'}
-                        `safesearch:` {'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}
-                        `    prefix:` {self.serverSettings[self.ctx.guild.id]['commandprefix']}"""
+                        ` adminrole:` {self.ctx.guild.get_role(self.serverSettings[hex(self.ctx.guild.id)]['adminrole']) if self.serverSettings[hex(self.ctx.guild.id)]['adminrole'] != None else 'None set'}
+                        `safesearch:` {'✅' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}
+                        `    prefix:` {self.serverSettings[hex(self.ctx.guild.id)]['commandprefix']}"""
                     )
                     
                     embed.add_field(name="Guild Search Engines", 
-                        value='\n'.join([f'`{command:>10}:` {"✅" if self.serverSettings[self.ctx.guild.id]["searchEngines"][command] == True else "❌"}' 
+                        value='\n'.join([f'`{command:>10}:` {"✅" if self.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][command] == True else "❌"}' 
                             for command in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()]
                         ])
                     )
@@ -338,7 +338,7 @@ class Sudo:
             #region server config settings
             elif args[0].lower() in [command.name for command in dict(self.bot.cogs)['Search Engines'].get_commands()]:
                 if len(args) == 1:
-                    embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else '❌'}")
+                    embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}")
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
                     try:
@@ -347,20 +347,20 @@ class Sudo:
 
                         reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
                         if str(reaction.emoji) == '✅':
-                            self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = True
+                            self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] = True
                         elif str(reaction.emoji) == '❌':
-                            self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = False
+                            self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] = False
                         await message.delete()
                         return
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
                 elif bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
-                    self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = True
+                    self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] = True
                 elif bool(re.search('^disable', args[1].lower()) or re.search('^off', args[1].lower())):
-                    self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = False
+                    self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] = False
                 else:
                     embed = discord.Embed(title=args[0].capitalize(), 
-                                          description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else '❌'}")
+                                          description=f"{'✅' if self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}")
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
                     
@@ -370,18 +370,18 @@ class Sudo:
 
                         reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
                         if str(reaction.emoji) == '✅':
-                            self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = True
+                            self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] = True
                         elif str(reaction.emoji) == '❌':
-                            self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] = False
+                            self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] = False
                         await message.delete()
                         return
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
                 await self.ctx.send(
-                    f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id]['searchEngines'][args[0].lower()] == True else 'disabled'}")          
+                    f"{args[0].capitalize()} is {'enabled' if self.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else 'disabled'}")          
             elif args[0].lower() == 'safesearch':
                 if len(args) == 1:
-                    embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}")
+                    embed = discord.Embed(title=args[0], description=f"{'✅' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}")
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
                     try:
@@ -390,20 +390,20 @@ class Sudo:
 
                         reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
                         if str(reaction.emoji) == '✅':
-                            self.serverSettings[self.ctx.guild.id]['safesearch'] = True
+                            self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] = True
                         elif str(reaction.emoji) == '❌':
-                            self.serverSettings[self.ctx.guild.id]['safesearch'] = False
+                            self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] = False
                         await message.delete()
                         return
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
                 elif bool(re.search('^enable', args[1].lower()) or re.search('^on', args[1].lower())):
-                    self.serverSettings[self.ctx.guild.id]['safesearch'] = True
+                    self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] = True
                 elif bool(re.search('^disable', args[1].lower()) or re.search('^off', args[1].lower())):
-                    self.serverSettings[self.ctx.guild.id]['safesearch'] = False
+                    self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] = False
                 else:
                     embed = discord.Embed(title=args[0].capitalize(), 
-                                          description=f"{'✅' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else '❌'}")
+                                          description=f"{'✅' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}")
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
                     
@@ -413,18 +413,18 @@ class Sudo:
 
                         reaction, user = await self.bot.wait_for("reaction_add", check=check, timeout=60)
                         if str(reaction.emoji) == '✅':
-                            self.serverSettings[self.ctx.guild.id]['safesearch'] = True
+                            self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] = True
                         elif str(reaction.emoji) == '❌':
-                            self.serverSettings[self.ctx.guild.id]['safesearch'] = False
+                            self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] = False
                         await message.delete()
                         return
                     except asyncio.TimeoutError as e: 
                         await message.clear_reactions()
                 await self.ctx.send(
-                    f"{args[0].capitalize()} is {'enabled' if self.serverSettings[self.ctx.guild.id]['safesearch'] == True else 'disabled'}")
+                    f"{args[0].capitalize()} is {'enabled' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else 'disabled'}")
             elif args[0].lower() == 'adminrole':
                 if len(args) == 1:
-                    adminroleID = self.serverSettings[self.ctx.guild.id]['adminrole']
+                    adminroleID = self.serverSettings[hex(self.ctx.guild.id)]['adminrole']
                     
                     embed = discord.Embed(
                         title='Adminrole', 
@@ -447,7 +447,7 @@ class Sudo:
                 while errorCount <= 1:
                     try: 
                         adminrole = self.ctx.guild.get_role(int(response))
-                        self.serverSettings[self.ctx.guild.id]['adminrole'] = adminrole.id
+                        self.serverSettings[hex(self.ctx.guild.id)]['adminrole'] = adminrole.id
                         await self.ctx.send(f"`{adminrole.name}` is now the admin role")
                         break
                     except (ValueError, AttributeError) as e:
@@ -477,7 +477,7 @@ class Sudo:
                         pass
             elif args[0].lower() == 'prefix':
                 if not args[1]:
-                    embed = discord.Embed(title='Prefix', description=f"{self.serverSettings[self.ctx.guild.id]['commandprefix']}")
+                    embed = discord.Embed(title='Prefix', description=f"{self.serverSettings[hex(self.ctx.guild.id)]['commandprefix']}")
                     embed.set_footer(text=f"Reply with the prefix that you want to set")
                     message = await self.ctx.send(embed=embed)
 
@@ -491,7 +491,7 @@ class Sudo:
                         await message.delete()
                 else: response = args[1]
                 
-                self.serverSettings[self.ctx.guild.id]['commandprefix'] = response
+                self.serverSettings[hex(self.ctx.guild.id)]['commandprefix'] = response
                 await self.ctx.send(f"`{response}` is now the guild prefix")
             #endregion
             
@@ -738,8 +738,8 @@ class Log():
             else:
                 #if guild owner/guild sudoer
                 if Sudo.isSudoer(bot, ctx, serverSettings):
-                    filename = f'{ctx.guild}_guildLogs'
-                    line = [row for row in logList if int(row["Guild"]) == ctx.guild.id]
+                    filename = f'{str(ctx.guild).replace(" ", "")}_guildLogs'
+                    line = [row for row in logList if int(row["Guild"] if row["Guild"] != 'DM' else '0') == ctx.guild.id]
                 
                 #else just bot user
                 else:
@@ -757,7 +757,7 @@ class Log():
                 await dm.send(file=discord.File(f'./src/cache/{ctx.author}_userSettings.yaml'))
                 os.remove(f"./src/cache/{ctx.author}_userSettings.yaml")
                 os.remove(f"./src/cache/{filename}.csv")
-     
+        
         except Exception as e:
             await ErrorHandler(bot, ctx, e)
         finally: 

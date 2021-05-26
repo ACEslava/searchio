@@ -93,7 +93,7 @@ class GoogleSearch:
          url = (''.join([
                "https://google.com/search?pws=0&q=", 
                self.searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
-               f"&uule={uuleParse}&num=5{'&safe=active' if self.serverSettings[self.ctx.guild.id]['safesearch']and not self.ctx.channel.nsfw else ''}"
+               f"&uule={uuleParse}&num=5{'&safe=active' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch']and not self.ctx.channel.nsfw else ''}"
             ])
          )
          response = get(url)
