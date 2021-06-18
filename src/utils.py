@@ -774,16 +774,18 @@ async def ErrorHandler(bot, ctx, error, args=None):
         pass
         
     with open("logs.csv", 'r', encoding='utf-8-sig') as file: 
-        doesErrorCodeMatch = False
-        errorCode = "%06x" % random.randint(0, 0xFFFFFF)
-        while doesErrorCodeMatch == False:
+        doesErrorCodeMatch = True
+        while doesErrorCodeMatch == True:
+            errorCode = "%06x" % random.randint(0, 0xFFFFFFFFFF)
             for line in csv.DictReader(file): 
-                if line["Command"] == error:
+                if line["Command"] == 'error':
                     if line["Args"] == errorCode:
                         doesErrorCodeMatch = True
-                        errorCode = "%06x" % random.randint(0, 0xFFFFFF)
-                        pass
-            break
+                        break
+                    else:
+                        doesErrorCodeMatch = False
+                else:
+                    continue
     
     Log.appendToLog(ctx, "error", errorCode)
 
@@ -792,7 +794,8 @@ async def ErrorHandler(bot, ctx, error, args=None):
     #prevents doxxing by removing username
     errorOut = '\n'.join([lines if r'C:\Users' not in lines else '\\'.join(lines.split('\\')[:2]+lines.split('\\')[3:]) for lines in str(traceback.format_exc()).split('\n')])
             
-    await errorLoggingChannel.send(f"Error `{errorCode}`\n```\nIn Guild: {ctx.guild.id}\nBy User: {str(ctx.author)}\nCommand: {ctx.command}\nArgs: {args if type(args) != None else 'None'}\n{errorOut}```")
+    errReport = await errorLoggingChannel.send(f"Error `{errorCode}`\n```\nIn Guild: {ctx.guild.id}\nIn Channel: {ctx.channel.id}\nBy User: {str(ctx.author)}\nCommand: {ctx.command}\nArgs: {args if type(args) != None else 'None'}\n{errorOut}```")
+    await errReport.add_reaction('✅')
 
     embed = discord.Embed(description=f"An unknown error has occured. Please try again later. \n If you wish to report this error, send the error code `{errorCode}` to ACEslava#9735")
     errorMsg = await ctx.send(embed=embed)

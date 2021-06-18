@@ -69,44 +69,48 @@ class WikipediaSearch:
 
                         elif responsetask in done:
                             try:
-                                emojitask.cancel()
-                                input = responsetask.result() 
-                                await input.delete()
-                                if input.content.lower() == 'cancel':
-                                    raise UserCancel
+                                try:
+                                    emojitask.cancel()
+                                    input = responsetask.result() 
+                                    await input.delete()
+                                    if input.content.lower() == 'cancel':
+                                        raise UserCancel
 
-                                input = int(input.content)
+                                    input = int(input.content)
                                 
-                                self.searchQuery = result[curPage][input]
-                                page = wikipedia.WikipediaPage(title=self.searchQuery)
-                                summary = page.summary[:page.summary.find('. ')+1]
-                                embed=discord.Embed(title=f'Wikipedia Article: {page.original_title}', description=summary, url=page.url) #outputs wikipedia article
-                                embed.set_footer(text=f"Requested by {self.ctx.author}")
-                                for message in msg:
-                                    await message.delete()
-                                searchresult = await self.ctx.send(embed=embed)
-                                
-                                await searchresult.add_reaction('🗑️')
-                                await self.bot.wait_for("reaction_add", 
-                                    check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == searchresult]), 
-                                    timeout=10)
-                                await searchresult.delete() 
-                                return
-                            
-                            except ValueError or IndexError:
-                                await msg[-1].edit(content='Invalid choice. Please choose a number between 0-9 or cancel')
-                                continue
+                                except ValueError or IndexError:
+                                    await msg[-1].edit(content='Invalid choice. Please choose a number between 0-9 or cancel')
+                                    continue
 
-                            except wikipedia.DisambiguationError as e:
-                                result = str(e).split('\n')
-                                result.pop(0)
-                                for index, message in enumerate(msg):
-                                    await message.delete()
-                                msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
-                                break
+                                try:
+                                    self.searchQuery = result[curPage][input]
+                                    page = wikipedia.WikipediaPage(title=self.searchQuery)
+                                    summary = page.summary[:page.summary.find('. ')+1]
+                                    embed=discord.Embed(title=f'Wikipedia Article: {page.original_title}', description=summary, url=page.url) #outputs wikipedia article
+                                    embed.set_footer(text=f"Requested by {self.ctx.author}")
+                                    
+                                    for message in msg:
+                                        await message.delete()
+                                    
+                                    msg[0] = await self.ctx.send(embed=embed)
+                                    await msg[0].add_reaction('🗑️')
+                                    await self.bot.wait_for("reaction_add", 
+                                        check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) == "🗑️", reaction.message == msg[0]]), 
+                                        timeout=10)
+                                    
+                                    await msg[0].delete() 
+                                    return
+
+                                except wikipedia.DisambiguationError as e:
+                                    result = str(e).split('\n')
+                                    result.pop(0)
+                                    for index, message in enumerate(msg):
+                                        await message.delete()
+                                    msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
+                                    break
                             
                             except asyncio.TimeoutError:
-                                await searchresult.clear_reactions()
+                                await msg[0].clear_reactions()
                                 return
                 
                     except UserCancel or asyncio.TimeoutError:

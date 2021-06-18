@@ -16,7 +16,7 @@ from csv import DictReader, DictWriter
 from datetime import datetime, timedelta
 from requests import get
 from time import sleep
-import discord, asyncio, re, yaml
+import discord, asyncio, re
 
 #region utility functions
 def prefix(bot, message): #handler for individual guild prefixes
