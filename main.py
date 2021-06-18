@@ -449,7 +449,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
 
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
@@ -499,7 +499,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
 
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
+        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
