@@ -56,6 +56,9 @@ class GoogleSearch:
          lines = tuple(' '.join([string if string != 'View all' else '' for string in div.stripped_strings]) for div in divs)
          printstring = '\n'.join(lines)
 
+         if len(printstring) > 2048:
+            printstring = printstring[:2045] + '...'
+
          resultEmbed.description = sub("\n\n+", "\n\n", printstring)
 
          # tries to add a link to the embed
@@ -124,7 +127,8 @@ class GoogleSearch:
                   if 'Images' in results.strings: 
                      images = results.findAll("img", recursive=True)
                      embeds = list(map(imageEmbed, images))
-                     del embeds[-1]
+                     if len(embeds) > 0:
+                        del embeds[-1]
                      break
                  
             if images is not None:

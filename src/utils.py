@@ -765,9 +765,9 @@ class Log():
 
 async def ErrorHandler(bot, ctx, error, args=None):
     if args is None: 
-            if ctx.args is None:
-                args = "None"
-            else: args = ' '.join(list(ctx.args[2:]))
+        if ctx.args is None:
+            args = "None"
+        else: args = ' '.join(list(ctx.args[2:]))
     elif isinstance(args, list): 
         args = ' '.join(args).strip()
     else:
