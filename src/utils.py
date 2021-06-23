@@ -87,7 +87,7 @@ class Sudo:
         return userSettings
         
     @staticmethod
-    def isSudoer(bot, ctx, serverSettings=None):
+    def isSudoer(bot, ctx, serverSettings:dict=None):
         if serverSettings == None:
             with open('serverSettings.yaml', 'r') as data:
                 serverSettings = yaml.load(data, yaml.FullLoader)
@@ -115,7 +115,7 @@ class Sudo:
         else: return serverSettings[hex(ctx.guild.id)]['commandprefix']
 
     @staticmethod
-    def isAuthorizedCommand(bot, ctx, serverSettings):
+    def isAuthorizedCommand(bot, ctx, serverSettings:dict):
         check = all([
             ctx.author.id not in serverSettings[hex(ctx.guild.id)]['blacklist'], 
             not any(role.id in serverSettings[hex(ctx.guild.id)]['blacklist'] for role in ctx.author.roles), 
@@ -224,6 +224,10 @@ class Sudo:
     
     async def sudo(self, args):
         try:
+            #deepcopies to check if settings have changed
+            oldServerSettings = copy.deepcopy(self.serverSettings)
+            oldUserSettings = copy.deepcopy(self.userSettings)
+            
             if args:
                 command = args.pop(0)
                 if command == 'echo':
@@ -271,12 +275,16 @@ class Sudo:
             args = args if len(args) > 0 else None
             await ErrorHandler(self.bot, self.ctx, e, args)
         finally: 
-            if command in ['blacklist', 'whitelist', 'sudoer', 'unsudoer']:
+            #only saves serverSettings if it has changed
+            if oldServerSettings != self.serverSettings:
                 with open('serverSettings.yaml', 'w') as data:
                     yaml.dump(self.serverSettings, data, allow_unicode=True)
-
+            
+            #only saves userSettings if it has changed
+            if oldUserSettings != self.userSettings:
                 with open('userSettings.yaml', 'w') as data:
                     yaml.dump(self.userSettings, data, allow_unicode=True)
+            
             return self.serverSettings, self.userSettings
     
     async def config(self, args):
@@ -600,7 +608,12 @@ class Sudo:
                 if len(args) == 1:
                     embed = discord.Embed(
                         title='Alias', 
-                        description="Reply with the command that you want to set as alias. Choose from:\n{j}".format(j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1])))
+                        description="Reply with the command that you want to set as alias. Choose from:\n{j}".format(
+                            j='\n'.join(
+                                f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1]
+                            )
+                        )
+                    )
                     message = await self.ctx.send(embed=embed)
 
                     try: 
@@ -620,22 +633,38 @@ class Sudo:
                 while errorCount <= 1:
                     try:
                         if response == 's':
-                            raise AttributeError
-                        elif response == 's':
-                            errorCount = 2
+                            raise AttributeError 
+                        elif response.lower() == 'none':
+                            self.userSettings[self.ctx.author.id]['searchAlias'] = None
+                            await self.ctx.send(f"Your alias has successfully been removed")
                         else:
                             getattr(dict(self.bot.cogs)['Search Engines'], response)
                             await self.ctx.send(f"`{response}` is now your alias")
                             self.userSettings[self.ctx.author.id]['searchAlias'] = response
-                            errorCount = 2
+                        errorCount = 2
                     except AttributeError:
                         embed = discord.Embed(
-                            description="Sorry, `{i}` is an invalid command.\nPlease choose from:\n{j}\n or cancel to cancel".format(i=response, j='\n'.join(f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1])))
+                            description="Sorry, `{i}` is an invalid command.\nPlease choose from:\n{j}\n`none`\nor cancel to cancel".format(
+                                i=response, 
+                                j='\n'.join(
+                                    f'`{command.name}`' for command in dict(self.bot.cogs)['Search Engines'].get_commands()[0:-1]
+                                )
+                            )
+                        )
                         errorMsg = await self.ctx.send(embed=embed)
                         try:
-                            messageEdit = asyncio.create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == self.ctx.author, timeout=60))
-                            reply = asyncio.create_task(self.bot.wait_for('message', check=lambda m: m.author == self.ctx.author, timeout=60))
-                                    
+                            messageEdit = asyncio.create_task(
+                                self.bot.wait_for(
+                                    'message_edit', check=lambda var, m: m.author == self.ctx.author, timeout=60
+                                )
+                            )
+                            
+                            reply = asyncio.create_task(
+                                self.bot.wait_for(
+                                    'message', check=lambda m: m.author == self.ctx.author, timeout=60
+                                )
+                            )
+
                             waiting = [messageEdit, reply]
                             done, waiting = await asyncio.wait(waiting, return_when=asyncio.FIRST_COMPLETED) # 30 seconds wait either reply or react
 
@@ -643,6 +672,7 @@ class Sudo:
                                 reply.cancel()
                                 messageEdit = messageEdit.result()[1].content
                                 response = ''.join(messageEdit[14:])
+                            
                             elif reply in done:
                                 messageEdit.cancel()
                                 reply = reply.result()
@@ -656,6 +686,7 @@ class Sudo:
                             await errorMsg.delete()
                             errorCount += 1
                             continue
+                        
                         except asyncio.TimeoutError as e:
                             await errorMsg.edit(content='Sorry you took too long')
                             asyncio.sleep(60)

@@ -667,10 +667,11 @@ class Administration(commands.Cog, name="Administration"):
         if Sudo.isSudoer(self.bot, ctx, serverSettings):
             Log.appendToLog(ctx, None, args)
             command = Sudo(self.bot, ctx, serverSettings, userSettings)
-            serverSettings = await command.sudo(list(args))
+            serverSettings, userSettings = await command.sudo(list(args))
         else:
             await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
             Log.appendToLog(ctx, None, 'unauthorised')
+        return
 
     @commands.command(
         name='config',
