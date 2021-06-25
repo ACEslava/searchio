@@ -92,7 +92,7 @@ def main():
     @bot.event
     async def on_guild_join(guild):
         #Reads settings of server
-        Sudo.settingsCheck(serverSettings, hex(guild.id))
+        Sudo.serverSettingsCheck(serverSettings, hex(guild.id), bot)
 
         owner = await bot.fetch_user(guild.owner_id)
         dm = await owner.create_dm()
