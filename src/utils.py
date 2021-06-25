@@ -808,28 +808,68 @@ async def ErrorHandler(bot, ctx, error, args=None):
         doesErrorCodeMatch = True
         while doesErrorCodeMatch == True:
             errorCode = "%06x" % random.randint(0, 0xFFFFFFFFFF)
-            for line in csv.DictReader(file): 
-                if line["Command"] == 'error':
-                    if line["Args"] == errorCode:
-                        doesErrorCodeMatch = True
-                        break
+            try:
+                for line in csv.DictReader(file): 
+                    if line["Command"] == 'error':
+                        if line["Args"] == errorCode:
+                            doesErrorCodeMatch = True
+                            break
+                        else:
+                            doesErrorCodeMatch = False
                     else:
-                        doesErrorCodeMatch = False
-                else:
-                    continue
+                        continue
+                doesErrorCodeMatch = False
+            except Exception as e:
+                print(e)
     
     Log.appendToLog(ctx, "error", errorCode)
 
-    errorLoggingChannel = await bot.fetch_channel(829172391557070878)
-
     #prevents doxxing by removing username
-    errorOut = '\n'.join([lines if r'C:\Users' not in lines else '\\'.join(lines.split('\\')[:2]+lines.split('\\')[3:]) for lines in str(traceback.format_exc()).split('\n')])
-            
-    errReport = await errorLoggingChannel.send(f"Error `{errorCode}`\n```\nIn Guild: {ctx.guild.id}\nIn Channel: {ctx.channel.id}\nBy User: {str(ctx.author)}\nCommand: {ctx.command}\nArgs: {args if type(args) != None else 'None'}\n{errorOut}```")
-    await errReport.add_reaction('✅')
+    errorOut = '\n'.join(
+        [
+            lines 
+            if r'C:\Users' not in lines 
+            else '\\'.join(lines.split('\\')[:2]+lines.split('\\')[3:])
+            for lines in str(traceback.format_exc()).split('\n')
+        ]
+    )
 
-    embed = discord.Embed(description=f"An unknown error has occured. Please try again later. \n If you wish to report this error, send the error code `{errorCode}` to ACEslava#9735")
+    #error message for the server
+    embed = discord.Embed(description=f"An unknown error has occured, please try again later. \n If you wish to report this error, react with 🐛")
+    embed.set_footer(text=f'Error Code: {errorCode}')
     errorMsg = await ctx.send(embed=embed)
-    await asyncio.sleep(60)
-    await errorMsg.delete()
-    return
+    await errorMsg.add_reaction('🐛')
+    
+    try:
+        #DMs a feedback form to the user
+        response = None
+        await bot.wait_for("reaction_add", check=lambda reaction, user: user == ctx.author and str(reaction.emoji)=='🐛', timeout=60)
+        await errorMsg.clear_reactions()
+        dm = await ctx.author.create_dm()
+        errForm = await dm.send('Please send a message containing any feedback regarding this bug.')
+        
+        response = await bot.wait_for('message', check=lambda m: m.author == ctx.author and isinstance(m.channel, discord.DMChannel), timeout=30)
+        response = response.content
+
+        await dm.send("Thank you for your feedback! If you want to see the status of SearchIO's bugs, join the Discord (https://discord.gg/fH4YTaGMRH).\nNote: this link is temporary")
+    except discord.errors.Forbidden:
+        await errorMsg.edit(embed=None, content='Sorry, I cannot open a DM at this time. Please check your privacy settings')
+    except TimeoutError:
+        await errForm.delete()
+    finally: 
+        #generates an error report for the tracker
+        string = '\n'.join([f"Error `{errorCode}`",
+        f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
+        f"In Channel: {str(ctx.channel)} ({ctx.channel.id})",
+        f"By User: {str(ctx.author)}({ctx.author.id})",
+        f"Command: {ctx.command}",
+        f"Args: {args if len(args) != 0 else 'None'}",
+        f"{f'User Feedback: {response}' if response is not None else ''}",
+        '\n'
+        f"{errorOut}```"])
+
+        errorLoggingChannel = await bot.fetch_channel(829172391557070878)
+        
+        errReport = await errorLoggingChannel.send(string)
+        await errReport.add_reaction('✅')
+        return
