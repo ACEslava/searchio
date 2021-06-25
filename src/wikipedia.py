@@ -7,12 +7,14 @@ class WikipediaSearch:
         self,
         bot,
         ctx,
+        message,
         args,
         searchQuery = None):
 
         self.searchQuery = searchQuery
         self.bot = bot
         self.ctx = ctx
+        self.message = message
 
         if args is None:
             wikipedia.set_lang('en')
@@ -26,9 +28,9 @@ class WikipediaSearch:
                 ''.join([f'[{index}]: {value}\n' for index, value in enumerate(result)]))
             
         try:
-            msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
+            msg = [self.message]
 
-            await asyncio.sleep(random.uniform(0,2))
+            #searches
             result = wikipedia.search(self.searchQuery)
 
             while 1:

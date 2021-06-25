@@ -21,9 +21,9 @@ import discord, asyncio, re
 #region utility functions
 def prefix(bot, message): #handler for individual guild prefixes
     try:
-        commandprefix = serverSettings[hex(message.guild.id)]['commandprefix']
+        commandprefix:str = serverSettings[hex(message.guild.id)]['commandprefix']
     except Exception:
-        commandprefix = '&'
+        commandprefix:str = '&'
     finally: return commandprefix
 
 async def searchQueryParse(ctx, args, bot): #handler for bot search queries
@@ -252,9 +252,43 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             UserCancel = Exception
             userquery, args = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
+            
+            continueLoop = True 
+            while continueLoop:
+                try:
+                    message = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
+                    search = create_task(WikipediaSearch(self.bot, ctx, message, args, userquery).search())
 
-            search = WikipediaSearch(self.bot, ctx, args, userquery)
-            await search.search()
+                    #checks for message edit
+                    waiting = [messageEdit, search]
+                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
+
+                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
+                        if type(messageEdit.exception()) == TimeoutError:
+                            raise TimeoutError
+                        await message.delete()
+                        messageEdit.cancel()
+                        search.cancel()
+
+                        messageEdit = messageEdit.result()
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}scholar ', '')
+                        continue
+                    else: raise TimeoutError
+
+                except TimeoutError: #after a minute, everything cancels
+                    await message.clear_reactions()
+                    messageEdit.cancel()
+                    search.cancel()
+                    continueLoop = False
+                    return
+
+                except asyncio.CancelledError:
+                    pass
+
+                except Exception as e:
+                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    return
             return
     
     @commands.command(

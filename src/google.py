@@ -22,51 +22,82 @@ class GoogleSearch:
 
    async def search(self):      
       #region utility functions
-      def linkUnicodeParse(link: str): #translates unicode codes in links
+
+      #translates unicode codes in links
+      def linkUnicodeParse(link: str): 
          return sub(r"%(.{2})",lambda m: chr(int(m.group(1),16)),link)
 
-      def uule(city: str) -> str: #formats uule strings for use in locales
+      #formats uule strings for use in locales
+      #found this on a random stackoverflow
+      def uule(city: str) -> str: 
          secret_list = list(ascii_uppercase) + \
             list(ascii_lowercase) + list(digits) + ["-", "_"]
 
          secret = secret_list[len(city) % len(secret_list)]
          hashed = standard_b64encode(city.encode()).decode().strip("=")
          return f"w+CAIQICI{secret}{hashed}"
-      #endregion
-      #region embed creation functions
-      def imageEmbed(image): #embed creation for image embeds
+      
+      #parses image url from html
+      def imageURLParser(image):
          try:
-            resultEmbed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}')
+            #searches html for image urls
             imgurl = linkUnicodeParse(findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
             if "encrypted" in imgurl:
                   imgurl = findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
             # imgurl = findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
-            print(" image: " + imgurl)
-            resultEmbed.set_image(url=imgurl)
+            return imgurl
+         except: raise
+      #endregion
+      
+      #region embed creation functions
+      #embed creation for image embeds
+      def imageEmbed(image):
+         try:
+            #creates and formats the embed 
+            resultEmbed = Embed(
+               title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}'
+            )
+
+            #sets the discord embed to the image
+            resultEmbed.set_image(url=imageURLParser(image))
             resultEmbed.url = url
          except: 
             resultEmbed.description = 'Image failed to load'
          finally: return resultEmbed
 
-      def textEmbed(result): #embed creation for text embeds
+      #embed creation for text embeds
+      def textEmbed(result):
+         #creates and formats the embed
          resultEmbed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}') 
 
+         #google results are separated by divs
+         #extracts all meaningful text in the search result by div
          resultFind = result.findAll('div')
          divs = tuple(d for d in resultFind if not d.find('div'))
-         lines = tuple(' '.join([string if string != 'View all' else '' for string in div.stripped_strings]) for div in divs)
+         lines = tuple(
+            ' '.join(
+               [string if string != 'View all' else '' for string in div.stripped_strings]
+            ) for div in divs
+         )
          printstring = '\n'.join(lines)
 
+         #discord prevents embeds longer than 2048 chars
+         #truncates adds ellipses to strings longer than 2048 chars
          if len(printstring) > 2048:
             printstring = printstring[:2045] + '...'
 
+         #sets embed description to string
          resultEmbed.description = sub("\n\n+", "\n\n", printstring)
 
-         # tries to add a link to the embed
+         #searches for link in div
          findLink = result.findAll("a", href_="")
          link_list = tuple(a for a in findLink if not a.find("img")) 
          if len(link_list) != 0: 
             try:
+               #parses link from html
                link = linkUnicodeParse(findall("(?<=url\?q=).*(?=&sa)", link_list[0]["href"])[0])
+               
+               #adds link to embed
                resultEmbed.add_field(name="Relevant Link", value=link)
                print(" link: " + link)
             except:
@@ -75,37 +106,41 @@ class GoogleSearch:
          # tries to add an image to the embed
          image = result.find("img")
          try:
-            imgurl = linkUnicodeParse(findall("(?<=imgurl=).*(?=&imgrefurl)", image.parent.parent["href"])[0])
-            if "encrypted" in imgurl:
-                  imgurl = findall("(?<=imgurl=).*(?=&imgrefurl)", image.findAll("img")[1].parent.parent["href"])[0]
-            # imgurl = findall("(?<=\=).*(?=&imgrefurl)", image["href"])[0]
-            print(" image: " + imgurl)
-            resultEmbed.set_image(url=imgurl)
+            resultEmbed.set_image(url=imageURLParser(image))
          except: 
             pass
          resultEmbed.url = url
          return resultEmbed
       #endregion 
+      
       try:
          #checks if image is in search query     
          if bool(search('image', self.searchQuery.lower())):
             hasFoundImage = True
          else: hasFoundImage = False 
 
-         uuleParse = uule(self.userSettings[self.ctx.author.id]['locale']) if self.userSettings[self.ctx.author.id]['locale'] is not None else 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
+         #gets uule string based on user settings
+         if self.userSettings[self.ctx.author.id]['locale'] is not None: 
+            uuleParse = uule(self.userSettings[self.ctx.author.id]['locale'])
+         else: 
+            #default uule is Google HQ
+            uuleParse = 'w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz' 
+         
+         #creates google search url
+         #format: https://google.com/search?pws=0&q=[query]&uule=[uule string]&num=[number of results]&safe=[safesearch status]
          url = (''.join([
                "https://google.com/search?pws=0&q=", 
                self.searchQuery.replace(" ", "+"), f'{"+-stock+-pinterest" if hasFoundImage else ""}',
                f"&uule={uuleParse}&num=5{'&safe=active' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch']and not self.ctx.channel.nsfw else ''}"
             ])
          )
+
+         #gets the webscraped html of the google search
          response = get(url)
          soup, index = BeautifulSoup(response.text, features="lxml"), 3
 
+         #if the search returns results
          if soup.find("div", {"id": "main"}) is not None:
-            #region html processing
-            wrongFirstResults = {"Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >'}
-
             Log.appendToLog(self.ctx, f"{self.ctx.command} results", url)
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
             
@@ -113,16 +148,21 @@ class GoogleSearch:
             # with open('test.html', 'w', encoding='utf-8-sig') as file:
             #    file.write(soup.prettify())
 
-            #end div filtering
+            #region html processing
+            #html div cleanup
             googleSnippetResults = [googleSnippetResults[resultNumber] for resultNumber in range(3, len(googleSnippetResults)-2)]
             
-            #bad result filtering
+            #bad divs to discard
+            wrongFirstResults = {"Did you mean: ", "Showing results for ", "Tip: ", "See results about", "Including results for ", "Related searches", "Top stories", 'People also ask', 'Next >'}
+            #bad div filtering
             googleSnippetResults = {result for result in googleSnippetResults if not any(badResult in result.strings for badResult in wrongFirstResults) or result.strings==''}
             #endregion
             
             #checks if user searched specifically for images
             images = None
             if hasFoundImage:
+
+               #searches for the "images for" search result div
                for results in googleSnippetResults:
                   if 'Images' in results.strings: 
                      images = results.findAll("img", recursive=True)
@@ -130,43 +170,41 @@ class GoogleSearch:
                      if len(embeds) > 0:
                         del embeds[-1]
                      break
-                 
-            if images is not None:
-               embeds = list(map(imageEmbed, images))
             else:
                embeds = list(map(textEmbed, googleSnippetResults))
             
             print(self.ctx.author.name + " searched for: "+self.searchQuery[:233]) 
+
+            #adds the page numbering footer to the embeds
             for index, item in enumerate(embeds):
                item.set_footer(text=f'Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}') 
             
-            doExit, curPage = False, 0
-
+            #sets the reactions for the search result
             if len(embeds) > 1:
                await gather(
                   self.message.add_reaction('🗑️'), 
                   self.message.add_reaction('◀️'), 
                   self.message.add_reaction('▶️')
                )
-
             else: 
                await self.message.add_reaction('🗑️')
 
+            #multipage result display 
+            doExit, curPage = False, 0
             while doExit == False:
                try:
                   await self.message.edit(content=None, embed=embeds[curPage%len(embeds)])
                      
                   reaction, user = await self.bot.wait_for(
-                           "reaction_add", 
-                           check=lambda reaction, user: 
-                                    all([
-                                       user == self.ctx.author, 
-                                       str(reaction.emoji) in ["◀️", "▶️", "🗑️"], 
-                                       reaction.message == self.message
-                                    ]), 
-                           timeout=60
+                     "reaction_add", 
+                     check=lambda reaction, user: 
+                        all([
+                           user == self.ctx.author, 
+                           str(reaction.emoji) in ["◀️", "▶️", "🗑️"], 
+                           reaction.message == self.message
+                        ]), 
+                     timeout=60
                   )
-
                   await self.message.remove_reaction(reaction, user)
                   
                   if str(reaction.emoji) == '🗑️':
@@ -206,9 +244,10 @@ class GoogleSearch:
 
    async def translate(self):
       try:
+         #translate string processing
          query = self.searchQuery.lower().split(' ')
+         
          if len(query) > 1:
-
             #processes keywords in query for language options
             del query[0]
             if "to" in query:
@@ -245,6 +284,7 @@ class GoogleSearch:
                await self.message.delete()
                return
             
+            #deletes translation and gives the user the Google results
             elif str(reaction.emoji) == '🔍':
                await self.message.clear_reactions()
                await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
@@ -252,6 +292,11 @@ class GoogleSearch:
                pass
          
          else: pass
+
+      except KeyError:
+         await self.message.clear_reactions()
+         await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+         await self.search()
 
       except TimeoutError: 
          raise
@@ -283,9 +328,11 @@ class GoogleSearch:
                   embed[-1].url = f'https://www.merriam-webster.com/dictionary/{response["word"]}'
                return embed
 
+         #definition string processing  
          query = self.searchQuery.lower().split(' ')
+         
          if len(query) > 1:
-            #queries dictionary
+            #queries dictionary API
             response = get(f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}')
             response = response.json()[0]
             
@@ -302,7 +349,7 @@ class GoogleSearch:
                await self.message.add_reaction('◀️')
                await self.message.add_reaction('▶️')
             
-            #while loop b/c multipage 
+            #multipage definition display
             while 1:
                await self.message.edit(content=None, embed=embeds[curPage%len(embeds)])
                reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == self.ctx.author, str(reaction.emoji) in ["◀️", "▶️", "🗑️",'🔍'], reaction.message == self.message]), timeout=60)
@@ -315,6 +362,8 @@ class GoogleSearch:
                   curPage-=1
                elif str(reaction.emoji) == '▶️':
                   curPage+=1
+               
+               #gives the user Google results
                elif str(reaction.emoji) == '🔍':
                   await self.message.clear_reactions()
                   await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
