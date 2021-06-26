@@ -38,7 +38,6 @@ class Sudo:
             serverSettings[serverID]['searchEngines'] = {key:True for key in commandList}
         
         #adds new search engines
-
         for searchEngines in commandList:
             if searchEngines not in serverSettings[serverID]['searchEngines'].keys():
                 serverSettings[serverID]['searchEngines'][searchEngines] = True

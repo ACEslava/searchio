@@ -159,9 +159,8 @@ class GoogleSearch:
             #endregion
             
             #checks if user searched specifically for images
-            images = None
+            images, embeds = None, None
             if hasFoundImage:
-
                #searches for the "images for" search result div
                for results in googleSnippetResults:
                   if 'Images' in results.strings: 
@@ -170,7 +169,8 @@ class GoogleSearch:
                      if len(embeds) > 0:
                         del embeds[-1]
                      break
-            else:
+            
+            if embeds == None:
                embeds = list(map(textEmbed, googleSnippetResults))
             
             print(self.ctx.author.name + " searched for: "+self.searchQuery[:233]) 
