@@ -221,7 +221,7 @@ class GoogleSearch:
 
          else:
             embed = Embed(title=f'Search results for: {self.searchQuery[:233]}{"..." if len(self.searchQuery) > 233 else ""}',
-               description = 'No results found')
+               description = 'No results found. Maybe try another search term.')
          
             embed.set_footer(text=f"Requested by {self.ctx.author}")
             await self.message.edit(content=None, embed=embed)
