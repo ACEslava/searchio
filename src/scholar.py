@@ -1,7 +1,9 @@
-from scholarly import scholarly
+from fp.fp import FreeProxy
+from scholarly import scholarly, ProxyGenerator
 from src.utils import Log, ErrorHandler
+from itertools import islice
 import discord, asyncio, random
-
+import scholarly as scholarlyExceptions
 class ScholarSearch:   
     @staticmethod
     async def search(bot, ctx, message, args, searchQuery):
@@ -41,9 +43,17 @@ class ScholarSearch:
         
         try:
             #region user flags processing
-            await asyncio.sleep(random.uniform(0,2))
+            
+            pg = ProxyGenerator()
+            proxy = FreeProxy(rand=True, timeout=1, country_id=['BR']).get()
+            pg.SingleProxy(http=proxy, https=proxy)
+            scholarly.use_proxy(pg)
+
+            #args processing
+            if args is None:
+                results = [next(scholarly.search_pubs(searchQuery)) for _ in range(5)]
+                embeds = list(map(publicationEmbeds, results))
             if 'author' in args:
-                results = scholarly.search_pubs(searchQuery)
                 results = [next(scholarly.search_author(searchQuery)) for _ in range(5)]
                 embeds = list(map(authorEmbeds, results))
             elif 'cite' in args:
@@ -51,8 +61,8 @@ class ScholarSearch:
                 results = [results for _ in range(5)]
                 embeds = list(map(citationEmbeds, results))
             else:
-                results = [next(scholarly.search_pubs(searchQuery)) for _ in range(5)]
-                embeds = list(map(publicationEmbeds, results))
+                message.edit(content='Invalid flag')
+                return
             #endregion
 
             doExit, curPage = False, 0
@@ -78,6 +88,10 @@ class ScholarSearch:
             raise
         except asyncio.CancelledError:
             pass
+        except scholarlyExceptions._navigator.MaxTriesExceededException:
+            await message.edit(content='Google Scholar is currently blocking our requests. Please try again later')
+            Log.appendToLog(ctx, f"{ctx.command} error", 'MaxTriesExceededException')
+            return
 
         except Exception as e:
             await ErrorHandler(bot, ctx, e, searchQuery)

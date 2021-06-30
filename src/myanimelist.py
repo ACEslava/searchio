@@ -22,7 +22,6 @@ class MyAnimeListSearch:
                 ''.join([f'[{index}]: {value.title}\n' for index, value in enumerate(result)]))
         try:
             msg = [self.message]
-            await asyncio.sleep(random.uniform(0,1))
             search = AnimeSearch(self.searchQuery)
 
             while 1:

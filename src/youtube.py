@@ -22,7 +22,6 @@ class YoutubeSearch:
             return embed
         
         try:
-            await asyncio.sleep(random.uniform(0,2))
             result = ytsearch(searchQuery, max_results=10).to_dict()
 
             embeds = list(map(resultEmbed, result))

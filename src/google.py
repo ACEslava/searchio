@@ -139,14 +139,14 @@ class GoogleSearch:
          response = get(url)
          soup, index = BeautifulSoup(response.text, features="lxml"), 3
 
+         #Debug HTML output
+         # with open('test.html', 'w', encoding='utf-8-sig') as file:
+         #    file.write(soup.prettify())
+
          #if the search returns results
          if soup.find("div", {"id": "main"}) is not None:
             Log.appendToLog(self.ctx, f"{self.ctx.command} results", url)
             googleSnippetResults = soup.find("div", {"id": "main"}).contents
-            
-            #Debug HTML output
-            # with open('test.html', 'w', encoding='utf-8-sig') as file:
-            #    file.write(soup.prettify())
 
             #region html processing
             #html div cleanup

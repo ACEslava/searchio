@@ -32,7 +32,7 @@ pep517==0.10.0
 pip-tools==6.0.1
 pornhub-api==0.2.0
 pycparser==2.20
-pydantic==1.8.1
+pydantic==1.8.2
 Pygments==2.8.1
 pyOpenSSL==20.0.1
 pyparsing==2.4.7
@@ -59,7 +59,7 @@ sphinxcontrib-serializinghtml==1.1.4
 stem==1.8.0
 toml==0.10.2
 typing-extensions==3.7.4.3
-urllib3==1.26.4
+urllib3==1.26.6
 wikipedia==1.4.0
 yarl==1.6.3
 youtube-search==2.1.0
