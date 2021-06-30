@@ -51,8 +51,13 @@ class PornhubSearch():
                 
                 except asyncio.TimeoutError: 
                     raise
+                except asyncio.CancelledError:
+                    pass
+
         except asyncio.TimeoutError:
             raise
+        except asyncio.CancelledError:
+            pass
 
         except Exception as e:
             await message.delete()

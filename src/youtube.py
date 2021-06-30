@@ -103,6 +103,8 @@ class YoutubeSearch:
                             
                 except asyncio.TimeoutError:
                     await message.clear_reactions()
+                except asyncio.CancelledError:
+                    pass
         
         except UserCancel as e:
             await ctx.send(f"Cancelled")

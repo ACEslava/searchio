@@ -100,6 +100,9 @@ class MyAnimeListSearch:
                             except asyncio.TimeoutError as e: 
                                 await searchresult.clear_reactions()
                                 return
+                            
+                            except asyncio.CancelledError:
+                                pass
                     
                     except UserCancel as e:
 
@@ -109,6 +112,9 @@ class MyAnimeListSearch:
                     except asyncio.TimeoutError:
                         for message in msg:
                             await message.delete()
+                    
+                    except asyncio.CancelledError:
+                        pass
 
                         await self.ctx.send(f"Search timed out. Aborting")
 

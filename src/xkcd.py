@@ -77,6 +77,9 @@ class XKCDSearch:
 
             except asyncio.TimeoutError:
                 return
+            
+            except asyncio.CancelledError:
+                pass
 
             except Exception as e:
                 await ErrorHandler(bot, ctx, e, searchQuery)

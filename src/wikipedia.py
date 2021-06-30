@@ -119,6 +119,9 @@ class WikipediaSearch:
                         for message in msg:
                             await message.delete()
                         return
+                    
+                    except asyncio.CancelledError:
+                        pass
 
                     except Exception as e:
                         for message in msg:
@@ -175,6 +178,9 @@ class WikipediaSearch:
                 except asyncio.TimeoutError:
                     await msg.clear_reactions()
                     break
+                
+                except asyncio.CancelledError:
+                    pass
         
         except Exception as e:
                 await ErrorHandler(self.bot, self.ctx, e)
