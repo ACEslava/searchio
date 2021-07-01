@@ -1,15 +1,15 @@
 from src.utils import Log, ErrorHandler
 from src.loadingmessage import LoadingMessage
 from bs4 import BeautifulSoup
-from google_trans_new import google_translator
 from iso639 import languages as Languages
+from translate import Translator
 from discord import Embed
 from base64 import standard_b64encode
 from requests import get
 from asyncio import TimeoutError, gather
 from string import ascii_uppercase, ascii_lowercase, digits
 from re import findall, sub, search
-
+from langid import classify as detect
 class GoogleSearch:
    def __init__(self, bot, ctx, serverSettings, userSettings, message, searchQuery):
       self.bot = bot
@@ -261,16 +261,18 @@ class GoogleSearch:
                del query[query.index('from')+1]
                del query[query.index('from')]
             else: srcLanguage = None
-            
-            #queries Google Translate for translations
+
+            #creates query
             query = ' '.join(query)
-            translator = google_translator()
-            result = translator.translate(query, lang_src=f'{srcLanguage if srcLanguage != None else "auto"}' , lang_tgt=destLanguage)
+
+            #queries Google Translate for translations
+            translator = Translator(to_lang=destLanguage, from_lang=f'{srcLanguage if srcLanguage != None else detect(query)[0]}')
+            result = translator.translate(query)
             
             #creates and sends embed
             if isinstance(result, list): result = '\n'.join(result)
-            embed = Embed(title=f"{Languages.get(alpha2=srcLanguage).name if srcLanguage != None else translator.detect(query)[1].capitalize()} " +
-               f"to {Languages.get(part1=destLanguage).name} Translation", 
+            embed = Embed(title=f"{Languages.get(alpha2=translator.from_lang).name}" +
+               f" to {Languages.get(alpha2=translator.to_lang).name} Translation", 
                description = result + '\n\nReact with 🔍 to search Google')
             embed.set_footer(text=f"Requested by {self.ctx.author}")
             await self.message.edit(content=None, embed=embed)
@@ -291,7 +293,9 @@ class GoogleSearch:
                await self.search()
                pass
          
-         else: pass
+         else:
+            await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+            await self.search()
 
       except KeyError:
          await self.message.clear_reactions()
@@ -304,6 +308,8 @@ class GoogleSearch:
       except Exception as e:
          await self.message.delete()
          await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
+         await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+         await self.search()
       
       finally: return
 
@@ -370,7 +376,9 @@ class GoogleSearch:
                   await self.search()
                   break
 
-         else: pass
+         else: 
+            await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+            await self.search()
          
 
       except TimeoutError: 
@@ -379,5 +387,7 @@ class GoogleSearch:
       except Exception as e:
          await self.message.delete()
          await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
+         await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+         await self.search()
       
       finally: return
