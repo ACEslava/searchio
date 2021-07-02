@@ -1,8 +1,8 @@
-from src.wikipedia import WikipediaSearch
+from src.wikipedia_ import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
-from src.loadingmessage import LoadingMessage
-from src.utils import Sudo, Log, ErrorHandler
+from src.loadingmessage import get_loading_message
+from src.utils import Sudo, Log, error_handler
 from src.scholar import ScholarSearch
 from src.youtube import YoutubeSearch
 from src.xkcd import XKCDSearch
@@ -29,7 +29,7 @@ def prefix(bot, message): #handler for individual guild prefixes
 async def searchQueryParse(ctx, args, bot): #handler for bot search queries
     UserCancel = KeyboardInterrupt
     global userSettings
-    userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+    userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
 
     if not args: #checks if search is empty
         await ctx.send("Enter search query or cancel") #if empty, asks user for search query
@@ -92,7 +92,7 @@ def main():
     @bot.event
     async def on_guild_join(guild):
         #Reads settings of server
-        Sudo.serverSettingsCheck(serverSettings, hex(guild.id), bot)
+        Sudo.server_settings_check(serverSettings, hex(guild.id), bot)
 
         owner = await bot.fetch_user(guild.owner_id)
         dm = await owner.create_dm()
@@ -136,7 +136,7 @@ def main():
         bot.owner_id = appInfo.owner.id
 
         for servers in bot.guilds:
-            serverSettings = Sudo.serverSettingsCheck(serverSettings, hex(servers.id), bot)
+            serverSettings = Sudo.server_settings_check(serverSettings, hex(servers.id), bot)
 
         with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
             lines = [dict(row) for row in DictReader(file) if datetime.utcnow()-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
@@ -154,14 +154,14 @@ def main():
     @bot.event
     async def on_command_error(ctx, error):
         if isinstance(error, commands.errors.CommandNotFound):
-            await ctx.send(f"Command not found. Do {Sudo.printPrefix(serverSettings, ctx)}help for available commands")
+            await ctx.send(f"Command not found. Do {Sudo.print_prefix(serverSettings, ctx)}help for available commands")
 
     @bot.command()
     async def help(ctx, *args):
         try:
             def check(reaction, user):
                 return user == ctx.author and str(reaction.emoji) in ["🗑️"]
-            commandPrefix = Sudo.printPrefix(ctx)
+            commandPrefix = Sudo.print_prefix(ctx)
             searchEngineCog = dict(bot.cogs)['Search Engines']
             adminCog = dict(bot.cogs)['Administration']
 
@@ -216,7 +216,7 @@ def main():
         except discord.errors.Forbidden:
             await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
         except Exception as e:
-            await ErrorHandler(bot, ctx, e)
+            await error_handler(bot, ctx, e)
         finally: return
 
     load_dotenv()
@@ -232,12 +232,13 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     
     async def cog_before_invoke(self, ctx):
         global userSettings
-        userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+        userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
         if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
-            Log.appendToLog(ctx, userSettings[ctx.author.id]['searchAlias'])
+            Log.append_to_log(ctx, userSettings[ctx.author.id]['searchAlias'])
         elif ctx.command.name == 's':
-            Log.appendToLog(ctx, 's', 'Not set')
-        else: Log.appendToLog(ctx)
+            Log.append_to_log(ctx, 's', 'Not set')
+        else:
+            Log.append_to_log(ctx)
         return
 
     @commands.command(
@@ -248,7 +249,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         description='--lang [ISO Language Code]: Specifies a country code to search through Wikipedia. Use wikilang to see available codes.')
     async def wiki(self, ctx, *args):
         global serverSettings
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+        if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             UserCancel = Exception
             userquery, args = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
@@ -256,7 +257,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             continueLoop = True 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(WikipediaSearch(self.bot, ctx, message, args, userquery).search())
 
@@ -287,7 +288,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
 
                 except Exception as e:
-                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    await error_handler(self.bot, ctx, e, userquery)
                     return
             return
     
@@ -295,7 +296,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         name= 'wikilang',
         brief="Lists supported languages for Wikipedia's --lang flag",
         usage='wikilang',
-        help="""Lists Wikipedia's supported wikis in ISO codes. Common language codes are:
+        help="Lists Wikipedia's supported wikis in ISO codes.",
+        description="""Common language codes are:
                     zh: 中文
                     es: Español
                     en: English
@@ -305,8 +307,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     ru: русский""")
     async def wikilang(self, ctx):
         global serverSettings
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
-            await WikipediaSearch(self.bot, ctx, "en").lang()
+        if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
+            await WikipediaSearch(self.bot, ctx, ctx.message, ()).lang()
             return
 
     @commands.command(
@@ -314,22 +316,22 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         brief='Search through Google',
         usage='google [query]',
         help='Google search. If a keyword is detected in [query], a special function will activate',
-        description=''.join(["translate: Uses Google Translate API to translate languages.",
-            "\n\n     Input auto detects language unless specified with 'from [language]'", 
-            "\n\n     Defaults to output English OR user locale if set, unless explicitly specified with 'to [language]'",
-            "\n\n     Example Query: translate مرحبا from arabic to spanish",
-            "\n\n\nimage: Searches only for image results.",
-            "\n\n\ndefine: Queries dictionaryapi.dev for an English definition of the word"]))
+        description='\n'.join(["translate: Uses Google Translate API to translate languages.",
+            "\n     Input auto detects language unless specified with 'from [language]'", 
+            "\n     Defaults to output English OR user locale if set, unless explicitly specified with 'to [language]'",
+            "\n     Example Query: translate مرحبا from arabic to spanish",
+            "\n\nimage: Searches only for image results.",
+            "\n\ndefine: Queries dictionaryapi.dev for an English definition of the word"]))
     async def google(self, ctx, *args):
         global serverSettings, userSettings
 
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+        if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     searchClass = GoogleSearch(self.bot, ctx, serverSettings, userSettings, message, userquery)
 
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
@@ -368,7 +370,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 
                 except Exception as e:
                     await message.delete()
-                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    await error_handler(self.bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -380,7 +382,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
     async def scholar(self, ctx, *args):
         global serverSettings
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+        if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             UserCancel = Exception
             userquery, args = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
@@ -388,7 +390,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             continueLoop = True 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(ScholarSearch.search(self.bot, ctx, message, args, userquery))
                     
@@ -419,7 +421,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    await error_handler(self.bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -431,13 +433,13 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings, userSettings
 
         UserCancel = Exception
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+        if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(YoutubeSearch.search(self.bot, ctx, message, userquery, userSettings))
                     
@@ -471,7 +473,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    await error_handler(self.bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -483,14 +485,14 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
 
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+        if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     searchEngine = MyAnimeListSearch(self.bot, ctx, message, userquery)
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(searchEngine.search())
@@ -521,7 +523,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
 
                 except Exception as e:
-                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    await error_handler(self.bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -533,14 +535,14 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         UserCancel = Exception
 
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
+        if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(XKCDSearch.search(self.bot, ctx, userquery, message))
 
@@ -570,7 +572,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
 
                 except Exception as e:
-                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    await error_handler(self.bot, ctx, e, userquery)
                     return
 
     @commands.command(
@@ -582,17 +584,17 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global serverSettings
         global userSettings
 
-        userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+        userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
         UserCancel = KeyboardInterrupt
         
-        if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
+        if Sudo.is_authorized_command(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             continueLoop = True
             
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(PornhubSearch.search(self.bot, ctx, userquery, message))
                     
@@ -622,7 +624,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     pass
                 
                 except Exception as e:
-                    await ErrorHandler(self.bot, ctx, e, userquery)
+                    await error_handler(self.bot, ctx, e, userquery)
                     return
 
     #alias command (always last)
@@ -634,7 +636,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def s(self, ctx, *args):
         try:
             if userSettings[ctx.author.id]['searchAlias'] is None:
-                embed = discord.Embed(description=f'Your shortcut is not set. Set it with {Sudo.printPrefix(serverSettings, ctx)}config alias [Search Engine]')
+                embed = discord.Embed(description=f'Your shortcut is not set. Set it with {Sudo.print_prefix(serverSettings, ctx)}config alias [Search Engine]')
                 message = await ctx.send(embed=embed)
                 await message.add_reaction('🗑️')
                 reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
@@ -644,7 +646,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 try:
                     await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
                 except AttributeError:
-                    embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.printPrefix(serverSettings, ctx)}help')
+                    embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
                     message = ctx.send(embed=embed)
                     await message.add_reaction('🗑️')
                     reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
@@ -653,7 +655,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         except TimeoutError as e: 
                     await message.clear_reactions()
         except Exception as e:
-            await ErrorHandler(self.bot, ctx, e, args)
+            await error_handler(self.bot, ctx, e, args)
         finally: return
 
 class Administration(commands.Cog, name="Administration"):
@@ -662,7 +664,7 @@ class Administration(commands.Cog, name="Administration"):
     
     async def cog_before_invoke(self, ctx):
         global userSettings
-        userSettings = Sudo.userSettingsCheck(userSettings, ctx.author.id)
+        userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
         return
     
     @commands.command(
@@ -670,7 +672,7 @@ class Administration(commands.Cog, name="Administration"):
         brief='DMs a .csv file of all the logs that the bot has for your username or guild if a sudoer.',
         usage='log')
     async def logging(self, ctx): 
-        await Log.logRequest(self.bot, ctx, serverSettings, userSettings)
+        await Log.log_request(self.bot, ctx, serverSettings, userSettings)
         return
 
     @commands.command(
@@ -698,13 +700,13 @@ class Administration(commands.Cog, name="Administration"):
         global serverSettings
         global userSettings
 
-        if Sudo.isSudoer(self.bot, ctx, serverSettings):
-            Log.appendToLog(ctx, None, args)
+        if Sudo.is_sudoer(self.bot, ctx, serverSettings):
+            Log.append_to_log(ctx, None, args)
             command = Sudo(self.bot, ctx, serverSettings, userSettings)
             serverSettings, userSettings = await command.sudo(list(args))
         else:
             await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
-            Log.appendToLog(ctx, None, 'unauthorised')
+            Log.append_to_log(ctx, None, 'unauthorised')
         return
 
     @commands.command(
@@ -737,11 +739,11 @@ class Administration(commands.Cog, name="Administration"):
             localSetting = args[0] in ['locale', 'alias']
         else: localSetting = False
         
-        if Sudo.isSudoer(self.bot, ctx, serverSettings) or localSetting:
+        if Sudo.is_sudoer(self.bot, ctx, serverSettings) or localSetting:
             serverSettings, userSettings = await command.config(args)
         
         else: serverSettings, userSettings = await command.config([])
-        Log.appendToLog(ctx)
+        Log.append_to_log(ctx)
 
     @commands.command(
         name='invite',
@@ -750,13 +752,13 @@ class Administration(commands.Cog, name="Administration"):
         help="DMs SearchIO's invite link to the user")
     async def invite(self, ctx):
         try:
-            Log.appendToLog(ctx)
+            Log.append_to_log(ctx)
             dm = await ctx.author.create_dm()
             await dm.send('Here ya go: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot%20applications.commands')
         except discord.errors.Forbidden:
             await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
         except Exception as e:
-            await ErrorHandler(self.bot, ctx, e)
+            await error_handler(self.bot, ctx, e)
         finally: return
 
     @commands.command(
@@ -775,12 +777,12 @@ class Administration(commands.Cog, name="Administration"):
             embed.set_footer(text=f'Requested by {ctx.author}')
             await message.edit(content=None, embed=embed)
         except Exception as e:
-            await ErrorHandler(self.bot, ctx, e)
+            await error_handler(self.bot, ctx, e)
         finally: return
 
 while 1:
     try:
         main()
-    except Exception:
+    except Exception as e:
         sleep(30)
         continue

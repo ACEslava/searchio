@@ -1,6 +1,7 @@
 import random
 
-def LoadingMessage():
+
+def get_loading_message() -> str:
     messages = [
         "Reticulating splines...",
         "Generating witty dialog...",
@@ -246,6 +247,7 @@ def LoadingMessage():
         "You are number 2843684714 in the queue",
         "Please wait while we serve other customers...",
         "Our premium plan is faster",
-        "Big Brother is always watching"]
+        "Big Brother is always watching",
+    ]
 
-    return f'<a:loading:860393918046273557> {random.choice(messages)}'
+    return f"<a:loading:860393918046273557> {random.choice(messages)}"
