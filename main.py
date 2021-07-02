@@ -1,4 +1,4 @@
-from src.wikipedia import WikipediaSearch
+from src.wikipedia_ import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
 from src.loadingmessage import get_loading_message
@@ -306,7 +306,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def wikilang(self, ctx):
         global serverSettings
         if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
-            await WikipediaSearch(self.bot, ctx, "en").lang()
+            await WikipediaSearch(self.bot, ctx, ctx.message, []).lang()
             return
 
     @commands.command(
@@ -781,6 +781,6 @@ class Administration(commands.Cog, name="Administration"):
 while 1:
     try:
         main()
-    except Exception:
+    except Exception as e:
         sleep(30)
         continue
