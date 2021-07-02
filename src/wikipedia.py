@@ -108,7 +108,7 @@ class WikipediaSearch:
                                     result.pop(0)
                                     for index, message in enumerate(msg):
                                         await message.delete()
-                                    msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
+                                    msg = [await self.ctx.send(f'{LoadingMessage()}')]
                                     break
                             
                             except asyncio.TimeoutError:

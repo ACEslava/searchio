@@ -2,7 +2,6 @@ import json
 import urllib.request as ureq
 import discord, asyncio, random, datetime, difflib
 from src.utils import Log, ErrorHandler
-from src.loadingmessage import LoadingMessage
 
 class xkcd:
     def __init__(self, num = ''): 

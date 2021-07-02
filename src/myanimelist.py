@@ -1,7 +1,6 @@
 from mal import *
 from src.utils import Log, ErrorHandler
-from src.loadingmessage import LoadingMessage
-import discord, asyncio, random
+import discord, asyncio
 
 class MyAnimeListSearch:
     def __init__(

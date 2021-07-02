@@ -1,8 +1,7 @@
 from fp.fp import FreeProxy
 from scholarly import scholarly, ProxyGenerator
 from src.utils import Log, ErrorHandler
-from itertools import islice
-import discord, asyncio, random
+import discord, asyncio
 import scholarly as scholarlyExceptions
 class ScholarSearch:   
     @staticmethod

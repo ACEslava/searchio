@@ -504,7 +504,7 @@ class Sudo:
             
             #region user config settings
             elif args[0].lower() == 'locale':
-                msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
+                msg = [await self.ctx.send(f'{LoadingMessage()}')]
                 uuleDB = open('./src/cache/googleUULE.csv', 'r', encoding='utf-8-sig').read().split('\n')
                 fieldnames = uuleDB.pop(0).split(',')
                 uuleDB = [dict(zip(fieldnames, [string.replace('"','') for string in lines.split('",')])) for lines in uuleDB] #parses get request into list of dicts

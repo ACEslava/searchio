@@ -52,7 +52,7 @@ class YoutubeSearch:
                         curPage+=1
                     elif str(reaction.emoji) == '⬇️' and userSettings[user.id]["downloadquota"]["dailyDownload"] < 50:
                         await message.remove_reaction(reaction, bot.user)
-                        downloadmessage = await ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')
+                        downloadmessage = await ctx.send(f'{LoadingMessage()}')
                         yt = YoutubeDownload(embeds[curPage].url)
                         download = yt.streams.filter(res='360p', file_extension='mp4', progressive=True).fmt_streams[0]
                         if round(download.filesize_approx/1000000, 2) < 100:
@@ -66,7 +66,7 @@ class YoutubeSearch:
 
                             if str(dlreaction.emoji) == '👍':
                                 await downloadmessage.clear_reactions()
-                                await downloadmessage.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+                                await downloadmessage.edit(content=f'{LoadingMessage()}', embed=None)
                                 
                                 userSettings[user.id]['downloadquota']['dailyDownload'] += round(download.filesize_approx/1000000, 2)
                                 userSettings[user.id]['downloadquota']['lifetimeDownload'] += round(download.filesize_approx/1000000, 2)

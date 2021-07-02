@@ -289,17 +289,17 @@ class GoogleSearch:
             #deletes translation and gives the user the Google results
             elif str(reaction.emoji) == '🔍':
                await self.message.clear_reactions()
-               await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+               await self.message.edit(content=f'{LoadingMessage()}', embed=None)
                await self.search()
                pass
          
          else:
-            await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+            await self.message.edit(content=f'{LoadingMessage()}', embed=None)
             await self.search()
 
       except KeyError:
          await self.message.clear_reactions()
-         await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+         await self.message.edit(content=f'{LoadingMessage()}', embed=None)
          await self.search()
 
       except TimeoutError: 
@@ -308,7 +308,7 @@ class GoogleSearch:
       except Exception as e:
          await self.message.delete()
          await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
-         await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+         await self.message.edit(content=f'{LoadingMessage()}', embed=None)
          await self.search()
       
       finally: return
@@ -372,12 +372,12 @@ class GoogleSearch:
                #gives the user Google results
                elif str(reaction.emoji) == '🔍':
                   await self.message.clear_reactions()
-                  await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+                  await self.message.edit(content=f'{LoadingMessage()}', embed=None)
                   await self.search()
                   break
 
          else: 
-            await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+            await self.message.edit(content=f'{LoadingMessage()}', embed=None)
             await self.search()
          
 
@@ -387,7 +387,7 @@ class GoogleSearch:
       except Exception as e:
          await self.message.delete()
          await ErrorHandler(self.bot, self.ctx, e, self.searchQuery)
-         await self.message.edit(content=f'{LoadingMessage()} <a:loading:829119343580545074>', embed=None)
+         await self.message.edit(content=f'{LoadingMessage()}', embed=None)
          await self.search()
       
       finally: return
