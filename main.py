@@ -1,7 +1,7 @@
 from src.wikipedia import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
-from src.loadingmessage import LoadingMessage
+from src.loadingmessage import get_loading_message
 from src.utils import Sudo, Log, ErrorHandler
 from src.scholar import ScholarSearch
 from src.youtube import YoutubeSearch
@@ -256,7 +256,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             continueLoop = True 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(WikipediaSearch(self.bot, ctx, message, args, userquery).search())
 
@@ -329,7 +329,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             continueLoop = True
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     searchClass = GoogleSearch(self.bot, ctx, serverSettings, userSettings, message, userquery)
 
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
@@ -388,7 +388,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             continueLoop = True 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(ScholarSearch.search(self.bot, ctx, message, args, userquery))
                     
@@ -437,7 +437,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             continueLoop = True 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(YoutubeSearch.search(self.bot, ctx, message, userquery, userSettings))
                     
@@ -490,7 +490,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     searchEngine = MyAnimeListSearch(self.bot, ctx, message, userquery)
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(searchEngine.search())
@@ -540,7 +540,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
 
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(XKCDSearch.search(self.bot, ctx, userquery))
 
@@ -592,7 +592,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             
             while continueLoop:
                 try:
-                    message = await ctx.send(LoadingMessage())
+                    message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
                     search = create_task(PornhubSearch.search(self.bot, ctx, userquery, message))
                     

@@ -1,5 +1,5 @@
 from src.utils import Log, ErrorHandler
-from src.loadingmessage import LoadingMessage
+from src.loadingmessage import get_loading_message
 import wikipedia, discord, asyncio, random
 
 class WikipediaSearch:
@@ -108,7 +108,7 @@ class WikipediaSearch:
                                     result.pop(0)
                                     for index, message in enumerate(msg):
                                         await message.delete()
-                                    msg = [await self.ctx.send(f'{LoadingMessage()} <a:loading:829119343580545074>')]
+                                    msg = [await self.ctx.send(f'{get_loading_message()} <a:loading:829119343580545074>')]
                                     break
                             
                             except asyncio.TimeoutError:
