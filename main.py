@@ -543,7 +543,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 try:
                     message = await ctx.send(get_loading_message())
                     messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    search = create_task(XKCDSearch.search(self.bot, ctx, userquery))
+                    search = create_task(XKCDSearch.search(self.bot, ctx, userquery, message))
 
                     #checks for message edit
                     waiting = [messageEdit, search]
