@@ -5,7 +5,7 @@ import discord
 from discord.ext import commands
 from mal import *
 
-from src.utils import Log, ErrorHandler
+from src.utils import Log, error_handler
 
 
 class MyAnimeListSearch:
@@ -135,11 +135,7 @@ class MyAnimeListSearch:
                                 embed.set_footer(text=f"Requested by {self.ctx.author}")
                                 searchresult = await self.ctx.send(embed=embed)
 
-                                Log.appendToLog(
-                                    self.ctx,
-                                    f"{self.ctx.command} result",
-                                    anime_item.title,
-                                )
+                                Log.append_to_log(self.ctx, f"{self.ctx.command} result", anime_item.title)
                                 for message in msg:
                                     await message.delete()
 
@@ -187,7 +183,7 @@ class MyAnimeListSearch:
                         for message in msg:
                             await message.delete()
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.search_query)
         finally:
             return
 

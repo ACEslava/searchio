@@ -6,7 +6,7 @@ from discord.ext import commands
 from fp.fp import FreeProxy
 from scholarly import scholarly, ProxyGenerator
 
-from src.utils import Log, ErrorHandler
+from src.utils import Log, error_handler
 
 
 class ScholarSearch:
@@ -152,10 +152,10 @@ class ScholarSearch:
             await message.edit(
                 content="Google Scholar is currently blocking our requests. Please try again later"
             )
-            Log.appendToLog(ctx, f"{ctx.command} error", "MaxTriesExceededException")
+            Log.append_to_log(ctx, f"{ctx.command} error", "MaxTriesExceededException")
             return
 
         except Exception as e:
-            await ErrorHandler(bot, ctx, e, search_query)
+            await error_handler(bot, ctx, e, search_query)
         finally:
             return

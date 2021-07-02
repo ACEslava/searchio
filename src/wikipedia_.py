@@ -6,7 +6,7 @@ import wikipedia
 from discord.ext import commands
 
 from src.loadingmessage import get_loading_message
-from src.utils import ErrorHandler
+from src.utils import error_handler
 
 
 class WikipediaSearch:
@@ -189,7 +189,7 @@ class WikipediaSearch:
                         raise
 
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.search_query)
         finally:
             return
 
@@ -258,7 +258,7 @@ class WikipediaSearch:
                     pass
 
         except Exception as e:
-            await ErrorHandler(self.bot, self.ctx, e)
+            await error_handler(self.bot, self.ctx, e)
         finally:
             return
 

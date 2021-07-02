@@ -13,7 +13,7 @@ from requests import get
 from translate import Translator
 
 from src.loadingmessage import get_loading_message
-from src.utils import Log, ErrorHandler
+from src.utils import Log, error_handler
 
 
 class GoogleSearch:
@@ -187,7 +187,7 @@ class GoogleSearch:
 
             # if the search returns results
             if soup.find("div", {"id": "main"}) is not None:
-                Log.appendToLog(self.ctx, f"{self.ctx.command} results", url)
+                Log.append_to_log(self.ctx, f"{self.ctx.command} results", url)
                 google_snippet_results = soup.find("div", {"id": "main"}).contents
 
                 # region html processing
@@ -320,7 +320,7 @@ class GoogleSearch:
 
         except Exception as e:
             await self.message.delete()
-            await ErrorHandler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.search_query)
         finally:
             return
 
@@ -419,7 +419,7 @@ class GoogleSearch:
 
         except Exception as e:
             await self.message.delete()
-            await ErrorHandler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.search_query)
             await self.message.edit(
                 content=f"{get_loading_message()} <a:loading:829119343580545074>",
                 embed=None,
@@ -554,7 +554,7 @@ class GoogleSearch:
 
         except Exception as e:
             await self.message.delete()
-            await ErrorHandler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.search_query)
             await self.message.edit(
                 content=f"{get_loading_message()} <a:loading:829119343580545074>",
                 embed=None,

@@ -5,7 +5,7 @@ from discord import Embed
 from discord.ext import commands
 from pornhub_api import PornhubApi
 
-from src.utils import ErrorHandler
+from src.utils import error_handler
 
 
 class PornhubSearch:
@@ -102,6 +102,6 @@ class PornhubSearch:
 
         except Exception as e:
             await message.delete()
-            await ErrorHandler(bot, ctx, e, search_query)
+            await error_handler(bot, ctx, e, search_query)
         finally:
             return

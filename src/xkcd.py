@@ -8,7 +8,7 @@ import urllib.request as ureq
 import discord
 from discord.ext import commands
 
-from src.utils import Log, ErrorHandler
+from src.utils import Log, error_handler
 
 
 class Xkcd:
@@ -54,7 +54,7 @@ class XKCDSearch:
                 embed.set_footer(text=f"Requested by {ctx.author}")
 
                 await message.edit(content=None, embed=embed)
-                Log.appendToLog(ctx, f"{ctx.command} result", x.url)
+                Log.append_to_log(ctx, f"{ctx.command} result", x.url)
 
                 await message.add_reaction("🗑️")
                 reaction, user = await bot.wait_for(
@@ -132,7 +132,7 @@ class XKCDSearch:
                 pass
 
             except Exception as e:
-                await ErrorHandler(bot, ctx, e, search_query)
+                await error_handler(bot, ctx, e, search_query)
                 return
 
 

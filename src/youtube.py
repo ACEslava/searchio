@@ -10,7 +10,7 @@ from pytube import YouTube as YoutubeDownload
 from youtube_search import YoutubeSearch as YTSearch
 
 from src.loadingmessage import get_loading_message
-from src.utils import ErrorHandler
+from src.utils import error_handler
 
 
 class YoutubeSearch:
@@ -203,7 +203,7 @@ class YoutubeSearch:
             await ctx.send(f"Search timed out. Aborting")
 
         except Exception as e:
-            await ErrorHandler(bot, ctx, e, search_query)
+            await error_handler(bot, ctx, e, search_query)
         finally:
             return
 
