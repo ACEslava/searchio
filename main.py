@@ -306,7 +306,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def wikilang(self, ctx):
         global serverSettings
         if Sudo.isAuthorizedCommand(self.bot, ctx, serverSettings):
-            await WikipediaSearch(self.bot, ctx, ctx.message, []).lang()
+            await WikipediaSearch(self.bot, ctx, ctx.message, ()).lang()
             return
 
     @commands.command(

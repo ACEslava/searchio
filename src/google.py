@@ -3,8 +3,10 @@ from base64 import standard_b64encode
 from re import findall, sub, search
 from string import ascii_uppercase, ascii_lowercase, digits
 
+import discord
 from bs4 import BeautifulSoup
 from discord import Embed
+from discord.ext import commands
 from iso639 import languages
 from langid import classify as detect
 from requests import get
@@ -15,7 +17,15 @@ from src.utils import Log, ErrorHandler
 
 
 class GoogleSearch:
-    def __init__(self, bot, ctx, server_settings, user_settings, message, search_query):
+    def __init__(
+        self,
+        bot: commands.Bot,
+        ctx: commands.Context,
+        server_settings: dict,
+        user_settings: dict,
+        message: discord.Message,
+        search_query: str,
+    ):
         self.bot = bot
         self.ctx = ctx
         self.serverSettings = server_settings
@@ -24,11 +34,11 @@ class GoogleSearch:
         self.search_query = search_query
         return
 
-    async def search(self):
+    async def search(self) -> None:
         # region utility functions
 
         # translates unicode codes in links
-        def link_unicode_parse(link: str):
+        def link_unicode_parse(link: str) -> str:
             return sub(r"%(.{2})", lambda m: chr(int(m.group(1), 16)), link)
 
         # formats uule strings for use in locales
@@ -46,7 +56,7 @@ class GoogleSearch:
             return f"w+CAIQICI{secret}{hashed}"
 
         # parses image url from html
-        def image_url_parser(image):
+        def image_url_parser(image) -> str:
             try:
                 # searches html for image urls
                 imgurl = link_unicode_parse(
@@ -85,7 +95,7 @@ class GoogleSearch:
                 return result_embed
 
         # embed creation for text embeds
-        def text_embed(result):
+        def text_embed(result) -> Embed:
             # creates and formats the embed
             result_embed = Embed(
                 title=f'Search results for: {self.search_query[:233]}{"..." if len(self.search_query) > 233 else ""}'
@@ -314,7 +324,7 @@ class GoogleSearch:
         finally:
             return
 
-    async def translate(self):
+    async def translate(self) -> None:
         try:
             # translate string processing
             query = self.search_query.lower().split(" ")
@@ -419,7 +429,7 @@ class GoogleSearch:
         finally:
             return
 
-    async def define(self):
+    async def define(self) -> None:
         try:
             # creates the embed for each definition result
             def definition_embed(word, response_) -> list[Embed]:

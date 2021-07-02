@@ -15,7 +15,7 @@ class WikipediaSearch:
         bot: commands.Bot,
         ctx: commands.Context,
         message: discord.Message,
-        args,
+        args: tuple,
         search_query: Optional[str] = None,
     ):
 
@@ -32,7 +32,7 @@ class WikipediaSearch:
             ].replace("lang ", "")
             wikipedia.set_lang(language)
 
-    async def search(self):
+    async def search(self) -> None:
         def search_pages(result_) -> discord.Embed:
             return discord.Embed(
                 title=f"Titles matching '{self.search_query}'",
@@ -193,7 +193,7 @@ class WikipediaSearch:
         finally:
             return
 
-    async def lang(self):
+    async def lang(self) -> None:
         def lang_pages(language_str_) -> discord.Embed:
             embed = discord.Embed(
                 title=f"Wikipedia Languages", description=language_str_

@@ -41,7 +41,7 @@ class XKCDSearch:
         ctx: commands.Context,
         search_query: str,
         message: discord.Message,
-    ):
+    ) -> None:
         error_count = 0
         while error_count <= 1:
             try:

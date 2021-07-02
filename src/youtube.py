@@ -21,7 +21,7 @@ class YoutubeSearch:
         message: discord.Message,
         search_query: str,
         user_settings: dict,
-    ):
+    ) -> None:
         def result_embed(result_) -> discord.Embed:
             embed_ = discord.Embed(
                 title=result_["title"],

@@ -11,7 +11,13 @@ from src.utils import Log, ErrorHandler
 
 class ScholarSearch:
     @staticmethod
-    async def search(bot: commands.Bot, ctx: commands.Context, message: discord.Message, args, search_query):
+    async def search(
+        bot: commands.Bot,
+        ctx: commands.Context,
+        message: discord.Message,
+        args: tuple,
+        search_query: str,
+    ):
         # region various embed types creation
         def publication_embeds(result) -> discord.Embed:
             embed = discord.Embed(
@@ -96,7 +102,9 @@ class ScholarSearch:
                 results = [next(scholarly.search_pubs(search_query)) for _ in range(5)]
                 embeds = list(map(publication_embeds, results))
             elif "author" in args:
-                results = [next(scholarly.search_author(search_query)) for _ in range(5)]
+                results = [
+                    next(scholarly.search_author(search_query)) for _ in range(5)
+                ]
                 embeds = list(map(author_embeds, results))
             elif "cite" in args:
                 results = scholarly.search_pubs(search_query)

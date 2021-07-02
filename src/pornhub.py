@@ -10,7 +10,12 @@ from src.utils import ErrorHandler
 
 class PornhubSearch:
     @staticmethod
-    async def search(bot: commands.Bot, ctx: commands.Context, search_query: str, message: discord.Message):
+    async def search(
+        bot: commands.Bot,
+        ctx: commands.Context,
+        search_query: str,
+        message: discord.Message,
+    ) -> None:
         def video_embed(video) -> Embed:
             embed = Embed(title=video.title)
             embed.add_field(name="Video ID", value=video.video_id)

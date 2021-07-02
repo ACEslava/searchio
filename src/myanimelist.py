@@ -23,7 +23,7 @@ class MyAnimeListSearch:
         self.message = message
 
     async def search(self) -> None:
-        def search_pages(result_):
+        def search_pages(result_) -> discord.Embed:
             return discord.Embed(
                 title=f"Titles matching '{self.search_query}'",
                 description="\n".join(
