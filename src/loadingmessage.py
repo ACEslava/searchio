@@ -247,4 +247,4 @@ def LoadingMessage():
         "Please wait while we serve other customers...",
         "Our premium plan is faster"]
 
-    return random.choice(messages)
+    return f'<a:loading:860393918046273557> {random.choice(messages)}'
