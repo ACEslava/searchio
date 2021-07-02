@@ -211,7 +211,7 @@ def main():
                 dm = await ctx.author.create_dm()
                 await dm.send(embed=embed)
                 await dm.send('\n'.join(['If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ',
-                'Want to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot']))
+                'Want to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot%20applications.commands']))
 
         except discord.errors.Forbidden:
             await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
@@ -752,7 +752,7 @@ class Administration(commands.Cog, name="Administration"):
         try:
             Log.appendToLog(ctx)
             dm = await ctx.author.create_dm()
-            await dm.send('Here ya go: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot')
+            await dm.send('Here ya go: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot%20applications.commands')
         except discord.errors.Forbidden:
             await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
         except Exception as e:
