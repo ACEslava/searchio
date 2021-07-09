@@ -11,6 +11,7 @@ import os
 import random
 import re
 import traceback
+from discord.errors import HTTPException
 import yaml
 from discord.ext import commands
 
@@ -343,7 +344,7 @@ class Sudo:
                 help_message = await self.ctx.send(embed=embed)
                 try:
                     await help_message.add_reaction("🗑️")
-                    reaction, user = await self.bot.wait_for(
+                    reaction, _ = await self.bot.wait_for(
                         "reaction_add",
                         check=lambda reaction_, user_: all(
                             [
@@ -1293,6 +1294,27 @@ async def error_handler(
         error_logging_channel = await bot.fetch_channel(829172391557070878)
         try:
             err_report = await error_logging_channel.send(string)
+        except HTTPException as e:
+            if e.code == 50035:
+                with open(f"./src/cache/errorReport_{error_code}.txt", "w") as file:
+                    file.write(error_out)
+                
+                string = "\n".join(
+                    [
+                        f"Error `{error_code}`",
+                        f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
+                        f"In Channel: {str(ctx.channel)} ({ctx.channel.id})",
+                        f"By User: {str(ctx.author)}({ctx.author.id})",
+                        f"Command: {ctx.command}",
+                        f"Args: {args if len(args) != 0 else 'None'}",
+                        f"{f'User Feedback: {response}' if response is not None else ''}```"
+                    ]
+                )
+                await error_logging_channel.send(string)
+                await error_logging_channel.send(file=discord.File(f"./src/cache/errorReport_{error_code}.txt"))
+                os.remove(f"./src/cache/errorReport_{error_code}.txt")
+                return
+                
         except Exception as e:
             print(e)
         await err_report.add_reaction("✅")

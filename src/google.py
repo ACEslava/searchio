@@ -13,8 +13,8 @@ from langid import classify as detect
 from requests import get
 from translate import Translator
 
-from src.loadingmessage import get_loading_message
 from src.utils import Log, error_handler
+from src.loadingmessage import get_loading_message
 
 
 class GoogleSearch:
@@ -375,7 +375,7 @@ class GoogleSearch:
                 # waits for user reaction options
                 await self.message.add_reaction("🗑️")
                 await self.message.add_reaction("🔍")
-                reaction, user = await self.bot.wait_for(
+                reaction, _ = await self.bot.wait_for(
                     "reaction_add",
                     check=lambda reaction_, user_: all(
                         [
@@ -500,7 +500,7 @@ class GoogleSearch:
                     )
 
                 # user react option system
-                do_exit, cur_page = False, 0
+                cur_page = 0
                 await self.message.add_reaction("🗑️")
                 await self.message.add_reaction("🔍")
                 if len(embeds) > 1:

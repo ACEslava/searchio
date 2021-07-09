@@ -57,7 +57,7 @@ class XKCDSearch:
                 Log.append_to_log(ctx, f"{ctx.command} result", x.url)
 
                 await message.add_reaction("🗑️")
-                reaction, user = await bot.wait_for(
+                reaction, _ = await bot.wait_for(
                     "reaction_add",
                     check=lambda reaction_, user_: all(
                         [

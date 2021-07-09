@@ -1,6 +1,12 @@
-from src.utils import Log, ErrorHandler
-from src.loadingmessage import LoadingMessage
-import wikipedia, discord, asyncio, random
+from src.utils import Log, error_handler
+from src.loadingmessage import get_loading_message
+
+from wikipedia import set_lang, search, WikipediaPage, languages, DisambiguationError
+from asyncio import TimeoutError, CancelledError
+import wikipedia
+import discord
+import asyncio
+import random
 
 class WikipediaSearch:
     def __init__(
@@ -17,10 +23,10 @@ class WikipediaSearch:
         self.message = message
 
         if args is None:
-            wikipedia.set_lang('en')
+            set_lang('en')
         elif any('lang' in i for i in args):
             language = args[[idx for idx, s in enumerate(args) if 'lang' in s][0]].replace('lang ', '')
-            wikipedia.set_lang(language)
+            set_lang(language)
     
     async def search(self):
         def searchPages(result):
@@ -31,7 +37,7 @@ class WikipediaSearch:
             msg = [self.message]
 
             #searches
-            result = wikipedia.search(self.searchQuery)
+            result = search(self.searchQuery)
 
             while 1:
                 result = [result[x:x+10] for x in range(0, len(result), 10)]
@@ -80,13 +86,13 @@ class WikipediaSearch:
 
                                     input = int(input.content)
                                 
-                                except ValueError or IndexError:
+                                except (ValueError, IndexError):
                                     await msg[-1].edit(content='Invalid choice. Please choose a number between 0-9 or cancel')
                                     continue
 
                                 try:
                                     self.searchQuery = result[curPage][input]
-                                    page = wikipedia.WikipediaPage(title=self.searchQuery)
+                                    page = WikipediaPage(title=self.searchQuery)
                                     summary = page.summary[:page.summary.find('. ')+1]
                                     embed=discord.Embed(title=f'Wikipedia Article: {page.original_title}', description=summary, url=page.url) #outputs wikipedia article
                                     embed.set_footer(text=f"Requested by {self.ctx.author}")
@@ -103,7 +109,7 @@ class WikipediaSearch:
                                     await msg[0].delete() 
                                     return
 
-                                except wikipedia.DisambiguationError as e:
+                                except DisambiguationError as e:
                                     result = str(e).split('\n')
                                     result.pop(0)
                                     for index, message in enumerate(msg):
@@ -111,16 +117,16 @@ class WikipediaSearch:
                                     msg = [await self.ctx.send(f'{LoadingMessage()}')]
                                     break
                             
-                            except asyncio.TimeoutError:
+                            except TimeoutError:
                                 await msg[0].clear_reactions()
                                 return
                 
-                    except UserCancel or asyncio.TimeoutError:
+                    except (UserCancel, TimeoutError):
                         for message in msg:
                             await message.delete()
                         return
                     
-                    except asyncio.CancelledError:
+                    except CancelledError:
                         pass
 
                     except Exception as e:

@@ -7,6 +7,7 @@ from src.scholar import ScholarSearch
 from src.youtube import YoutubeSearch
 from src.xkcd import XKCDSearch
 from src.pornhub import PornhubSearch
+
 from dotenv import load_dotenv
 from discord.ext import commands
 from os import getenv, path
@@ -16,52 +17,15 @@ from csv import DictReader, DictWriter
 from datetime import datetime, timedelta
 from requests import get
 from time import sleep
-import discord, asyncio, re
 
-#region utility functions
-def prefix(bot, message): #handler for individual guild prefixes
-    try:
-        commandprefix:str = serverSettings[hex(message.guild.id)]['commandprefix']
-    except Exception:
-        commandprefix:str = '&'
-    finally: return commandprefix
-
-async def searchQueryParse(ctx, args, bot): #handler for bot search queries
-    UserCancel = KeyboardInterrupt
-    global userSettings
-    userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
-
-    if not args: #checks if search is empty
-        await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-        try:
-            userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-            if userquery.content.lower() == 'cancel': raise UserCancel
-            else: userquery = userquery.content.split('--')
-
-        except TimeoutError:
-            await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-        except UserCancel:
-            await ctx.send('Aborting')
-            return
-    else: 
-        userquery = ' '.join([query.strip() for query in list(args)]).split('--') #turns multiword search into single string.
-
-    if len(userquery) > 1:
-        flags = userquery[1:]
-    else:
-        flags = None
-    
-    userquery = userquery[0]
-    return userquery, flags
-#endregion
+import discord
+import asyncio
+import re
 
 def main():
     global serverSettings, userSettings
     #region onlaunch code
-    intents = discord.Intents.default()
-    intents.members = True
-    intents.presences = True
+    intents = discord.Intents.all()
 
     bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
 
@@ -199,7 +163,7 @@ def main():
                     helpMessage = await ctx.send(embed=embed)
                     try:
                         await helpMessage.add_reaction('🗑️')
-                        reaction, user = await bot.wait_for("reaction_add", check=check, timeout=60)
+                        reaction, _ = await bot.wait_for("reaction_add", check=check, timeout=60)
                         if str(reaction.emoji) == '🗑️':
                             await helpMessage.delete()
                             return
@@ -226,6 +190,44 @@ def main():
     bot.add_cog(Administration(bot))
 
     bot.run(DISCORD_TOKEN)
+
+# region utility functions
+def prefix(bot, message):   # handler for individual guild prefixes
+    try:
+        commandprefix: str = serverSettings[hex(message.guild.id)]['commandprefix']
+    except Exception:
+        commandprefix:str = '&'
+    finally: return commandprefix
+
+async def searchQueryParse(ctx, args, bot):  #handler for bot search queries
+    UserCancel = KeyboardInterrupt
+    global userSettings
+    userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
+
+    if not args: #checks if search is empty
+        await ctx.send("Enter search query or cancel") #if empty, asks user for search query
+        try:
+            userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
+            if userquery.content.lower() == 'cancel': raise UserCancel
+            else: userquery = userquery.content.split('--')
+
+        except TimeoutError:
+            await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
+
+        except UserCancel:
+            await ctx.send('Aborting')
+            return
+    else: 
+        userquery = ' '.join([query.strip() for query in list(args)]).split('--') #turns multiword search into single string.
+
+    if len(userquery) > 1:
+        flags = userquery[1:]
+    else:
+        flags = None
+    
+    userquery = userquery[0]
+    return userquery, flags
+#endregion
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
         self.bot = bot
@@ -250,7 +252,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def wiki(self, ctx, *args):
         global serverSettings
         if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
-            UserCancel = Exception
             userquery, args = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
             
@@ -383,7 +384,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def scholar(self, ctx, *args):
         global serverSettings
         if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
-            UserCancel = Exception
             userquery, args = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
 
@@ -432,7 +432,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def youtube(self, ctx, *args):
         global serverSettings, userSettings
 
-        UserCancel = Exception
         if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
             if userquery is None: return
@@ -483,7 +482,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         help='Searches through MyAnimeList')
     async def mal(self, ctx, *args):
         global serverSettings
-        UserCancel = Exception
 
         if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
@@ -533,7 +531,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         help='Searches for an XKCD comic. Search query can be an XKCD comic number, random, or latest.')
     async def xkcd(self, ctx, *args):
         global serverSettings
-        UserCancel = Exception
 
         if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
@@ -585,7 +582,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         global userSettings
 
         userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
-        UserCancel = KeyboardInterrupt
         
         if Sudo.is_authorized_command(self.bot, ctx, serverSettings) and ctx.channel.nsfw:
             userquery, _ = await searchQueryParse(ctx, args, self.bot)
@@ -639,7 +635,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 embed = discord.Embed(description=f'Your shortcut is not set. Set it with {Sudo.print_prefix(serverSettings, ctx)}config alias [Search Engine]')
                 message = await ctx.send(embed=embed)
                 await message.add_reaction('🗑️')
-                reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                 if str(reaction.emoji) == '🗑️':
                     await message.delete()           
             else: 
@@ -649,7 +645,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
                     message = ctx.send(embed=embed)
                     await message.add_reaction('🗑️')
-                    reaction, user = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+                    reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                     if str(reaction.emoji) == '🗑️':
                         await message.delete()
         except TimeoutError as e: 

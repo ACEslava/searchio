@@ -3,7 +3,7 @@ from typing import Optional
 
 import discord
 from discord.ext import commands
-from mal import *
+from mal import AnimeSearch
 
 from src.utils import Log, error_handler
 
@@ -154,7 +154,7 @@ class MyAnimeListSearch:
                                     await searchresult.delete()
                                 return
 
-                            except ValueError or IndexError:
+                            except (ValueError, IndexError):
                                 await msg[-1].edit(
                                     content="Invalid choice. Please choose a number between 0-9 or cancel"
                                 )
