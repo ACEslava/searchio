@@ -221,7 +221,7 @@ class YoutubeSearch:
                                                         f"{share_link}\n\n"
                                                         "You now have "
                                                         f"{50 - round(user_settings[user.id]['downloadquota']['dailyDownload'], 3)}MB "
-                                                        f"left in your daily quota."
+                                                        f"left in your daily quota. "
                                                         "Negative values mean your daily quota for the next day will be subtracted."
                                                     )
                                                 )

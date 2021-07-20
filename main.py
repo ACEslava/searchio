@@ -632,22 +632,27 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def s(self, ctx, *args):
         try:
             if userSettings[ctx.author.id]['searchAlias'] is None:
-                embed = discord.Embed(description=f'Your shortcut is not set. Set it with {Sudo.print_prefix(serverSettings, ctx)}config alias [Search Engine]')
+                embed = discord.Embed(description=f'Your shortcut is not set. React with 🔍 to set it now')
                 message = await ctx.send(embed=embed)
+                await message.add_reaction('🗑️')
+                await message.add_reaction('🔍')
+                reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ['🔍', '🗑️'], reaction.message == message]), timeout=60)
+                
+                if str(reaction.emoji) == '🗑️':
+                    await message.delete()   
+                elif str(reaction.emoji) == '🔍':  
+                    await getattr(Administration, 'config').__call__(self, ctx, ('alias'))
+                    await message.delete()      
+
+            try:
+                await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
+            except AttributeError:
+                embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
+                message = ctx.send(embed=embed)
                 await message.add_reaction('🗑️')
                 reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
                 if str(reaction.emoji) == '🗑️':
-                    await message.delete()           
-            else: 
-                try:
-                    await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
-                except AttributeError:
-                    embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
-                    message = ctx.send(embed=embed)
-                    await message.add_reaction('🗑️')
-                    reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
-                    if str(reaction.emoji) == '🗑️':
-                        await message.delete()
+                    await message.delete()
         except TimeoutError as e: 
                     await message.clear_reactions()
         except Exception as e:
@@ -769,7 +774,7 @@ class Administration(commands.Cog, name="Administration"):
             serverLatency = datetime.now() - beforeTime
             embed = discord.Embed(description='\n'.join(
                             [f'Message Send Time: `{round(serverLatency.total_seconds()*1000, 2)}ms`',
-                            f'API Heartbeat: `{round(self.bot.latency, 2)}ms`']))
+                            f'API Heartbeat: `{round(self.bot.latency, 2)*100}ms`']))
             embed.set_footer(text=f'Requested by {ctx.author}')
             await message.edit(content=None, embed=embed)
         except Exception as e:

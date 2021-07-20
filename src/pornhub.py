@@ -104,4 +104,5 @@ class PornhubSearch:
             await message.delete()
             await error_handler(bot, ctx, e, search_query)
         finally:
+            await message.clear_reactions()
             return

@@ -992,7 +992,7 @@ class Sudo:
                             message_edit = asyncio.create_task(
                                 self.bot.wait_for(
                                     "message_edit",
-                                    check=lambda var, m: m.author == self.ctx.author,
+                                    check=lambda m: m.author == self.ctx.author,
                                     timeout=60,
                                 )
                             )
