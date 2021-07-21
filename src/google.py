@@ -553,6 +553,13 @@ class GoogleSearch:
         except TimeoutError:
             raise
 
+        except KeyError:
+            await self.message.edit(
+                content=f"{get_loading_message()} <a:loading:829119343580545074>",
+                embed=None,
+            )
+            await self.search()
+
         except Exception as e:
             await self.message.delete()
             await error_handler(self.bot, self.ctx, e, self.search_query)

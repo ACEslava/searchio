@@ -274,7 +274,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}scholar ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}{ctx.invoked_with} ', '') #finds the new user query
                         continue
                     else: raise TimeoutError
 
@@ -356,7 +356,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}google ', '') #finds the new user query
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}{ctx.invoked_with} ', '') #finds the new user query
                         continue
                     else: raise TimeoutError
                 
@@ -406,7 +406,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}scholar ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}{ctx.invoked_with} ', '') #finds the new user query
                         continue
                     else: raise TimeoutError
                 
@@ -454,7 +454,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}youtube ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}{ctx.invoked_with} ', '') #finds the new user query
                         continue
                     else: 
                         with open('userSettings.yaml', 'r') as data:
@@ -507,7 +507,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}pornhub ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}{ctx.invoked_with} ', '') #finds the new user query
                         continue
                     else: raise TimeoutError
 
@@ -555,7 +555,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}pornhub ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}{ctx.invoked_with} ', '') #finds the new user query
                         continue
                     else: raise TimeoutError
 
@@ -606,7 +606,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}pornhub ', '')
+                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}{ctx.invoked_with} ', '') #finds the new user query
                         continue
                     else: raise TimeoutError
                 
