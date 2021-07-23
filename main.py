@@ -68,19 +68,21 @@ def main():
             embed = discord.Embed(title=f"Search.io was added to your server: '{guild.name}'.", 
                 description = f"""
             Search.io is a bot that searches through multiple search engines/APIs.
-            The activation command is '&', and a list of various commands can be found using '&help'.
+            The activation command is `&`, and a list of various commands can be found using `&help`.
             
-            A list of admin commands can be found by using '&help sudo'. These commands may need ID numbers, which requires Developer Mode.
-            To turn on Developer Mode, go to Settings > Appearances > Advanced > Developer Mode. Then right click on users, roles, channels, or guilds to copy their ID.
-            If you need to block a specific user from using Search.io, do '&sudo blacklist [userID]'. Unblock with '&sudo whitelist [userID]'
+            • A list of admin commands can be found by using `&help sudo`. These commands may need ID numbers, which requires Developer Mode.
+            • To turn on Developer Mode, go to Settings > Appearances > Advanced > Developer Mode. Then right click on users, roles, channels, or guilds to copy their ID.
 
-            Guild-specific settings can be accessed with '&config'
-            As a start, it is suggested to designate an administrator role that can use Search.io's sudo commands. Do '&config adminrole [roleID]' to designate an admin role.
-            You can change the command prefix with '&config prefix [character]'
-            You can also block or unblock specific commands with '&config [command]'
-            It is also suggested to turn on Safe Search, if needed. Do '&config safesearch'. The default is off. 
+            • Guild-specific settings can be accessed with `&config`
+            • As a start, it is suggested to designate an administrator role that can use Search.io's sudo commands. Do `&config adminrole [roleID]` to designate an admin role.
+            • You can change the command prefix with `&config prefix [character]`
+            • You can also block or unblock specific commands with `&config [command]`
+            • It is also suggested to turn on Safe Search, if needed. Do `&config safesearch on`. 
 
-            If you have any problems with Search.io, DM {str(appInfo.owner)}""")
+            • If you need to block a specific user from using Search.io, do `&sudo blacklist [userID]`. 
+            • Unblock with `&sudo whitelist [userID]`
+
+            If you have any problems with Search.io, join the help server: https://discord.gg/YB8VGYMZSQ""")
             await dm.send(embed=embed)
         except discord.errors.Forbidden:
             pass
