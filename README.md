@@ -69,6 +69,9 @@ Run main.py
         dailyDownload: float
         lifetimeDownload: float
         updateTime: ISO-8601 datetime str
+      level:
+        rank: int
+        xp: int
       locale: str OR null
       searchAlias: str OR null
   ```
