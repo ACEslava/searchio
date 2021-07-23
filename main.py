@@ -14,7 +14,7 @@ from os import getenv, path
 from asyncio import TimeoutError, create_task, wait
 from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from requests import get
 from time import sleep, time
 from copy import deepcopy
@@ -31,10 +31,10 @@ def main():
 
     bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
 
-    #checks if serverSettings.json exists
+    #checks if required files exist
     if not path.exists('logs.csv'):
         with open('logs.csv', 'w') as file:
-            file.write('')
+            file.write('Time,Guild,User,User_Plaintext,Command,Args')
 
     if not path.exists('serverSettings.yaml'):
         with open('serverSettings.yaml', 'w') as file:
@@ -63,7 +63,6 @@ def main():
 
         owner = await bot.fetch_user(guild.owner_id)
         dm = await owner.create_dm()
-        appInfo = await bot.application_info()
         try:
             embed = discord.Embed(title=f"Search.io was added to your server: '{guild.name}'.", 
                 description = f"""
@@ -104,12 +103,24 @@ def main():
         appInfo = await bot.application_info()
         bot.owner_id = appInfo.owner.id
 
+        #add new servers to settings
         for servers in bot.guilds:
             serverSettings = Sudo.server_settings_check(serverSettings, hex(servers.id), bot)
-            await autosaveConfigs()
+
+        #remove old servers from settings
+        delete_queue = []
+        guild_list = [g.id for g in bot.guilds]
+        for keys in serverSettings.keys():
+            if int(keys, 0) not in guild_list:
+                delete_queue.append(keys)
+        
+        for keys in delete_queue:
+            del serverSettings[keys]
+
+        await autosaveConfigs()
 
         with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
-            lines = [dict(row) for row in DictReader(file) if datetime.utcnow()-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
+            lines = [dict(row) for row in DictReader(file) if datetime.now(timezone.utc)-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
             
         with open("logs.csv", "w", newline='', encoding='utf-8-sig') as file:
             logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
@@ -321,6 +332,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         if userSettings[ctx.author.id]['level']['xp'] >= userSettings[ctx.author.id]['level']['rank']*10:
             userSettings[ctx.author.id]['level']['xp'] = 0
             userSettings[ctx.author.id]['level']['rank'] += 1
+            
+            await autosaveConfigs()
             
             await ctx.send(
                 embed=discord.Embed(

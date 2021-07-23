@@ -1,5 +1,4 @@
-from datetime import datetime, timedelta, date
-
+from datetime import datetime, timedelta, date, timezone
 import asyncio
 import csv
 import difflib
@@ -442,13 +441,16 @@ class Sudo:
             # region config menu
             if not args:
                 try:
+                    levelInfo = self.user_settings[self.ctx.author.id]['level']
+                    level_arithmeticSum = int(((levelInfo['rank']-1)*10)/2*levelInfo['rank'])
+
                     embed = discord.Embed(title=f"{self.ctx.author} Configuration")
                     embed.add_field(
                         name="User Statistics",
                         value=f"""
-                        `              Level:` {self.user_settings[self.ctx.author.id]['level']['rank']}
-                        `                 XP:` {self.user_settings[self.ctx.author.id]['level']['xp']}/{self.user_settings[self.ctx.author.id]['level']['rank']*10}
-                        `           Searches:` {(self.user_settings[self.ctx.author.id]['level']['rank']-1)*10+self.user_settings[self.ctx.author.id]['level']['xp']}
+                        `              Level:` {levelInfo['rank']}
+                        `                 XP:` {levelInfo['xp']}/{levelInfo['rank']*10}
+                        `           Searches:` {level_arithmeticSum+levelInfo['xp']}
                         `   Daily Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
                         `Lifetime Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB
                         `             Sudoer:` {'True' if Sudo.is_sudoer(self.bot, self.ctx, self.server_settings) else 'False'}""",
@@ -1151,21 +1153,24 @@ class Log:
             writer = csv.DictWriter(
                 file, fieldnames=log_fieldnames, extrasaction="ignore"
             )
-            writer.writerow(
-                dict(
-                    zip(
-                        log_fieldnames,
-                        [
-                            datetime.utcnow().isoformat(),
-                            guild,
-                            ctx.author.id,
-                            str(ctx.author),
-                            optcommand if optcommand is not None else ctx.command,
-                            args,
-                        ],
+            try:
+                writer.writerow(
+                    dict(
+                        zip(
+                            log_fieldnames,
+                            [
+                                datetime.now(timezone.utc).isoformat(),
+                                guild,
+                                ctx.author.id,
+                                str(ctx.author),
+                                optcommand if optcommand is not None else ctx.command,
+                                args,
+                            ],
+                        )
                     )
                 )
-            )
+            except Exception as e:
+                print(e)
         return
 
     @staticmethod
