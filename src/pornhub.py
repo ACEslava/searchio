@@ -9,13 +9,20 @@ from src.utils import error_handler
 
 
 class PornhubSearch:
-    @staticmethod
-    async def search(
-        bot: commands.Bot,
+    def __init__(
+        self,
+        bot: commands.bot,
         ctx: commands.Context,
-        search_query: str,
         message: discord.Message,
-    ) -> None:
+        query: str,
+        **kwargs
+    ):
+        self.bot = bot
+        self.ctx = ctx
+        self.message = message
+        self.query = query
+
+    async def __call__(self):
         def video_embed(video) -> Embed:
             embed = Embed(title=video.title)
             embed.add_field(name="Video ID", value=video.video_id)
@@ -50,40 +57,40 @@ class PornhubSearch:
             return embed
 
         try:
-            data = PornhubApi().search.search(search_query).videos[0:10]
+            data = PornhubApi().search.search(self.query).videos[0:10]
             embeds = list(map(video_embed, data))
 
             for index, item in enumerate(embeds):
                 item.set_footer(
-                    text=f"Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}"
+                    text=f"Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}"
                 )
 
             do_exit, cur_page = False, 0
-            await message.add_reaction("🗑️")
+            await self.message.add_reaction("🗑️")
             if len(embeds) > 1:
-                await message.add_reaction("◀️")
-                await message.add_reaction("▶️")
+                await self.message.add_reaction("◀️")
+                await self.message.add_reaction("▶️")
 
             while not do_exit:
                 try:
-                    await message.edit(
+                    await self.message.edit(
                         content=None, embed=embeds[cur_page % len(embeds)]
                     )
-                    reaction, user = await bot.wait_for(
+                    reaction, user = await self.bot.wait_for(
                         "reaction_add",
                         check=lambda reaction_, user_: all(
                             [
-                                user_ == ctx.author,
+                                user_ == self.ctx.author,
                                 str(reaction_.emoji) in ["◀️", "▶️", "🗑️"],
-                                reaction_.message == message,
+                                reaction_.message == self.message,
                             ]
                         ),
                         timeout=60,
                     )
-                    await message.remove_reaction(reaction, user)
+                    await self.message.remove_reaction(reaction, user)
 
                     if str(reaction.emoji) == "🗑️":
-                        await message.delete()
+                        await self.message.delete()
                         do_exit = True
                     elif str(reaction.emoji) == "◀️":
                         cur_page -= 1
@@ -97,12 +104,12 @@ class PornhubSearch:
 
         except asyncio.TimeoutError:
             raise
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, discord.errors.NotFound):
             pass
 
         except Exception as e:
-            await message.delete()
-            await error_handler(bot, ctx, e, search_query)
+            await self.message.delete()
+            await error_handler(self.bot, self.ctx, e, self.query)
         finally:
-            await message.clear_reactions()
+            await self.message.clear_reactions()
             return

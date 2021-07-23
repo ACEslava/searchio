@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, date
 import asyncio
 import csv
 import difflib
-from typing import Optional, Union, Tuple
+from typing import List, Optional, Union, Tuple
 
 import discord
 import os

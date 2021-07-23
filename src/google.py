@@ -10,12 +10,12 @@ from discord import Embed
 from discord.ext import commands
 from iso639 import languages
 from langid import classify as detect
-from requests import get
 from translate import Translator
 
 from src.utils import Log, error_handler
 from src.loadingmessage import get_loading_message
 
+import aiohttp
 
 class GoogleSearch:
     def __init__(
@@ -179,8 +179,10 @@ class GoogleSearch:
             )
 
             # gets the webscraped html of the google search
-            response = get(url)
-            soup, index = BeautifulSoup(response.text, features="lxml"), 3
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as resp:
+                    data = await resp.read()
+            soup, index = BeautifulSoup(data.decode('utf-8'), features="lxml"), 3
 
             # Debug HTML output
             # with open('test.html', 'w', encoding='utf-8-sig') as file:

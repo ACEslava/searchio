@@ -3,11 +3,13 @@ from datetime import datetime, timedelta
 import asyncio
 import discord
 import os
+from discord import message
+from discord.ext.commands import bot, context
 import requests
 from requests.models import HTTPError
 import yaml
 from discord.ext import commands
-from pytube import YouTube as YoutubeDownload
+from pytube import YouTube as YoutubeDownload, query
 from youtube_search import YoutubeSearch as YTSearch
 from urllib import error as URLError
 from src.loadingmessage import get_loading_message
@@ -15,14 +17,24 @@ from src.utils import error_handler
 
 
 class YoutubeSearch:
-    @staticmethod
-    async def search(
+    def __init__(
+        self,
         bot: commands.Bot,
         ctx: commands.Context,
         message: discord.Message,
-        search_query: str,
+        query: str,
         user_settings: dict,
-    ) -> None:
+        **kwargs
+    ):
+        self.bot = bot,
+        self.ctx = ctx,
+        self.message = message,
+        self.query = query,
+        self.user_settings = user_settings
+
+    async def __call__(self):
+        UserCancel = KeyboardInterrupt
+        
         def result_embed(result_) -> discord.Embed:
             embed_ = discord.Embed(
                 title=result_["title"],
@@ -39,7 +51,7 @@ class YoutubeSearch:
             )
 
             embed_.set_thumbnail(url=result_["thumbnails"][0])
-            embed_.set_footer(text=f"Requested by {ctx.author}")
+            embed_.set_footer(text=f"Requested by {self.ctx.author}")
             return embed_
         
         def download_embed(result_) -> discord.Embed:
@@ -51,44 +63,45 @@ class YoutubeSearch:
             )
 
         try:
-            result = YTSearch(search_query, max_results=10).to_dict()
+            result = YTSearch(self.query
+    , max_results=10).to_dict()
 
             embeds = list(map(result_embed, result))
 
             do_exit, cur_page = False, 0
-            await message.add_reaction("🗑️")
-            await message.add_reaction("⬇️")
+            await self.message.add_reaction("🗑️")
+            await self.message.add_reaction("⬇️")
             if len(embeds) > 1:
-                await message.add_reaction("◀️")
-                await message.add_reaction("▶️")
+                await self.message.add_reaction("◀️")
+                await self.message.add_reaction("▶️")
             elif len(embeds) == 0:
                 embed = discord.Embed(
-                    description=f"No results found for: {search_query}"
+                    description=f"No results found for: {self.query}"
                 )
-                await message.edit(content=None, embed=embed)
+                await self.message.edit(content=None, embed=embed)
                 await asyncio.sleep(60)
-                await message.delete()
+                await self.message.delete()
                 return
             
             while not do_exit:
                 try:
-                    await message.edit(
+                    await self.message.edit(
                         content=None, embed=embeds[cur_page % len(embeds)]
                     )
-                    reaction, user = await bot.wait_for(
+                    reaction, user = await self.bot.wait_for(
                         "reaction_add",
                         check=lambda reaction_, user_: all(
                             [
                                 str(reaction_.emoji) in ["◀️", "▶️", "🗑️", "⬇️"],
-                                reaction_.message == message,
-                                not user_.bot,
+                                reaction_.self.message == self.message,
+                                not user_.self.bot,
                             ]
                         ),
                         timeout=60,
                     )
-                    await message.remove_reaction(reaction, user)
+                    await self.message.remove_reaction(reaction, user)
                     if str(reaction.emoji) == "🗑️":
-                        await message.delete()
+                        await self.message.delete()
                         do_exit = True
                     elif str(reaction.emoji) == "◀️":
                         cur_page -= 1
@@ -96,11 +109,11 @@ class YoutubeSearch:
                         cur_page += 1
                     elif (
                         str(reaction.emoji) == "⬇️"
-                        and user_settings[user.id]["downloadquota"]["dailyDownload"]
+                        and self.user_settings[user.id]["downloadquota"]["dailyDownload"]
                         < 50
                     ):
-                        await message.remove_reaction(reaction, bot.user)
-                        msg = [await ctx.send(
+                        await self.message.remove_reaction(reaction, self.bot.user)
+                        msg = [await self.ctx.send(
                             f"{get_loading_message()}"
                         )]
                         yt = YoutubeDownload(embeds[cur_page].url)
@@ -115,36 +128,36 @@ class YoutubeSearch:
 
                                 for index, item in enumerate(embeds):
                                     item.set_footer(
-                                        text=f"Page {index+1}/{len(embeds)}\nRequested by: {str(ctx.author)}"
+                                        text=f"Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}"
                                     )
 
                                 await msg[0].add_reaction("🗑️")
                                 if len(embeds) > 1:
                                     await msg[0].add_reaction("◀️")
                                     await msg[0].add_reaction("▶️")
-                                msg.append(await ctx.send("Please choose option or cancel"))
+                                msg.append(await self.ctx.send("Please choose option or cancel"))
 
                                 while 1:
                                     await msg[0].edit(
                                         content=None, embed=embeds[cur_page % len(embeds)]
                                     )
                                     emojitask = asyncio.create_task(
-                                        bot.wait_for(
+                                        self.bot.wait_for(
                                             "reaction_add",
                                             check=lambda reaction_, user_: all(
                                                 [
-                                                    user_ == ctx.author,
+                                                    user_ == self.ctx.author,
                                                     str(reaction_.emoji) in ["◀️", "▶️", "🗑️"],
-                                                    reaction_.message == msg[0],
+                                                    reaction_.self.message == msg[0],
                                                 ]
                                             ),
                                             timeout=60,
                                         )
                                     )
                                     responsetask = asyncio.create_task(
-                                        bot.wait_for(
-                                            "message",
-                                            check=lambda m: m.author == ctx.author,
+                                        self.bot.wait_for(
+                                            "self.message",
+                                            check=lambda m: m.author == self.ctx.author,
                                             timeout=30,
                                         )
                                     )
@@ -176,19 +189,19 @@ class YoutubeSearch:
 
                                                 input = int(input.content)
 
-                                            except ValueError or IndexError:
+                                            except (ValueError, IndexError):
                                                 await msg[-1].edit(
                                                     content="Invalid choice. Please choose a number between 0-9 or cancel"
                                                 )
                                                 continue
 
                                             try:
-                                                for message in msg: await message.delete()
-                                                msg = [await ctx.send(f"{get_loading_message()}")]
+                                                for self.message in msg: await self.message.delete()
+                                                msg = [await self.ctx.send(f"{get_loading_message()}")]
                                                 download = download[cur_page][input]
 
-                                                user_settings[user.id]["downloadquota"]["dailyDownload"] += round(download.filesize_approx / 1000000, 2)
-                                                user_settings[user.id]["downloadquota"]["lifetimeDownload"] += round(download.filesize_approx / 1000000, 2)
+                                                self.user_settings[user.id]["downloadquota"]["dailyDownload"] += round(download.filesize_approx / 1000000, 2)
+                                                self.user_settings[user.id]["downloadquota"]["lifetimeDownload"] += round(download.filesize_approx / 1000000, 2)
                                                 download.download(output_path="./src/cache")
 
                                                 best_server = requests.get(
@@ -220,34 +233,34 @@ class YoutubeSearch:
                                                     description=(
                                                         f"{share_link}\n\n"
                                                         "You now have "
-                                                        f"{50 - round(user_settings[user.id]['downloadquota']['dailyDownload'], 3)}MB "
+                                                        f"{50 - round(self.user_settings[user.id]['downloadquota']['dailyDownload'], 3)}MB "
                                                         f"left in your daily quota. "
                                                         "Negative values mean your daily quota for the next day will be subtracted."
                                                     )
                                                 )
                                                 embed.set_footer(text=f"Requested by {user}")
-                                                for message in msg: await message.delete()
-                                                await ctx.send(embed=embed)
+                                                for self.message in msg: await self.message.delete()
+                                                await self.ctx.send(embed=embed)
 
                                                 with open("userSettings.yaml", "w") as data:
-                                                    yaml.dump(user_settings, data, allow_unicode=True)
+                                                    yaml.dump(self.user_settings, data, allow_unicode=True)
 
                                                 return
                                             except asyncio.TimeoutError:
                                                 await msg[0].clear_reactions()
                                                 return
 
-                                        except UserCancel or asyncio.TimeoutError:
-                                            for message in msg:
-                                                await message.delete()
+                                        except (UserCancel, asyncio.TimeoutError):
+                                            for self.message in msg:
+                                                await self.message.delete()
                                             return
 
                                         except asyncio.CancelledError:
                                             pass
 
                                         except Exception:
-                                            for message in msg:
-                                                await message.delete()
+                                            for self.message in msg:
+                                                await self.message.delete()
                                             raise
 
                         else:
@@ -260,21 +273,18 @@ class YoutubeSearch:
                             await msg[0].edit(content=None, embed=embed)
 
                 except asyncio.TimeoutError:
-                    await message.clear_reactions()
-                except asyncio.CancelledError:
+                    await self.message.clear_reactions()
+                except (asyncio.CancelledError, discord.errors.NotFound):
                     pass
 
         except UserCancel:
-            await ctx.send(f"Cancelled")
+            await self.ctx.send(f"Cancelled")
 
         except asyncio.TimeoutError:
-            await ctx.send(f"Search timed out. Aborting")
+            await self.ctx.send(f"Search timed out. Aborting")
 
         except Exception as e:
-            await error_handler(bot, ctx, e, search_query)
+            await error_handler(self.bot, self.ctx, e, self.query
+    )
         finally:
             return
-
-
-class UserCancel(Exception):
-    pass

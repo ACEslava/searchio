@@ -3,29 +3,32 @@ from typing import Optional
 
 import discord
 from discord.ext import commands
+from discord.ext.commands import bot, context
 from mal import AnimeSearch
 
 from src.utils import Log, error_handler
-
 
 class MyAnimeListSearch:
     def __init__(
         self,
         bot: commands.Bot,
         ctx: commands.Context,
-        message: discord.Message,
-        search_query: Optional[str] = None,
+        message: discord.message,
+        query: str,
+        **kwargs
     ):
-
-        self.search_query = search_query
         self.bot = bot
         self.ctx = ctx
         self.message = message
+        self.query = query
+    
+    async def __call__(self):
 
-    async def search(self) -> None:
+        UserCancel = KeyboardInterrupt
+
         def search_pages(result_) -> discord.Embed:
             return discord.Embed(
-                title=f"Titles matching '{self.search_query}'",
+                title=f"Titles matching '{self.query}'",
                 description="\n".join(
                     [
                         f"[{index_}]: {value.title}"
@@ -35,8 +38,8 @@ class MyAnimeListSearch:
             )
 
         try:
-            msg = [self.message]
-            search = AnimeSearch(self.search_query)
+            errorMessage = None
+            search = AnimeSearch(self.query)
 
             while 1:
                 result = [
@@ -48,18 +51,17 @@ class MyAnimeListSearch:
 
                 for index, item in enumerate(embeds):
                     item.set_footer(
-                        text=f"Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}"
+                        text=f"Please choose option or cancel\nPage {index+1}/{len(embeds)}"
                     )
 
-                await msg[0].add_reaction("🗑️")
+                await self.message.add_reaction("🗑️")
                 if len(embeds) > 1:
-                    await msg[0].add_reaction("◀️")
-                    await msg[0].add_reaction("▶️")
-                msg.append(await self.ctx.send("Please choose option or cancel"))
+                    await self.message.add_reaction("◀️")
+                    await self.message.add_reaction("▶️")
 
                 while 1:
                     try:
-                        await msg[0].edit(
+                        await self.message.edit(
                             content=None, embed=embeds[cur_page % len(embeds)]
                         )
                         emojitask = asyncio.create_task(
@@ -69,7 +71,7 @@ class MyAnimeListSearch:
                                     [
                                         user_ == self.ctx.author,
                                         str(reaction_.emoji) in ["◀️", "▶️", "🗑️"],
-                                        reaction_.message == msg[0],
+                                        reaction_.message == self.message,
                                     ]
                                 ),
                                 timeout=60,
@@ -89,10 +91,10 @@ class MyAnimeListSearch:
                         )  # 30 seconds wait either reply or react
                         if emojitask in done:
                             reaction, user = emojitask.result()
-                            await msg[0].remove_reaction(reaction, user)
+                            await self.message.remove_reaction(reaction, user)
 
                             if str(reaction.emoji) == "🗑️":
-                                await msg[0].delete()
+                                await self.message.delete()
                                 return
                             elif str(reaction.emoji) == "◀️":
                                 cur_page -= 1
@@ -109,6 +111,9 @@ class MyAnimeListSearch:
                                 input = int(input.content)
                                 anime_item = result[cur_page][input]
 
+                                if errorMessage is not None:
+                                    await errorMessage.delete()
+                                    
                                 embed = discord.Embed(
                                     title=f"{anime_item.title}",
                                     description=anime_item.synopsis,
@@ -133,13 +138,11 @@ class MyAnimeListSearch:
 
                                 embed.set_thumbnail(url=anime_item.image_url)
                                 embed.set_footer(text=f"Requested by {self.ctx.author}")
-                                searchresult = await self.ctx.send(embed=embed)
 
                                 Log.append_to_log(self.ctx, f"{self.ctx.command} result", anime_item.title)
-                                for message in msg:
-                                    await message.delete()
-
-                                await searchresult.add_reaction("🗑️")
+                                await self.message.clear_reactions()
+                                await self.message.edit(embed=embed)
+                                await self.message.add_reaction("🗑️")
                                 reaction, user = await self.bot.wait_for(
                                     "reaction_add",
                                     check=lambda reaction_, user_: all(
@@ -151,42 +154,32 @@ class MyAnimeListSearch:
                                     timeout=60,
                                 )
                                 if str(reaction.emoji) == "🗑️":
-                                    await searchresult.delete()
+                                    await self.message.delete()
                                 return
 
                             except (ValueError, IndexError):
-                                await msg[-1].edit(
-                                    content="Invalid choice. Please choose a number between 0-9 or cancel"
-                                )
+                                errorMessage = await self.ctx.send(content="Invalid choice. Please choose a number between 0-9 or cancel")
                                 continue
 
                             except asyncio.TimeoutError:
-                                await searchresult.clear_reactions()
+                                await self.message.clear_reactions()
                                 return
-
-                            except asyncio.CancelledError:
-                                pass
 
                     except UserCancel:
 
-                        for message in msg:
-                            await message.delete()
+                        await self.message.delete()
 
                     except asyncio.TimeoutError:
-                        for message in msg:
-                            await message.delete()
+                        await self.message.delete()
 
-                    except asyncio.CancelledError:
-                        await self.ctx.send(f"Search timed out. Aborting")
+                    except (asyncio.CancelledError, discord.errors.NotFound):
+                        pass
 
                     except Exception:
-                        for message in msg:
-                            await message.delete()
+                        await self.message.delete()
+                        raise
+
         except Exception as e:
-            await error_handler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.query)
         finally:
             return
-
-
-class UserCancel(Exception):
-    pass
