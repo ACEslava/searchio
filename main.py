@@ -432,16 +432,16 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     await error_handler(self.bot, ctx, e, userquery)
                     return
 
-    @commands.command(
-        name= 'scholar',
-        brief='Search through Google Scholar',
-        usage='scholar [query] [flags]',
-        help='Google Scholar search',
-        description="""--author: Use [query] to search for a specific author. Cannot be used with --cite
-                        --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
-    async def scholar(self, ctx, *args):
-        await genericSearch(bot, ctx, ScholarSearch, args)
-        return
+    # @commands.command(
+    #     name= 'scholar',
+    #     brief='Search through Google Scholar',
+    #     usage='scholar [query] [flags]',
+    #     help='Google Scholar search',
+    #     description="""--author: Use [query] to search for a specific author. Cannot be used with --cite
+    #                     --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
+    # async def scholar(self, ctx, *args):
+    #     await genericSearch(bot, ctx, ScholarSearch, args)
+    #     return
 
     @commands.command(
         name= 'youtube',
