@@ -201,11 +201,18 @@ class Sudo:
                         user.id
                     )
                     await self.ctx.send(f"`{str(user)}` blacklisted")
+                
                 elif role is not None:
                     self.server_settings[hex(self.ctx.guild.id)]["blacklist"].append(
                         role.id
                     )
-                    await self.ctx.send(f"'{role.name}' is now blacklisted")
+                    
+                    await self.ctx.send(
+                        discord.Embed(
+                            description=f"'{role.name}' is now blacklisted"
+                        )
+                    )
+                
                 else:
                     await self.ctx.send(
                         f"No user/role named `{''.join(args)}` was found in the guild"
@@ -225,15 +232,29 @@ class Sudo:
                         self.server_settings[hex(self.ctx.guild.id)][
                             "blacklist"
                         ].remove(user.id)
-                        await self.ctx.send(f"`{str(user)}` removed from blacklist")
+                        
+                        await self.ctx.send(
+                            discord.Embed(
+                                description=f"`{str(user)}` removed from blacklist"
+                            )
+                        )
+                    
                     elif role is not None:
+                        
                         self.server_settings[hex(self.ctx.guild.id)][
                             "blacklist"
                         ].remove(role.id)
-                        await self.ctx.send(f"'{role.name}' removed from blacklist")
+                        
+                        await self.ctx.send(
+                            discord.Embed(
+                                description=f"'{role.name}' removed from blacklist"
+                            )
+                        )
                     else:
                         await self.ctx.send(
-                            f"No user/role with the ID `{''.join(args)}` was found in the guild"
+                            discord.Embed(
+                                description=f"No user/role with the ID `{''.join(args)}` was found in the guild"
+                            )
                         )
                 except ValueError:
                     await self.ctx.send(f"`{''.join(args)}` not in blacklist")
@@ -256,9 +277,19 @@ class Sudo:
                     self.server_settings[hex(self.ctx.guild.id)]["sudoer"].append(
                         user.id
                     )
-                    await self.ctx.send(f"`{str(user)}` is now a sudoer")
+                    
+                    await self.ctx.send(
+                        discord.Embed(
+                            description=f"`{str(user)}` is now a sudoer"
+                        )
+                    )
                 else:
-                    await self.ctx.send(f"`{str(user)}` is already a sudoer")
+                    
+                    await self.ctx.send(
+                        discord.Embed(
+                            description=f"`{str(user)}` is already a sudoer"
+                        )
+                    )
         except Exception:
             raise
         finally:
@@ -275,9 +306,9 @@ class Sudo:
                     self.server_settings[hex(self.ctx.guild.id)]["sudoer"].remove(
                         user.id
                     )
-                    await self.ctx.send(f"`{str(user)}` has been removed from sudo")
+                    await self.ctx.send(discord.Embed(description=f"`{str(user)}` has been removed from sudo"))
                 else:
-                    await self.ctx.send(f"`{str(user)}` is not a sudoer")
+                    await self.ctx.send(discord.Embed(description=f"`{str(user)}` is not a sudoer"))
         except Exception:
             raise
         finally:
@@ -368,7 +399,7 @@ class Sudo:
                         value=f"""
                         `              Level:` {self.user_settings[self.ctx.author.id]['level']['rank']}
                         `                 XP:` {self.user_settings[self.ctx.author.id]['level']['xp']}/{self.user_settings[self.ctx.author.id]['level']['rank']*10}
-                        `           Searches:` {self.user_settings[self.ctx.author.id]['level']['rank']*10+self.user_settings[self.ctx.author.id]['level']['xp']}
+                        `           Searches:` {(self.user_settings[self.ctx.author.id]['level']['rank']-1)*10+self.user_settings[self.ctx.author.id]['level']['xp']}
                         `   Daily Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
                         `Lifetime Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""",
                         inline=False,
