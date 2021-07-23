@@ -5,22 +5,28 @@ from discord import Embed
 from discord.ext import commands
 from pornhub_api import PornhubApi
 
-from src.utils import error_handler
+from src.utils import error_handler, Sudo
 
 
 class PornhubSearch:
     def __init__(
         self,
-        bot: commands.bot,
+        bot: commands.Bot,
         ctx: commands.Context,
+        server_settings: dict,
+        user_settings: dict,
         message: discord.Message,
-        query: str,
-        **kwargs
+        args: list,
+        query: str
     ):
         self.bot = bot
         self.ctx = ctx
+        self.serverSettings = server_settings
+        self.userSettings = user_settings
         self.message = message
+        self.args = args
         self.query = query
+        return
 
     async def __call__(self):
         def video_embed(video) -> Embed:
@@ -78,13 +84,14 @@ class PornhubSearch:
                     )
                     reaction, user = await self.bot.wait_for(
                         "reaction_add",
-                        check=lambda reaction_, user_: all(
-                            [
-                                user_ == self.ctx.author,
-                                str(reaction_.emoji) in ["◀️", "▶️", "🗑️"],
-                                reaction_.message == self.message,
-                            ]
-                        ),
+                        check=
+                            lambda reaction_, user_: Sudo.pageTurnCheck(
+                                reaction_, 
+                                user_, 
+                                self.message, 
+                                self.bot, 
+                                self.ctx, 
+                                self.serverSettings),
                         timeout=60,
                     )
                     await self.message.remove_reaction(reaction, user)

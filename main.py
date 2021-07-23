@@ -263,11 +263,12 @@ async def genericSearch(bot, ctx, searchObject, args):
                 search = create_task(
                     searchObject(
                         bot=bot, 
-                        ctx=ctx, 
+                        ctx=ctx,
+                        server_settings=serverSettings,
+                        user_settings=userSettings,
                         message=message, 
                         args=args, 
                         query=userquery, 
-                        user_settings=userSettings
                     )()
                 )
 

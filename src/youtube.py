@@ -13,7 +13,7 @@ from pytube import YouTube as YoutubeDownload, query
 from youtube_search import YoutubeSearch as YTSearch
 from urllib import error as URLError
 from src.loadingmessage import get_loading_message
-from src.utils import error_handler
+from src.utils import error_handler, Sudo
 
 
 class YoutubeSearch:
@@ -21,16 +21,20 @@ class YoutubeSearch:
         self,
         bot: commands.Bot,
         ctx: commands.Context,
-        message: discord.Message,
-        query: str,
+        server_settings: dict,
         user_settings: dict,
-        **kwargs
+        message: discord.Message,
+        args: list,
+        query: str
     ):
-        self.bot = bot,
-        self.ctx = ctx,
-        self.message = message,
-        self.query = query,
-        self.user_settings = user_settings
+        self.bot = bot
+        self.ctx = ctx
+        self.serverSettings = server_settings
+        self.userSettings = user_settings
+        self.message = message
+        self.args = args
+        self.query = query
+        return
 
     async def __call__(self):
         UserCancel = KeyboardInterrupt
@@ -109,7 +113,7 @@ class YoutubeSearch:
                         cur_page += 1
                     elif (
                         str(reaction.emoji) == "⬇️"
-                        and self.user_settings[user.id]["downloadquota"]["dailyDownload"]
+                        and self.userSettings[user.id]["downloadquota"]["dailyDownload"]
                         < 50
                     ):
                         await self.message.remove_reaction(reaction, self.bot.user)
@@ -144,13 +148,14 @@ class YoutubeSearch:
                                     emojitask = asyncio.create_task(
                                         self.bot.wait_for(
                                             "reaction_add",
-                                            check=lambda reaction_, user_: all(
-                                                [
-                                                    user_ == self.ctx.author,
-                                                    str(reaction_.emoji) in ["◀️", "▶️", "🗑️"],
-                                                    reaction_.self.message == msg[0],
-                                                ]
-                                            ),
+                                            check=
+                                                lambda reaction_, user_: Sudo.pageTurnCheck(
+                                                    reaction_, 
+                                                    user_, 
+                                                    self.message, 
+                                                    self.bot, 
+                                                    self.ctx, 
+                                                    self.serverSettings),
                                             timeout=60,
                                         )
                                     )
@@ -200,8 +205,8 @@ class YoutubeSearch:
                                                 msg = [await self.ctx.send(f"{get_loading_message()}")]
                                                 download = download[cur_page][input]
 
-                                                self.user_settings[user.id]["downloadquota"]["dailyDownload"] += round(download.filesize_approx / 1000000, 2)
-                                                self.user_settings[user.id]["downloadquota"]["lifetimeDownload"] += round(download.filesize_approx / 1000000, 2)
+                                                self.userSettings[user.id]["downloadquota"]["dailyDownload"] += round(download.filesize_approx / 1000000, 2)
+                                                self.userSettings[user.id]["downloadquota"]["lifetimeDownload"] += round(download.filesize_approx / 1000000, 2)
                                                 download.download(output_path="./src/cache")
 
                                                 best_server = requests.get(
@@ -233,7 +238,7 @@ class YoutubeSearch:
                                                     description=(
                                                         f"{share_link}\n\n"
                                                         "You now have "
-                                                        f"{50 - round(self.user_settings[user.id]['downloadquota']['dailyDownload'], 3)}MB "
+                                                        f"{50 - round(self.userSettings[user.id]['downloadquota']['dailyDownload'], 3)}MB "
                                                         f"left in your daily quota. "
                                                         "Negative values mean your daily quota for the next day will be subtracted."
                                                     )
@@ -243,7 +248,7 @@ class YoutubeSearch:
                                                 await self.ctx.send(embed=embed)
 
                                                 with open("userSettings.yaml", "w") as data:
-                                                    yaml.dump(self.user_settings, data, allow_unicode=True)
+                                                    yaml.dump(self.userSettings, data, allow_unicode=True)
 
                                                 return
                                             except asyncio.TimeoutError:

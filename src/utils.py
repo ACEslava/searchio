@@ -156,6 +156,41 @@ class Sudo:
         )
         return any([check, Sudo.is_sudoer(bot, ctx, server_settings)])
 
+    @staticmethod
+    def pageTurnCheck(reaction, user, message, bot, ctx, server_settings):
+        if server_settings is None:
+            with open("serverSettings.yaml", "r") as data:
+                server_settings = yaml.load(data, yaml.FullLoader)
+
+        # Checks if sudoer is owner
+        is_owner = user.id == bot.owner_id
+
+        # Checks if sudoer is server owner
+        if ctx.guild:
+            is_server_owner = user.id == ctx.guild.owner_id
+        else:
+            is_server_owner = False
+
+        # Checks if sudoer has the designated adminrole or is a sudoer
+        try:
+            has_admin = server_settings[hex(ctx.guild.id)]["adminrole"] in [
+                role.id for role in user.roles
+            ]
+            is_sudoer = user.id in server_settings[hex(ctx.guild.id)]["sudoer"]
+        except Exception as e:
+            print(e)
+        finally:
+            return all(
+                [
+                    (
+                        user == ctx.author or 
+                        any([is_owner, is_server_owner, has_admin, is_sudoer])
+                    ),
+                    str(reaction.emoji) in ["◀️", "▶️", "🗑️"],
+                    reaction.message == message,
+                ]
+            )
+
     async def user_search(self, search: Union[int, str]) -> Optional[discord.Member]:
         try:
             if search.isnumeric():
@@ -200,7 +235,11 @@ class Sudo:
                     self.server_settings[hex(self.ctx.guild.id)]["blacklist"].append(
                         user.id
                     )
-                    await self.ctx.send(f"`{str(user)}` blacklisted")
+                    await self.ctx.send(
+                        embed=discord.Embed(
+                            description=f"`{str(user)}` blacklisted"
+                        )
+                    )
                 
                 elif role is not None:
                     self.server_settings[hex(self.ctx.guild.id)]["blacklist"].append(
@@ -208,14 +247,16 @@ class Sudo:
                     )
                     
                     await self.ctx.send(
-                        discord.Embed(
+                        embed=discord.Embed(
                             description=f"'{role.name}' is now blacklisted"
                         )
                     )
                 
                 else:
                     await self.ctx.send(
-                        f"No user/role named `{''.join(args)}` was found in the guild"
+                        embed=discord.Embed(
+                            description=f"No user/role named `{''.join(args)}` was found in the guild"
+                        )   
                     )
         except Exception:
             raise
@@ -234,7 +275,7 @@ class Sudo:
                         ].remove(user.id)
                         
                         await self.ctx.send(
-                            discord.Embed(
+                            embed=discord.Embed(
                                 description=f"`{str(user)}` removed from blacklist"
                             )
                         )
@@ -246,13 +287,13 @@ class Sudo:
                         ].remove(role.id)
                         
                         await self.ctx.send(
-                            discord.Embed(
+                            embed=discord.Embed(
                                 description=f"'{role.name}' removed from blacklist"
                             )
                         )
                     else:
                         await self.ctx.send(
-                            discord.Embed(
+                            embed=discord.Embed(
                                 description=f"No user/role with the ID `{''.join(args)}` was found in the guild"
                             )
                         )
@@ -279,14 +320,14 @@ class Sudo:
                     )
                     
                     await self.ctx.send(
-                        discord.Embed(
+                        embed=discord.Embed(
                             description=f"`{str(user)}` is now a sudoer"
                         )
                     )
                 else:
                     
                     await self.ctx.send(
-                        discord.Embed(
+                        embed=discord.Embed(
                             description=f"`{str(user)}` is already a sudoer"
                         )
                     )
@@ -306,9 +347,17 @@ class Sudo:
                     self.server_settings[hex(self.ctx.guild.id)]["sudoer"].remove(
                         user.id
                     )
-                    await self.ctx.send(discord.Embed(description=f"`{str(user)}` has been removed from sudo"))
+                    await self.ctx.send(
+                        embed=discord.Embed(
+                            description=f"`{str(user)}` has been removed from sudo"
+                        )
+                    )
                 else:
-                    await self.ctx.send(discord.Embed(description=f"`{str(user)}` is not a sudoer"))
+                    await self.ctx.send(
+                        embed=discord.Embed(
+                            description=f"`{str(user)}` is not a sudoer"
+                        )
+                    )
         except Exception:
             raise
         finally:
@@ -401,7 +450,8 @@ class Sudo:
                         `                 XP:` {self.user_settings[self.ctx.author.id]['level']['xp']}/{self.user_settings[self.ctx.author.id]['level']['rank']*10}
                         `           Searches:` {(self.user_settings[self.ctx.author.id]['level']['rank']-1)*10+self.user_settings[self.ctx.author.id]['level']['xp']}
                         `   Daily Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
-                        `Lifetime Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""",
+                        `Lifetime Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB
+                        `             Sudoer:` {'True' if Sudo.is_sudoer(self.bot, self.ctx, self.server_settings) else 'False'}""",
                         inline=False,
                     )
 

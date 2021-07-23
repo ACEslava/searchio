@@ -11,11 +11,10 @@ from discord.ext import commands
 from iso639 import languages
 from langid import classify as detect
 from translate import Translator
-
-from src.utils import Log, error_handler
+from requests import get
+from src.utils import Log, error_handler, Sudo
 from src.loadingmessage import get_loading_message
 
-import aiohttp
 
 class GoogleSearch:
     def __init__(
@@ -25,7 +24,7 @@ class GoogleSearch:
         server_settings: dict,
         user_settings: dict,
         message: discord.Message,
-        search_query: str,
+        search_query: str
     ):
         self.bot = bot
         self.ctx = ctx
@@ -179,10 +178,8 @@ class GoogleSearch:
             )
 
             # gets the webscraped html of the google search
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as resp:
-                    data = await resp.read()
-            soup, index = BeautifulSoup(data.decode('utf-8'), features="lxml"), 3
+            data = get(url)
+            soup, index = BeautifulSoup(data.text, features="lxml"), 3
 
             # Debug HTML output
             # with open('test.html', 'w', encoding='utf-8-sig') as file:
@@ -268,13 +265,14 @@ class GoogleSearch:
 
                         reaction, user = await self.bot.wait_for(
                             "reaction_add",
-                            check=lambda reaction_, user_: all(
-                                [
-                                    user_ == self.ctx.author,
-                                    str(reaction_.emoji) in ["◀️", "▶️", "🗑️"],
-                                    reaction_.message == self.message,
-                                ]
-                            ),
+                            check=
+                                lambda reaction_, user_: Sudo.pageTurnCheck(
+                                    reaction_, 
+                                    user_, 
+                                    self.message, 
+                                    self.bot, 
+                                    self.ctx, 
+                                    self.serverSettings),
                             timeout=60,
                         )
                         await self.message.remove_reaction(reaction, user)
@@ -303,13 +301,14 @@ class GoogleSearch:
                     await self.message.add_reaction("🗑️")
                     reaction, user = await self.bot.wait_for(
                         "reaction_add",
-                        check=lambda reaction_, user_: all(
-                            [
-                                user_ == self.ctx.author,
-                                reaction_.message == self.message,
-                                str(reaction_.emoji) == "🗑️",
-                            ]
-                        ),
+                        check=
+                            lambda reaction_, user_: Sudo.pageTurnCheck(
+                                reaction_, 
+                                user_, 
+                                self.message, 
+                                self.bot, 
+                                self.ctx, 
+                                self.serverSettings),
                         timeout=60,
                     )
                     if str(reaction.emoji) == "🗑️":
@@ -379,12 +378,14 @@ class GoogleSearch:
                 await self.message.add_reaction("🔍")
                 reaction, _ = await self.bot.wait_for(
                     "reaction_add",
-                    check=lambda reaction_, user_: all(
-                        [
-                            user_ == self.ctx.author,
-                            str(reaction_.emoji) in ["🔍", "🗑️"],
-                        ]
-                    ),
+                    check=
+                        lambda reaction_, user_: Sudo.pageTurnCheck(
+                            reaction_, 
+                            user_, 
+                            self.message, 
+                            self.bot, 
+                            self.ctx, 
+                            self.serverSettings),
                     timeout=60,
                 )
 
@@ -516,13 +517,14 @@ class GoogleSearch:
                     )
                     reaction, user = await self.bot.wait_for(
                         "reaction_add",
-                        check=lambda reaction_, user_: all(
-                            [
-                                user_ == self.ctx.author,
-                                str(reaction_.emoji) in ["◀️", "▶️", "🗑️", "🔍"],
-                                reaction_.message == self.message,
-                            ]
-                        ),
+                        check=
+                            lambda reaction_, user_: Sudo.pageTurnCheck(
+                                reaction_, 
+                                user_, 
+                                self.message, 
+                                self.bot, 
+                                self.ctx, 
+                                self.serverSettings),
                         timeout=60,
                     )
                     await self.message.remove_reaction(reaction, user)

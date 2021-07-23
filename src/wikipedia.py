@@ -6,7 +6,7 @@ import wikipedia as Wikipedia
 from discord.ext import commands
 
 from src.loadingmessage import get_loading_message
-from src.utils import error_handler
+from src.utils import error_handler, Sudo
 
 
 class WikipediaSearch:
@@ -14,16 +14,20 @@ class WikipediaSearch:
         self,
         bot: commands.Bot,
         ctx: commands.Context,
+        server_settings: dict,
+        user_settings: dict,
         message: discord.Message,
-        args: tuple,
-        query: Optional[str] = None,
-        **kwargs
+        args: list,
+        query: str
     ):
         self.bot = bot
         self.ctx = ctx
+        self.serverSettings = server_settings
+        self.userSettings = user_settings
         self.message = message
         self.args = args
         self.query = query
+        return
 
     async def __call__(self):
         UserCancel = KeyboardInterrupt
@@ -71,13 +75,14 @@ class WikipediaSearch:
                         emojitask = asyncio.create_task(
                             self.bot.wait_for(
                                 "reaction_add",
-                                check=lambda reaction_, user_: all(
-                                    [
-                                        user_ == self.ctx.author,
-                                        str(reaction_.emoji) in ["◀️", "▶️", "🗑️"],
-                                        reaction_.message == self.message,
-                                    ]
-                                ),
+                                check=
+                                    lambda reaction_, user_: Sudo.pageTurnCheck(
+                                        reaction_, 
+                                        user_, 
+                                        self.message, 
+                                        self.bot, 
+                                        self.ctx, 
+                                        self.serverSettings),
                                 timeout=60,
                             )
                         )
@@ -140,13 +145,14 @@ class WikipediaSearch:
                                     await self.message.add_reaction("🗑️")
                                     await self.bot.wait_for(
                                         "reaction_add",
-                                        check=lambda reaction_, user_: all(
-                                            [
-                                                user_ == self.ctx.author,
-                                                str(reaction_.emoji) == "🗑️",
-                                                reaction_.message == self.message,
-                                            ]
-                                        ),
+                                        check=
+                                            lambda reaction_, user_: Sudo.pageTurnCheck(
+                                                reaction_, 
+                                                user_, 
+                                                self.message, 
+                                                self.bot, 
+                                                self.ctx, 
+                                                self.serverSettings),
                                         timeout=60,
                                     )
                                     return

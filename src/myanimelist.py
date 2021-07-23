@@ -6,21 +6,27 @@ from discord.ext import commands
 from discord.ext.commands import bot, context
 from mal import AnimeSearch
 
-from src.utils import Log, error_handler
+from src.utils import Log, error_handler, Sudo
 
 class MyAnimeListSearch:
     def __init__(
         self,
         bot: commands.Bot,
         ctx: commands.Context,
-        message: discord.message,
-        query: str,
-        **kwargs
+        server_settings: dict,
+        user_settings: dict,
+        message: discord.Message,
+        args: list,
+        query: str
     ):
         self.bot = bot
         self.ctx = ctx
+        self.serverSettings = server_settings
+        self.userSettings = user_settings
         self.message = message
+        self.args = args
         self.query = query
+        return
     
     async def __call__(self):
 
@@ -67,13 +73,14 @@ class MyAnimeListSearch:
                         emojitask = asyncio.create_task(
                             self.bot.wait_for(
                                 "reaction_add",
-                                check=lambda reaction_, user_: all(
-                                    [
-                                        user_ == self.ctx.author,
-                                        str(reaction_.emoji) in ["◀️", "▶️", "🗑️"],
-                                        reaction_.message == self.message,
-                                    ]
-                                ),
+                                check=
+                                    lambda reaction_, user_: Sudo.pageTurnCheck(
+                                        reaction_, 
+                                        user_, 
+                                        self.message, 
+                                        self.bot, 
+                                        self.ctx, 
+                                        self.serverSettings),
                                 timeout=60,
                             )
                         )
@@ -145,12 +152,14 @@ class MyAnimeListSearch:
                                 await self.message.add_reaction("🗑️")
                                 reaction, user = await self.bot.wait_for(
                                     "reaction_add",
-                                    check=lambda reaction_, user_: all(
-                                        [
-                                            user_ == self.ctx.author,
-                                            str(reaction_.emoji) == "🗑️",
-                                        ]
-                                    ),
+                                    check=
+                                        lambda reaction_, user_: Sudo.pageTurnCheck(
+                                            reaction_, 
+                                            user_, 
+                                            self.message, 
+                                            self.bot, 
+                                            self.ctx, 
+                                            self.serverSettings),
                                     timeout=60,
                                 )
                                 if str(reaction.emoji) == "🗑️":
