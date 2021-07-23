@@ -10,68 +10,93 @@ pip install -r requirements.txt
 
 Obtain Discord bot credentials and place in a .env file in the same directory as main.py 
 
-`DISCORD_TOKEN = [copy paste token]`
+`DISCORD_TOKEN = [YOUR TOKEN]`
 
 Run main.py
 
 
 ## To develop:
 
-  All search modules are imported from ./src
+  The bot uses a modularised system were individual search modules are hooked up to main.py.
+  Each module consists of a class named [Search Engine]Search, with a constructor:
+  ```
+  def __init__(
+      self,
+      bot: commands.Bot,
+      ctx: commands.Context,
+      server_settings: dict,
+      user_settings: dict,
+      message: discord.Message,
+      args: list,
+      query: str
+  ):
+      self.bot = bot
+      self.ctx = ctx
+      self.serverSettings = server_settings
+      self.userSettings = user_settings
+      self.message = message
+      self.args = args
+      self.query = query
+      return
+  ```
+  and an async `__call__` method.
   
-  The modules each have the ability to send messages using discord.py.
-     
-   Example:
-
-   https://github.com/ACEslava/wikipediasearch/blob/b6f1e54c185c3191a1496c817c27f5b59868dca9/src/wikipedia.py#L1-L17
-
-  * Each module is required to be hooked up to the logging system
-    * This can be done via:
-    ```
-    Log.appendToLog(ctx=discord.ext.commands.Context, command=str, args=str OR list)
-    ```
-  * The required instance attributes are:
+  Modules are self sufficient, handling all search engine API calls and results displays.
+  Before the module is called, a `discord.Message` instance is created, containing a loading animation. All attempts should be made to contain search results to that one message instance.
+  After the search concludes and there is an associated single URL with the search (i.e. a Google search page or website URL), the result is logged as follows:
   ```
-    bot=discord.ext.commands.Bot
-    ctx=discord.ext.commands.Context
-    searchQuery=str
+  from src.utils import Log
+  Log.append_to_log(self.ctx, f"{self.ctx.command} result", [url variable])
   ```
-  * Optional instance attributes are:
+  
+  All modules display their results in a `discord.Embed`, with the title linking to the relevant url and the discription displaying a brief summary of the results.
+  Any additional information is displayed in embed fields.
+  The footer always contains "Requested by: [Discord User and Discriminator]"
+  The embeds are immediately followed by a 🗑️ reaction to allow the user to delete their search results.
+  
+  If any `Exception`s occur outside of the normal ones (`asyncio.TimeoutError`, etc), they are sent to a handler as follows:
   ```
-    searchSettings=dict
-    userSettings=dict
+  from src.utils import error_handler
+  except Exception as e:
+    await error_handler(self.bot, self.ctx, e, self.query)
+    return
   ```
-
-  * The serverSettings.yaml (and by extension searchSettings dict) are structured as follows:
+  
+  Single-option modules, such as youtube.py, immediately display the results to the user, and are limited to a maximum of 10 results. Each result is contained within a separate embed and all results are precached as a list before results are sent to the user. The user is allowed to navigate between results using ◀️ and ▶️ reactions.
+  Multi-option modules, such as wikipedia.py, display a multipage listing of all the results to the user to choose from. This listing is organised into a newline-separated string of `[index number]: [result name]`. Users reply to the result with their chosen index number and the listing is replaced with further information on the result of their choice.
+  
+  Both servers and users have settings that must be saved in between bot run instances. These settings are in the form of `dict`s and are saved to `.yaml` files whenever their are changed and every hour.
+  
+  The server `dict` is structured as follows:
   ```
-    guildID=int:
+    serverSettings = {
+      guildID=str: { #hex code of  the guildID
         adminrole: roleID=int OR null,
         blacklist: [userID=int],
         sudoer: [userID=int],
         safesearch: bool,
         commandprefix: char,
-        searchEngines:
-          google: bool,
-          image: bool,
-          mal: bool,
-          pornhub: bool,
-          s: bool,
-          scholar: bool
-          wiki: bool
-          wikilang: bool
-          xkcd: bool
-          youtube: bool
+        searchEngines: {
+          #search engine modules: bool
+        }
+      }
+    }
   ```
-  * The userSettings.yaml (and by extension userSettings dict) are structured as follows:
+  The user `dict` is structured as follows:
   ```
-    userID=int:
-      downloadquota:
-        dailyDownload: float
-        lifetimeDownload: float
-        updateTime: ISO-8601 datetime str
-      level:
-        rank: int
-        xp: int
-      locale: str OR null
-      searchAlias: str OR null
+    userSettings = {
+      userID=int: {
+        downloadquota: {
+            dailyDownload: float
+            lifetimeDownload: float
+            updateTime: ISO-8601 datetime str
+          }
+        level: {
+          rank: int
+          xp: int
+        }
+        locale: str OR null
+        searchAlias: str OR null
+      }
+    }
   ```
