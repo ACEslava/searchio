@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, date
 
 import asyncio
-import copy
 import csv
 import difflib
 from typing import Optional, Union, Tuple
@@ -36,7 +35,6 @@ class Sudo:
     @staticmethod
     def server_settings_check(server_settings: dict, server_id: int, bot: commands.Bot) -> dict:
 
-        oldserver_setting = copy.deepcopy(server_settings)
         command_list = [
             command.name for command in dict(bot.cogs)["Search Engines"].get_commands()
         ]
@@ -74,15 +72,10 @@ class Sudo:
         for keys in delete_queue:
             del server_settings[server_id]["searchEngines"][keys]
 
-        if oldserver_setting != server_settings:
-            with open("serverSettings.yaml", "w") as data:
-                yaml.dump(server_settings, data, allow_unicode=True)
-
         return server_settings
 
     @staticmethod
     def user_settings_check(user_settings: dict, user_id: int) -> dict:
-        olduser_setting = copy.deepcopy(user_settings)
         if user_id not in user_settings.keys():
             user_settings[user_id] = {}
 
@@ -99,7 +92,8 @@ class Sudo:
             }
         if "searchAlias" not in keys:
             user_settings[user_id]["searchAlias"] = None
-
+        if "level" not in keys:
+            user_settings[user_id]["level"] = {"rank":1, "xp":0}
         if datetime.utcnow() - datetime.fromisoformat(
             user_settings[user_id]["downloadquota"]["updateTime"]
         ) > timedelta(hours=24):
@@ -111,10 +105,6 @@ class Sudo:
                 user_settings[user_id]["downloadquota"]["dailyDownload"] -= 50
             else:
                 user_settings[user_id]["downloadquota"]["dailyDownload"] = 0
-
-        if olduser_setting != user_settings:
-            with open("userSettings.yaml", "w") as data:
-                yaml.dump(user_settings, data, allow_unicode=True)
 
         return user_settings
 
@@ -297,10 +287,6 @@ class Sudo:
 
     async def sudo(self, args):
         try:
-            # deepcopies to check if settings have changed
-            old_server_settings = copy.deepcopy(self.server_settings)
-            old_user_settings = copy.deepcopy(self.user_settings)
-
             if args:
                 command = args.pop(0)
                 if command == "echo":
@@ -365,16 +351,6 @@ class Sudo:
             args = args if len(args) > 0 else None
             await error_handler(self.bot, self.ctx, e, args)
         finally:
-            # only saves serverSettings if it has changed
-            if old_server_settings != self.server_settings:
-                with open("serverSettings.yaml", "w") as data:
-                    yaml.dump(self.server_settings, data, allow_unicode=True)
-
-            # only saves userSettings if it has changed
-            if old_user_settings != self.user_settings:
-                with open("userSettings.yaml", "w") as data:
-                    yaml.dump(self.user_settings, data, allow_unicode=True)
-
             return self.server_settings, self.user_settings
 
     async def config(self, args: list) -> Tuple[dict, dict]:
@@ -386,16 +362,24 @@ class Sudo:
             # region config menu
             if not args:
                 try:
-                    embed = discord.Embed(title="Configuration")
+                    embed = discord.Embed(title=f"{self.ctx.author} Configuration")
+                    embed.add_field(
+                        name="User Statistics",
+                        value=f"""
+                        `              Level:` {self.user_settings[self.ctx.author.id]['level']['rank']}
+                        `                 XP:` {self.user_settings[self.ctx.author.id]['level']['xp']}/{self.user_settings[self.ctx.author.id]['level']['rank']*10}
+                        `           Searches:` {self.user_settings[self.ctx.author.id]['level']['rank']*10+self.user_settings[self.ctx.author.id]['level']['xp']}
+                        `   Daily Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
+                        `Lifetime Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""",
+                        inline=False,
+                    )
 
                     embed.add_field(
                         name="User Configuration",
                         value=f"""
                         `             Locale:` {self.user_settings[self.ctx.author.id]['locale'] if self.user_settings[self.ctx.author.id]['locale'] is not None else 'None Set'}
-                        `              Alias:` {self.user_settings[self.ctx.author.id]['searchAlias'] if self.user_settings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}
-                        `   Daily Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
-                        `Lifetime Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB""",
-                        inline=False,
+                        `              Alias:` {self.user_settings[self.ctx.author.id]['searchAlias'] if self.user_settings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}""",
+                        inline=False
                     )
 
                     embed.add_field(
@@ -424,6 +408,8 @@ class Sudo:
                     embed.set_footer(
                         text=f"Do {self.print_prefix(self.server_settings)}config [setting] to change a specific setting"
                     )
+
+                    embed.set_thumbnail(url=self.ctx.author.avatar_url)
                     config_message = await self.ctx.send(embed=embed)
 
                     await config_message.add_reaction("🗑️")
@@ -1053,11 +1039,6 @@ class Sudo:
             return self.server_settings, self.user_settings
         finally:
             if args:
-                with open("serverSettings.yaml", "w") as data:
-                    yaml.dump(self.server_settings, data, allow_unicode=True)
-
-                with open("userSettings.yaml", "w") as data:
-                    yaml.dump(self.user_settings, data, allow_unicode=True)
                 Log.append_to_log(self.ctx, "config", args)
             return self.server_settings, self.user_settings
 

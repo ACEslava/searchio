@@ -16,14 +16,16 @@ from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta
 from requests import get
-from time import sleep
+from time import sleep, time
+from copy import deepcopy
 
 import discord
 import asyncio
 import re
+import random
 
 def main():
-    global serverSettings, userSettings
+    global serverSettings, userSettings, bot
     #region onlaunch code
     intents = discord.Intents.all()
 
@@ -55,8 +57,9 @@ def main():
 
     @bot.event
     async def on_guild_join(guild):
-        #Reads settings of server
+        #Creates new settings entry for guild
         Sudo.server_settings_check(serverSettings, hex(guild.id), bot)
+        await autosaveConfigs()
 
         owner = await bot.fetch_user(guild.owner_id)
         dm = await owner.create_dm()
@@ -101,6 +104,7 @@ def main():
 
         for servers in bot.guilds:
             serverSettings = Sudo.server_settings_check(serverSettings, hex(servers.id), bot)
+            await autosaveConfigs()
 
         with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
             lines = [dict(row) for row in DictReader(file) if datetime.utcnow()-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
@@ -118,7 +122,11 @@ def main():
     @bot.event
     async def on_command_error(ctx, error):
         if isinstance(error, commands.errors.CommandNotFound):
-            await ctx.send(f"Command not found. Do {Sudo.print_prefix(serverSettings, ctx)}help for available commands")
+            await ctx.send(embed=
+                discord.Embed(
+                    description=f"Command not found. Do {Sudo.print_prefix(serverSettings, ctx)}help for available commands"
+                )
+            )
 
     @bot.command()
     async def help(ctx, *args):
@@ -183,13 +191,10 @@ def main():
             await error_handler(bot, ctx, e)
         finally: return
 
-    load_dotenv()
-    DISCORD_TOKEN = getenv("DISCORD_TOKEN")
-
     bot.add_cog(SearchEngines(bot))
     bot.add_cog(Administration(bot))
-
-    bot.run(DISCORD_TOKEN)
+    
+    return
 
 # region utility functions
 def prefix(bot, message):   # handler for individual guild prefixes
@@ -227,6 +232,25 @@ async def searchQueryParse(ctx, args, bot):  #handler for bot search queries
     
     userquery = userquery[0]
     return userquery, flags
+
+async def asyncTiming(interval, periodic_function): #handler for timed functions
+    while True:
+        print(round(time() - start_time, 1), "Starting periodic function")
+        await asyncio.gather(
+            asyncio.sleep(interval),
+            periodic_function(),
+        )
+
+async def autosaveConfigs():
+    global userSettings, serverSettings
+    with open("serverSettings.yaml", "w") as data:
+        dump(serverSettings, data, allow_unicode=True)
+    print('Server settings saved')
+
+    with open("userSettings.yaml", "w") as data:
+        dump(userSettings, data, allow_unicode=True)
+    print('User settings saved')
+    return
 #endregion
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
@@ -234,7 +258,23 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     
     async def cog_before_invoke(self, ctx):
         global userSettings
+        old_userSettings = deepcopy(userSettings)
         userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
+        if old_userSettings != userSettings:
+            await autosaveConfigs()
+
+        #Leveling system
+        userSettings[ctx.author.id]['level']['xp'] += 1
+        if userSettings[ctx.author.id]['level']['xp'] >= userSettings[ctx.author.id]['level']['rank']*10:
+            userSettings[ctx.author.id]['level']['xp'] = 0
+            userSettings[ctx.author.id]['level']['rank'] += 1
+            
+            await ctx.send(
+                embed=discord.Embed(
+                    description=f"Congratulations {ctx.author}, you are now level {userSettings[ctx.author.id]['level']['rank']}"
+                )
+            )
+
         if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
             Log.append_to_log(ctx, userSettings[ctx.author.id]['searchAlias'])
         elif ctx.command.name == 's':
@@ -639,20 +679,20 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ['🔍', '🗑️'], reaction.message == message]), timeout=60)
                 
                 if str(reaction.emoji) == '🗑️':
-                    await message.delete()   
+                    await message.delete() 
+                    return  
                 elif str(reaction.emoji) == '🔍':  
                     await getattr(Administration, 'config').__call__(self, ctx, ('alias'))
                     await message.delete()      
 
-            try:
-                await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
-            except AttributeError:
-                embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
-                message = ctx.send(embed=embed)
-                await message.add_reaction('🗑️')
-                reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
-                if str(reaction.emoji) == '🗑️':
-                    await message.delete()
+            await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
+        except AttributeError:
+            embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
+            message = ctx.send(embed=embed)
+            await message.add_reaction('🗑️')
+            reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+            if str(reaction.emoji) == '🗑️':
+                await message.delete()
         except TimeoutError as e: 
                     await message.clear_reactions()
         except Exception as e:
@@ -666,6 +706,7 @@ class Administration(commands.Cog, name="Administration"):
     async def cog_before_invoke(self, ctx):
         global userSettings
         userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
+        await autosaveConfigs()
         return
     
     @commands.command(
@@ -704,7 +745,9 @@ class Administration(commands.Cog, name="Administration"):
         if Sudo.is_sudoer(self.bot, ctx, serverSettings):
             Log.append_to_log(ctx, None, args)
             command = Sudo(self.bot, ctx, serverSettings, userSettings)
+            
             serverSettings, userSettings = await command.sudo(list(args))
+            await autosaveConfigs()
         else:
             await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
             Log.append_to_log(ctx, None, 'unauthorised')
@@ -744,6 +787,7 @@ class Administration(commands.Cog, name="Administration"):
             serverSettings, userSettings = await command.config(args)
         
         else: serverSettings, userSettings = await command.config([])
+        await autosaveConfigs()
         Log.append_to_log(ctx)
 
     @commands.command(
@@ -783,7 +827,16 @@ class Administration(commands.Cog, name="Administration"):
 
 while 1:
     try:
+        #bot starting code
         main()
+        load_dotenv()
+        asyncio.ensure_future(bot.start(getenv("DISCORD_TOKEN")))
+
+        #autosave configs
+        asyncio.ensure_future(asyncTiming(3600, autosaveConfigs))
+
+        start_time = time()
+        asyncio.get_event_loop().run_forever()
     except Exception as e:
         sleep(30)
         continue
