@@ -63,13 +63,14 @@ Run main.py
   ```
   
   Single-option modules, such as youtube.py, immediately display the results to the user, and are limited to a maximum of 10 results. Each result is contained within a separate embed and all results are precached as a list before results are sent to the user. The user is allowed to navigate between results using ◀️ and ▶️ reactions.
+  
   Multi-option modules, such as wikipedia.py, display a multipage listing of all the results to the user to choose from. This listing is organised into a newline-separated string of `[index number]: [result name]`. Users reply to the result with their chosen index number and the listing is replaced with further information on the result of their choice.
   
   Both servers and users have settings that must be saved in between bot run instances. These settings are in the form of `dict`s and are saved to `.yaml` files whenever their are changed and every hour.
   
   The server `dict` is structured as follows:
   ```
-    serverSettings = {
+    self.serverSettings = {
       guildID=str: { #hex code of  the guildID
         adminrole: roleID=int OR null,
         blacklist: [userID=int],
@@ -84,7 +85,7 @@ Run main.py
   ```
   The user `dict` is structured as follows:
   ```
-    userSettings = {
+    self.userSettings = {
       userID=int: {
         downloadquota: {
             dailyDownload: float
