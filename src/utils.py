@@ -3,6 +3,7 @@ import asyncio
 import csv
 import difflib
 from typing import List, Optional, Union, Tuple
+from yaml import load, dump, FullLoader
 
 import discord
 import os
@@ -10,7 +11,6 @@ import random
 import re
 import traceback
 from discord.errors import HTTPException
-import yaml
 from discord.ext import commands
 
 from src.loadingmessage import get_loading_message
@@ -111,7 +111,7 @@ class Sudo:
     def is_sudoer(bot: commands.Bot, ctx: commands.Context, server_settings: dict = None) -> bool:
         if server_settings is None:
             with open("serverSettings.yaml", "r") as data:
-                server_settings = yaml.load(data, yaml.FullLoader)
+                server_settings = load(data, FullLoader)
 
         # Checks if sudoer is owner
         is_owner = ctx.author.id == bot.owner_id
@@ -156,10 +156,10 @@ class Sudo:
         return any([check, Sudo.is_sudoer(bot, ctx, server_settings)])
 
     @staticmethod
-    def pageTurnCheck(reaction, user, message, bot, ctx, server_settings):
+    def pageTurnCheck(reaction, user, message, bot, ctx, server_settings, valid_emojis=["◀️", "▶️", "🗑️"]):
         if server_settings is None:
             with open("serverSettings.yaml", "r") as data:
-                server_settings = yaml.load(data, yaml.FullLoader)
+                server_settings = load(data, FullLoader)
 
         # Checks if sudoer is owner
         is_owner = user.id == bot.owner_id
@@ -185,7 +185,7 @@ class Sudo:
                         user == ctx.author or 
                         any([is_owner, is_server_owner, has_admin, is_sudoer])
                     ),
-                    str(reaction.emoji) in ["◀️", "▶️", "🗑️"],
+                    str(reaction.emoji) in valid_emojis,
                     reaction.message == message,
                 ]
             )
@@ -1206,7 +1206,7 @@ class Log:
                 writer.writerows(log_list)
 
             with open(f"./src/cache/{ctx.author}_userSettings.yaml", "w") as file:
-                yaml.dump(user_settings[ctx.author.id], file, allow_unicode=True)
+                dump(user_settings[ctx.author.id], file, allow_unicode=True)
 
             # if bot owner
             if await bot.is_owner(ctx.author):
@@ -1344,6 +1344,18 @@ async def error_handler(
     except TimeoutError:
         await err_form.delete()
     finally:
+        #Error log in Discord server
+        #changes alias to command used
+        with open('userSettings.yaml', 'r') as data:
+            userSettings = load(data, FullLoader)
+
+        if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
+            command = userSettings[ctx.author.id]['searchAlias']
+        elif ctx.command.name == 's':
+            command = 'alias unset'
+        else:
+            command = ctx.command
+
         # generates an error report for the tracker
         string = "\n".join(
             [
@@ -1351,7 +1363,7 @@ async def error_handler(
                 f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
                 f"In Channel: {str(ctx.channel)} ({ctx.channel.id})",
                 f"By User: {str(ctx.author)}({ctx.author.id})",
-                f"Command: {ctx.command}",
+                f"Command: {command}",
                 f"Args: {args if len(args) != 0 else 'None'}",
                 f"{f'User Feedback: {response}' if response is not None else ''}",
                 "\n" f"{error_out}```",

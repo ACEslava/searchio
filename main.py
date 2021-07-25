@@ -55,6 +55,9 @@ def main():
         if userSettings is None: userSettings = {}
     #endregion
 
+    bot.add_cog(SearchEngines(bot))
+    bot.add_cog(Administration(bot))
+
     @bot.event
     async def on_guild_join(guild):
         #Creates new settings entry for guild
@@ -141,6 +144,13 @@ def main():
                 )
             )
 
+        elif isinstance(error, commands.CommandOnCooldown):
+            await ctx.send(embed=
+                discord.Embed(
+                    description=f"Command currently ratelimited. Please try again in {error.retry_after}s."
+                )
+            )
+
     @bot.command()
     async def help(ctx, *args):
         try:
@@ -204,9 +214,6 @@ def main():
             await error_handler(bot, ctx, e)
         finally: return
 
-    bot.add_cog(SearchEngines(bot))
-    bot.add_cog(Administration(bot))
-    
     return
 
 # region utility functions
@@ -334,19 +341,19 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             userSettings[ctx.author.id]['level']['rank'] += 1
             
             await autosaveConfigs()
-            
+
             await ctx.send(
                 embed=discord.Embed(
                     description=f"Congratulations {ctx.author}, you are now level {userSettings[ctx.author.id]['level']['rank']}"
                 )
             )
 
-        if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
-            Log.append_to_log(ctx, userSettings[ctx.author.id]['searchAlias'])
-        elif ctx.command.name == 's':
-            Log.append_to_log(ctx, 's', 'Not set')
-        else:
-            Log.append_to_log(ctx)
+        # if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
+        #     Log.append_to_log(ctx, userSettings[ctx.author.id]['searchAlias'])
+        # elif ctx.command.name == 's':
+        #     Log.append_to_log(ctx, 's', 'Not set')
+        # else:
+        Log.append_to_log(ctx)
         return
     
     @commands.command(
@@ -369,7 +376,18 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             "\n     Defaults to output English OR user locale if set, unless explicitly specified with 'to [language]'",
             "\n     Example Query: translate مرحبا from arabic to spanish",
             "\n\nimage: Searches only for image results.",
-            "\n\ndefine: Queries dictionaryapi.dev for an English definition of the word"]))
+            "\n\ndefine: Queries dictionaryapi.dev for an English definition of the word",
+            "\n\nweather: Queries openweathermap for weather information at the specified location"]),
+        aliases=[
+            'g',
+            'googel',
+            'googlr',
+            'googl',
+            'gogle',
+            'gogl',
+            'foogle'
+        ])
+    @commands.cooldown(1, 3, commands.BucketType.default)
     async def google(self, ctx, *args):
         global serverSettings, userSettings
 
@@ -414,6 +432,9 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     
                     elif bool(re.search('define', userquery.lower())):
                         search = create_task(searchClass.define())
+
+                    elif bool(re.search('weather', userquery.lower())):
+                        search = create_task(searchClass.weather())
                     
                     else: search = create_task(searchClass.search())
                     
@@ -424,7 +445,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
                         if type(messageEdit.exception()) == TimeoutError:
                             raise TimeoutError
-                        await message.delete()
+                        await searchClass.message.delete()
                         messageEdit.cancel()
                         search.cancel()
 
@@ -501,34 +522,41 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         usage='s [query]',
         help='A user-settable shortcut for any search function')
     async def s(self, ctx, *args):
-        try:
-            if userSettings[ctx.author.id]['searchAlias'] is None:
-                embed = discord.Embed(description=f'Your shortcut is not set. React with 🔍 to set it now')
-                message = await ctx.send(embed=embed)
-                await message.add_reaction('🗑️')
-                await message.add_reaction('🔍')
-                reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ['🔍', '🗑️'], reaction.message == message]), timeout=60)
+        await ctx.send(embed=
+            discord.Embed(
+                description="""The alias system is now deprecated due to interference with other features.
+                As an alternative, &google can now be accessed with &g. Sorry for the inconvenience."""
+            )
+        )
+        return
+        # try:
+        #     if userSettings[ctx.author.id]['searchAlias'] is None:
+        #         embed = discord.Embed(description=f'Your shortcut is not set. React with 🔍 to set it now')
+        #         message = await ctx.send(embed=embed)
+        #         await message.add_reaction('🗑️')
+        #         await message.add_reaction('🔍')
+        #         reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ['🔍', '🗑️'], reaction.message == message]), timeout=60)
                 
-                if str(reaction.emoji) == '🗑️':
-                    await message.delete() 
-                    return  
-                elif str(reaction.emoji) == '🔍':  
-                    await getattr(Administration, 'config').__call__(self, ctx, ('alias'))
-                    await message.delete()      
+        #         if str(reaction.emoji) == '🗑️':
+        #             await message.delete() 
+        #             return  
+        #         elif str(reaction.emoji) == '🔍':  
+        #             await getattr(Administration, 'config').__call__(self, ctx, ('alias'))
+        #             await message.delete()      
 
-            await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
-        except AttributeError:
-            embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
-            message = ctx.send(embed=embed)
-            await message.add_reaction('🗑️')
-            reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
-            if str(reaction.emoji) == '🗑️':
-                await message.delete()
-        except TimeoutError as e: 
-                    await message.clear_reactions()
-        except Exception as e:
-            await error_handler(self.bot, ctx, e, args)
-        finally: return
+        #     await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
+        # except AttributeError:
+        #     embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
+        #     message = ctx.send(embed=embed)
+        #     await message.add_reaction('🗑️')
+        #     reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
+        #     if str(reaction.emoji) == '🗑️':
+        #         await message.delete()
+        # except TimeoutError as e: 
+        #             await message.clear_reactions()
+        # except Exception as e:
+        #     await error_handler(self.bot, ctx, e, args)
+        # finally: return
 
 class Administration(commands.Cog, name="Administration"):
     def __init__(self, bot):

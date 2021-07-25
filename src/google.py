@@ -3,17 +3,25 @@ from base64 import standard_b64encode
 from re import findall, sub, search
 from string import ascii_uppercase, ascii_lowercase, digits
 from typing import List
-
-import discord
 from bs4 import BeautifulSoup
 from discord import Embed
 from discord.ext import commands
 from iso639 import languages
 from langid import classify as detect
 from translate import Translator
-from requests import get
 from src.utils import Log, error_handler, Sudo
 from src.loadingmessage import get_loading_message
+from PIL import Image, ImageFont, ImageDraw
+from yaml import load, FullLoader
+from datetime import datetime, timezone, timedelta
+from dotenv import load_dotenv
+from os import getenv
+
+import discord
+import aiohttp
+import aiofiles
+import os
+import io
 
 
 class GoogleSearch:
@@ -178,8 +186,9 @@ class GoogleSearch:
             )
 
             # gets the webscraped html of the google search
-            data = get(url)
-            soup, index = BeautifulSoup(data.text, features="lxml"), 3
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, headers={'User-Agent':'python-requests/2.25.1'}) as data:
+                    soup, index = BeautifulSoup(await data.text(), features="lxml"), 3
 
             # Debug HTML output
             # with open('test.html', 'w', encoding='utf-8-sig') as file:
@@ -385,7 +394,8 @@ class GoogleSearch:
                             self.message, 
                             self.bot, 
                             self.ctx, 
-                            self.serverSettings),
+                            self.serverSettings,
+                            ["◀️", "▶️", "🗑️", "🔍"]),
                     timeout=60,
                 )
 
@@ -413,7 +423,7 @@ class GoogleSearch:
         except KeyError:
             await self.message.clear_reactions()
             await self.message.edit(
-                content=f"{get_loading_message()} <a:loading:829119343580545074>",
+                content=f"{get_loading_message()}",
                 embed=None,
             )
             await self.search()
@@ -425,7 +435,7 @@ class GoogleSearch:
             await self.message.delete()
             await error_handler(self.bot, self.ctx, e, self.search_query)
             await self.message.edit(
-                content=f"{get_loading_message()} <a:loading:829119343580545074>",
+                content=f"{get_loading_message()}",
                 embed=None,
             )
             await self.search()
@@ -481,11 +491,13 @@ class GoogleSearch:
 
             if len(query) > 1:
                 # queries dictionary API
-                response = get(
-                    f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}'
-                )
-                response = response.json()[0]
-
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}'
+                    ) as data:
+                        
+                        response = await data.json()
+                response = response[0]
                 # creates embed
                 embeds = [
                     item
@@ -518,13 +530,14 @@ class GoogleSearch:
                     reaction, user = await self.bot.wait_for(
                         "reaction_add",
                         check=
-                            lambda reaction_, user_: Sudo.pageTurnCheck(
-                                reaction_, 
-                                user_, 
-                                self.message, 
-                                self.bot, 
-                                self.ctx, 
-                                self.serverSettings),
+                        lambda reaction_, user_: Sudo.pageTurnCheck(
+                            reaction_, 
+                            user_, 
+                            self.message, 
+                            self.bot, 
+                            self.ctx, 
+                            self.serverSettings,
+                            ["◀️", "▶️", "🗑️", "🔍"]),
                         timeout=60,
                     )
                     await self.message.remove_reaction(reaction, user)
@@ -541,7 +554,7 @@ class GoogleSearch:
                     elif str(reaction.emoji) == "🔍":
                         await self.message.clear_reactions()
                         await self.message.edit(
-                            content=f"{get_loading_message()} <a:loading:829119343580545074>",
+                            content=f"{get_loading_message()}",
                             embed=None,
                         )
                         await self.search()
@@ -549,7 +562,7 @@ class GoogleSearch:
 
             else:
                 await self.message.edit(
-                    content=f"{get_loading_message()} <a:loading:829119343580545074>",
+                    content=f"{get_loading_message()}",
                     embed=None,
                 )
                 await self.search()
@@ -559,7 +572,7 @@ class GoogleSearch:
 
         except KeyError:
             await self.message.edit(
-                content=f"{get_loading_message()} <a:loading:829119343580545074>",
+                content=f"{get_loading_message()}",
                 embed=None,
             )
             await self.search()
@@ -568,7 +581,282 @@ class GoogleSearch:
             await self.message.delete()
             await error_handler(self.bot, self.ctx, e, self.search_query)
             await self.message.edit(
-                content=f"{get_loading_message()} <a:loading:829119343580545074>",
+                content=f"{get_loading_message()}",
+                embed=None,
+            )
+            await self.search()
+
+        finally:
+            return
+
+    async def weather(self) -> None:
+        try:
+            load_dotenv()
+            query = self.search_query.lower().split(" ")
+
+            if len(query) <= 1:
+                await self.search()
+                return
+
+            del query[0]
+            OPENWEATHERMAP_TOKEN = getenv("OPENWEATHERMAP_TOKEN")
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f'https://nominatim.openstreetmap.org/search.php?q={" ".join(query).replace(" ", "+")}&format=jsonv2',
+                    headers={'Accept-Language':'en-US'}
+                ) as data:
+
+                    geocode = await data.json()
+                    geocode = [
+                        g for g in geocode 
+                        if g["type"] =='administrative'
+                    ]
+                    if len(geocode) == 0:
+                        #no results found
+                        return
+
+            coords = (round(float(geocode[0]['lat']), 4), round(float(geocode[0]['lon']), 4))
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    ''.join([
+                        f'https://api.openweathermap.org/data/2.5/onecall?',
+                        f'lat={coords[0]}&lon={coords[1]}',
+                        f'&exclude=minutely&units=metric&appid={OPENWEATHERMAP_TOKEN}'
+                    ])
+                ) as data:
+
+                    json = await data.json()
+
+            #weekdays as integers
+            weekDayCodes = {
+                0:'Monday',
+                1:'Tuesday',
+                2:'Wednesday',
+                3:'Thursday',
+                4:'Friday',
+                5:'Saturday',
+                6:'Sunday'
+            }
+
+            #creating dict with weekday forecast
+            forecast = {
+                weekDayCodes[datetime.fromtimestamp(i['dt']+json['timezone_offset'], timezone.utc).weekday()]:i 
+                for i in json['daily'][1:6]
+            }
+
+            im = Image.new(
+                mode="RGB", 
+                size=(1920,1080),
+                color = (47,47,47)
+            )
+
+            #get necessary images
+            async def getImages(imageList:'list[str]'):
+                async def http_req(session, url):
+                    async with session.get(url) as resp:
+                        if resp.status == 200:
+                            file = await aiofiles.open(
+                                file=f'./src/cache/{url.split("/")[-1]}',
+                                mode='wb'
+                                )
+                            await file.write(await resp.read())
+                            await file.close()
+
+                async with aiohttp.ClientSession() as session:
+                    await gather(
+                        *[
+                            http_req(session, url) 
+                            for url in imageList
+                        ]
+                    )
+
+            iconCodes = [json["current"]["weather"][0]["icon"]]+[w["weather"][0]["icon"] for w in forecast.values()]
+            imageList = set([
+                f'https://openweathermap.org/img/wn/{i}@4x.png' 
+                for i in iconCodes
+                if not os.path.exists(f'./src/cache/{i}@4x.png')
+            ])
+
+            await getImages(imageList)
+
+            #current data
+            todayImage = Image.open(f'./src/cache/{json["current"]["weather"][0]["icon"]}@4x.png')
+            todayImage = todayImage.resize(
+                (int(todayImage.width * 2), int(todayImage.height * 2)),
+                resample=Image.ANTIALIAS
+            )
+
+            im.paste(
+                todayImage, 
+                (740,200), 
+                todayImage
+            )
+            font = ImageFont.truetype("./src/cache/NotoSans-Bold.ttf", 200)
+
+            draw = ImageDraw.Draw(im)
+            #region text formatting
+            draw.text(
+                (450, 470),
+                f'{round(json["current"]["temp"])}°C',
+                (255,255,255),
+                font=font,
+                anchor="ms"
+            )
+
+            font = ImageFont.truetype("./src/cache/NotoSans-Bold.ttf", 48)
+
+            draw.text(
+                (1100, 265),
+                weekDayCodes[datetime.fromtimestamp(json["current"]['dt']+json['timezone_offset'], timezone.utc).weekday()],
+                (255,255,255),
+                font=font
+            )
+
+            draw.text(
+                (1100, 315),
+                f'Precipitation: {json["hourly"][0]["pop"]*100}%',
+                (255,255,255),
+                font=font
+            )
+
+            draw.text(
+                (1100, 365),
+                f'Humidity: {json["current"]["humidity"]}%',
+                (255,255,255),
+                font=font
+            )
+
+            draw.text(
+                (1100, 415),
+                f'Wind: {json["current"]["wind_speed"]}m/s @ {json["current"]["wind_deg"]}°',
+                (255,255,255),
+                font=font
+            )
+
+            draw.text(
+                (1100, 465),
+                json["current"]["weather"][0]["main"],
+                (255,255,255),
+                font=font
+            )
+
+            font = ImageFont.truetype("./src/cache/NotoSans-Bold.ttf", 100)
+            city_name = geocode[0]['display_name'].split(', ')
+            draw.text(
+                (960, 150),
+                ', '.join(city_name[::len(city_name)-1]),
+                (255,255,255),
+                font=font,
+                anchor='ms'
+            )
+            #endregion
+
+            #5 day forecast
+            five_day_forcast = []
+            for icon in iconCodes[1:]:
+                five_day_forcast.append(
+                    Image.open(f'./src/cache/{icon}@4x.png')
+                )
+
+            x = 200
+            for idx, image in enumerate(five_day_forcast):
+                im.paste(
+                    image, 
+                    (x-50,720), 
+                    image
+                )
+
+                font = ImageFont.truetype("./src/cache/NotoSans-Bold.ttf", 48)
+
+                draw.text(
+                    (x+50, 720),
+                    list(forecast.keys())[idx],
+                    (255,255,255),
+                    font=font,
+                    anchor="ms"
+                )
+
+                temp = list(forecast.values())[idx]['temp']
+                draw.text(
+                    (x+50, 980),
+                    f"{round(temp['min'])}/{round(temp['max'])}",
+                    (255,255,255),
+                    font=font,
+                    anchor="ms"
+                )
+
+                x += 344
+            
+
+            with io.BytesIO() as image_binary:
+                im.save(image_binary, 'PNG')
+                image_binary.seek(0)
+
+                await self.message.delete()
+                file = discord.File(fp=image_binary, filename='image.png')
+                embed = discord.Embed()
+                embed.set_image(url="attachment://image.png")
+                embed.set_footer(text=f"Requested by: {str(self.ctx.author)}")
+                
+                self.message = await self.ctx.send(
+                    embed=embed,
+                    file=file
+                )
+
+                await self.message.add_reaction("🗑️")
+                await self.message.add_reaction("🔍")
+
+            reaction, user = await self.bot.wait_for(
+                "reaction_add",
+                check=
+                lambda reaction_, user_: Sudo.pageTurnCheck(
+                    reaction_, 
+                    user_, 
+                    self.message, 
+                    self.bot, 
+                    self.ctx, 
+                    self.serverSettings,
+                    ["🗑️", "🔍"]),
+                timeout=60,
+            )
+            await self.message.remove_reaction(reaction, user)
+
+            if str(reaction.emoji) == "🗑️":
+                await self.message.delete()
+                return
+
+            # gives the user Google results
+            elif str(reaction.emoji) == "🔍":
+                await self.message.clear_reactions()
+                await self.message.edit(
+                    content=f"{get_loading_message()}",
+                    embed=None,
+                    file=None
+                )
+                await self.search()
+
+            else:
+                await self.message.edit(
+                    content=f"{get_loading_message()}",
+                    embed=None,
+                )
+                await self.search()
+
+        except TimeoutError:
+            raise
+
+        except KeyError:
+            await self.message.edit(
+                content=f"{get_loading_message()}",
+                embed=None,
+            )
+            await self.search()
+
+        except Exception as e:
+            await self.message.delete()
+            await error_handler(self.bot, self.ctx, e, self.search_query)
+            await self.message.edit(
+                content=f"{get_loading_message()}",
                 embed=None,
             )
             await self.search()
