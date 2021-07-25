@@ -97,7 +97,7 @@ class YoutubeSearch:
                         check=lambda reaction_, user_: all(
                             [
                                 str(reaction_.emoji) in ["◀️", "▶️", "🗑️", "⬇️"],
-                                reaction_.self.message == self.message,
+                                reaction_.message == self.message,
                                 not user_.self.bot,
                             ]
                         ),

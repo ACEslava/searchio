@@ -147,9 +147,11 @@ def main():
         elif isinstance(error, commands.CommandOnCooldown):
             await ctx.send(embed=
                 discord.Embed(
-                    description=f"Command currently ratelimited. Please try again in {error.retry_after}s."
+                    description=f"Command currently ratelimited. Please try again in {round(error.retry_after)+1}s."
                 )
             )
+
+        return
 
     @bot.command()
     async def help(ctx, *args):
