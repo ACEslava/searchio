@@ -191,8 +191,8 @@ class GoogleSearch:
                     soup, index = BeautifulSoup(await data.text(), features="lxml"), 3
 
             # Debug HTML output
-            # with open('test.html', 'w', encoding='utf-8-sig') as file:
-            #    file.write(soup.prettify())
+            with open('test.html', 'w', encoding='utf-8-sig') as file:
+               file.write(soup.prettify())
 
             # if the search returns results
             if soup.find("div", {"id": "main"}) is not None:
