@@ -10,3 +10,5 @@ userSettings.yaml
 scholar.log
 __pycache__/
 .python-version
+.replit
+.breakpoints
