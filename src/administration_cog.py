@@ -44,7 +44,7 @@ class Administration(commands.Cog, name="Administration"):
                 Args: userName OR userID""")
     async def sudo(self, ctx, *args):
 
-        if Sudo.is_sudoer(self.bot, ctx, self.bot.serverSettings):
+        if Sudo.is_sudoer(self.bot, ctx):
             Log.append_to_log(ctx, None, args)
             command = Sudo(self.bot, ctx)
 
