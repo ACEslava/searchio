@@ -32,7 +32,6 @@ class Sudo:
         server_settings = bot.serverSettings
 
         command_list = dict(bot.cogs)["Search Engines"].get_commands()
-        server_settings_searchengines = server_settings[server_id]["searchEngines"]
 
         if server_id not in server_settings.keys():
             server_settings[server_id] = {}
@@ -52,7 +51,9 @@ class Sudo:
             server_settings_searchengines = {
                 key: True for key in command_list
             }
-
+        else:
+            server_settings_searchengines = server_settings[server_id]["searchEngines"]    
+        
         # adds new search engines
         for searchEngines in command_list:
             if searchEngines.name not in server_settings_searchengines.keys() and searchEngines.enabled is True:
