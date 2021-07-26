@@ -280,8 +280,7 @@ class GoogleSearch:
                                     user_, 
                                     self.message, 
                                     self.bot, 
-                                    self.ctx, 
-                                    self.serverSettings),
+                                    self.ctx),
                             timeout=60,
                         )
                         await self.message.remove_reaction(reaction, user)
@@ -316,8 +315,7 @@ class GoogleSearch:
                                 user_, 
                                 self.message, 
                                 self.bot, 
-                                self.ctx, 
-                                self.serverSettings),
+                                self.ctx),
                         timeout=60,
                     )
                     if str(reaction.emoji) == "🗑️":
@@ -394,7 +392,6 @@ class GoogleSearch:
                             self.message, 
                             self.bot, 
                             self.ctx, 
-                            self.serverSettings,
                             ["◀️", "▶️", "🗑️", "🔍"]),
                     timeout=60,
                 )
@@ -536,7 +533,6 @@ class GoogleSearch:
                             self.message, 
                             self.bot, 
                             self.ctx, 
-                            self.serverSettings,
                             ["◀️", "▶️", "🗑️", "🔍"]),
                         timeout=60,
                     )
@@ -613,6 +609,7 @@ class GoogleSearch:
                     ]
                     if len(geocode) == 0:
                         #no results found
+                        await self.search()
                         return
 
             coords = (round(float(geocode[0]['lat']), 4), round(float(geocode[0]['lon']), 4))
@@ -815,7 +812,6 @@ class GoogleSearch:
                     self.message, 
                     self.bot, 
                     self.ctx, 
-                    self.serverSettings,
                     ["🗑️", "🔍"]),
                 timeout=60,
             )

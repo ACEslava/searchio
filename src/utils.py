@@ -20,23 +20,19 @@ class Sudo:
     def __init__(
         self,
         bot: commands.Bot,
-        ctx: commands.Context,
-        server_settings: dict,
-        user_settings: dict,
+        ctx: commands.Context
     ):
 
         self.bot = bot
         self.ctx = ctx
-        self.server_settings = server_settings
-        self.user_settings = user_settings
 
     # region database correction/query code
     @staticmethod
-    def server_settings_check(server_settings: dict, server_id: int, bot: commands.Bot) -> dict:
+    def server_settings_check(server_id: int, bot: commands.Bot) -> dict:
+        server_settings = bot.serverSettings
 
-        command_list = [
-            command.name for command in dict(bot.cogs)["Search Engines"].get_commands()
-        ]
+        command_list = dict(bot.cogs)["Search Engines"].get_commands()
+        server_settings_searchengines = server_settings[server_id]["searchEngines"]
 
         if server_id not in server_settings.keys():
             server_settings[server_id] = {}
@@ -53,24 +49,28 @@ class Sudo:
         if "safesearch" not in keys:
             server_settings[server_id]["safesearch"] = False
         if "searchEngines" not in keys:
-            server_settings[server_id]["searchEngines"] = {
+            server_settings_searchengines = {
                 key: True for key in command_list
             }
 
         # adds new search engines
         for searchEngines in command_list:
-            if searchEngines not in server_settings[server_id]["searchEngines"].keys():
-                server_settings[server_id]["searchEngines"][searchEngines] = True
+            if searchEngines.name not in server_settings_searchengines.keys() and searchEngines.enabled is True:
+                server_settings_searchengines[searchEngines.name] = True
 
         # removes old search engines
+        command_list_names = [c.name for c in command_list]
         delete_queue = [
             keys
-            for keys in server_settings[server_id]["searchEngines"].keys()
-            if keys not in command_list
+            for keys in server_settings_searchengines.keys()
+            if keys not in command_list_names or not next((x for x in command_list if x.name == keys), None).enabled
+            #^finds attribute in command_list with name key
         ]
-        for keys in delete_queue:
-            del server_settings[server_id]["searchEngines"][keys]
 
+        for keys in delete_queue:
+            del server_settings_searchengines[keys]
+
+        server_settings[server_id]['searchEngines'] = server_settings_searchengines
         return server_settings
 
     @staticmethod
@@ -108,7 +108,8 @@ class Sudo:
         return user_settings
 
     @staticmethod
-    def is_sudoer(bot: commands.Bot, ctx: commands.Context, server_settings: dict = None) -> bool:
+    def is_sudoer(bot: commands.Bot, ctx: commands.Context) -> bool:
+        server_settings = bot.serverSettings
         if server_settings is None:
             with open("serverSettings.yaml", "r") as data:
                 server_settings = load(data, FullLoader)
@@ -141,7 +142,9 @@ class Sudo:
             return server_settings[hex(ctx.guild.id)]["commandprefix"]
 
     @staticmethod
-    def is_authorized_command(bot: commands.Bot, ctx: commands.Context, server_settings: dict) -> bool:
+    def is_authorized_command(bot: commands.Bot, ctx: commands.Context) -> bool:
+        server_settings = bot.serverSettings
+
         check = all(
             [
                 ctx.author.id not in server_settings[hex(ctx.guild.id)]["blacklist"],
@@ -153,10 +156,12 @@ class Sudo:
                 is not False,
             ]
         )
-        return any([check, Sudo.is_sudoer(bot, ctx, server_settings)])
+        return any([check, Sudo.is_sudoer(bot, ctx)])
 
     @staticmethod
-    def pageTurnCheck(reaction, user, message, bot, ctx, server_settings, valid_emojis=["◀️", "▶️", "🗑️"]):
+    def pageTurnCheck(reaction, user, message, bot, ctx, valid_emojis=["◀️", "▶️", "🗑️"]):
+        server_settings = bot.serverSettings
+
         if server_settings is None:
             with open("serverSettings.yaml", "r") as data:
                 server_settings = load(data, FullLoader)
@@ -190,6 +195,25 @@ class Sudo:
                 ]
             )
 
+    @staticmethod
+    def prefix(bot, message):   # handler for individual guild prefixes
+        try:
+            commandprefix: str = bot.serverSettings[hex(message.guild.id)]['commandprefix']
+        except Exception:
+            commandprefix:str = '&'
+        finally: return commandprefix
+
+    @staticmethod
+    async def save_configs(bot):
+        with open("serverSettings.yaml", "w") as data:
+            dump(bot.serverSettings, data, allow_unicode=True)
+        print('Server settings saved')
+
+        with open("userSettings.yaml", "w") as data:
+            dump(bot.userSettings, data, allow_unicode=True)
+        print('User settings saved')
+        return
+    
     async def user_search(self, search: Union[int, str]) -> Optional[discord.Member]:
         try:
             if search.isnumeric():
@@ -231,7 +255,7 @@ class Sudo:
                 user = await self.user_search(" ".join(args))
                 role = self.ctx.guild.get_role(int("".join(args)))
                 if user is not None:
-                    self.server_settings[hex(self.ctx.guild.id)]["blacklist"].append(
+                    self.bot.serverSettings[hex(self.ctx.guild.id)]["blacklist"].append(
                         user.id
                     )
                     await self.ctx.send(
@@ -241,7 +265,7 @@ class Sudo:
                     )
                 
                 elif role is not None:
-                    self.server_settings[hex(self.ctx.guild.id)]["blacklist"].append(
+                    self.bot.serverSettings[hex(self.ctx.guild.id)]["blacklist"].append(
                         role.id
                     )
                     
@@ -269,7 +293,7 @@ class Sudo:
                     user = await self.user_search(" ".join(args))
                     role = self.ctx.guild.get_role(int("".join(args)))
                     if user is not None:
-                        self.server_settings[hex(self.ctx.guild.id)][
+                        self.bot.serverSettings[hex(self.ctx.guild.id)][
                             "blacklist"
                         ].remove(user.id)
                         
@@ -281,7 +305,7 @@ class Sudo:
                     
                     elif role is not None:
                         
-                        self.server_settings[hex(self.ctx.guild.id)][
+                        self.bot.serverSettings[hex(self.ctx.guild.id)][
                             "blacklist"
                         ].remove(role.id)
                         
@@ -312,9 +336,9 @@ class Sudo:
                 user = await self.user_search(" ".join(args))
                 if (
                     user.id
-                    not in self.server_settings[hex(self.ctx.guild.id)]["sudoer"]
+                    not in self.bot.serverSettings[hex(self.ctx.guild.id)]["sudoer"]
                 ):
-                    self.server_settings[hex(self.ctx.guild.id)]["sudoer"].append(
+                    self.bot.serverSettings[hex(self.ctx.guild.id)]["sudoer"].append(
                         user.id
                     )
                     
@@ -342,8 +366,8 @@ class Sudo:
                 or self.ctx.author.id == self.ctx.guild.owner_id
             ):
                 user = await self.user_search(" ".join(args))
-                if user.id in self.server_settings[hex(self.ctx.guild.id)]["sudoer"]:
-                    self.server_settings[hex(self.ctx.guild.id)]["sudoer"].remove(
+                if user.id in self.bot.serverSettings[hex(self.ctx.guild.id)]["sudoer"]:
+                    self.bot.serverSettings[hex(self.ctx.guild.id)]["sudoer"].remove(
                         user.id
                     )
                     await self.ctx.send(
@@ -384,7 +408,7 @@ class Sudo:
                 embed = discord.Embed(
                     title="Sudo",
                     description=f"Admin commands. Server owner has sudo privilege by default.\n"
-                    f"Usage: {self.print_prefix(self.server_settings)}sudo [command] [args]",
+                    f"Usage: {self.print_prefix(self.bot.serverSettings)}sudo [command] [args]",
                 )
                 embed.add_field(
                     name="Commands",
@@ -430,7 +454,7 @@ class Sudo:
             args = args if len(args) > 0 else None
             await error_handler(self.bot, self.ctx, e, args)
         finally:
-            return self.server_settings, self.user_settings
+            return self.bot.serverSettings, self.bot.userSettings
 
     async def config(self, args: list) -> Tuple[dict, dict]:
         def check(reaction_: discord.Reaction, user_: discord.User) -> bool:
@@ -441,7 +465,7 @@ class Sudo:
             # region config menu
             if not args:
                 try:
-                    levelInfo = self.user_settings[self.ctx.author.id]['level']
+                    levelInfo = self.bot.userSettings[self.ctx.author.id]['level']
                     level_arithmeticSum = int(((levelInfo['rank']-1)*10)/2*levelInfo['rank'])
 
                     embed = discord.Embed(title=f"{self.ctx.author} Configuration")
@@ -451,45 +475,45 @@ class Sudo:
                         `              Level:` {levelInfo['rank']}
                         `                 XP:` {levelInfo['xp']}/{levelInfo['rank']*10}
                         `           Searches:` {level_arithmeticSum+levelInfo['xp']}
-                        `   Daily Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
-                        `Lifetime Downloaded:` {self.user_settings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB
-                        `             Sudoer:` {'True' if Sudo.is_sudoer(self.bot, self.ctx, self.server_settings) else 'False'}""",
+                        `   Daily Downloaded:` {self.bot.userSettings[self.ctx.author.id]['downloadquota']['dailyDownload']}/50MB
+                        `Lifetime Downloaded:` {self.bot.userSettings[self.ctx.author.id]['downloadquota']['lifetimeDownload']}MB
+                        `             Sudoer:` {'True' if Sudo.is_sudoer(self.bot, self.ctx) else 'False'}""",
                         inline=False,
                     )
 
                     embed.add_field(
                         name="User Configuration",
                         value=f"""
-                        `             Locale:` {self.user_settings[self.ctx.author.id]['locale'] if self.user_settings[self.ctx.author.id]['locale'] is not None else 'None Set'}
-                        `              Alias:` {self.user_settings[self.ctx.author.id]['searchAlias'] if self.user_settings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}""",
+                        `             Locale:` {self.bot.userSettings[self.ctx.author.id]['locale'] if self.bot.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
+                        `              Alias:` {self.bot.userSettings[self.ctx.author.id]['searchAlias'] if self.bot.userSettings[self.ctx.author.id]['searchAlias'] is not None else 'None Set'}""",
                         inline=False
                     )
 
                     embed.add_field(
                         name="Guild Administration",
                         value=f"""
-                        ` adminrole:` {self.ctx.guild.get_role(self.server_settings[hex(self.ctx.guild.id)]['adminrole']) if self.server_settings[hex(self.ctx.guild.id)]['adminrole'] is not None else 'None set'}
-                        `safesearch:` {'✅' if self.server_settings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}
-                        `    prefix:` {self.server_settings[hex(self.ctx.guild.id)]['commandprefix']}""",
+                        ` adminrole:` {self.ctx.guild.get_role(self.bot.serverSettings[hex(self.ctx.guild.id)]['adminrole']) if self.bot.serverSettings[hex(self.ctx.guild.id)]['adminrole'] is not None else 'None set'}
+                        `safesearch:` {'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}
+                        `    prefix:` {self.bot.serverSettings[hex(self.ctx.guild.id)]['commandprefix']}""",
                     )
 
                     embed.add_field(
                         name="Guild Search Engines",
                         value="\n".join(
                             [
-                                f'`{command:>10}:` {"✅" if self.server_settings[hex(self.ctx.guild.id)]["searchEngines"][command] == True else "❌"}'
+                                f'`{command:>10}:` {"✅" if self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][command] is True else "❌"}'
                                 for command in [
                                     command.name
                                     for command in dict(self.bot.cogs)[
                                         "Search Engines"
-                                    ].get_commands()
+                                    ].get_commands() if command.enabled
                                 ]
                             ]
                         ),
                     )
 
                     embed.set_footer(
-                        text=f"Do {self.print_prefix(self.server_settings)}config [setting] to change a specific setting"
+                        text=f"Do {self.print_prefix(self.bot.serverSettings)}config [setting] to change a specific setting"
                     )
 
                     embed.set_thumbnail(url=self.ctx.author.avatar_url)
@@ -529,7 +553,7 @@ class Sudo:
                 if len(args) == 1:
                     embed = discord.Embed(
                         title=args[0],
-                        description=f"{'✅' if self.server_settings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}",
+                        description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}",
                     )
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
@@ -541,11 +565,11 @@ class Sudo:
                             "reaction_add", check=check, timeout=60
                         )
                         if str(reaction.emoji) == "✅":
-                            self.server_settings[hex(self.ctx.guild.id)][
+                            self.bot.serverSettings[hex(self.ctx.guild.id)][
                                 "searchEngines"
                             ][args[0].lower()] = True
                         elif str(reaction.emoji) == "❌":
-                            self.server_settings[hex(self.ctx.guild.id)][
+                            self.bot.serverSettings[hex(self.ctx.guild.id)][
                                 "searchEngines"
                             ][args[0].lower()] = False
                         await message.delete()
@@ -556,20 +580,20 @@ class Sudo:
                     re.search("^enable", args[1].lower())
                     or re.search("^on", args[1].lower())
                 ):
-                    self.server_settings[hex(self.ctx.guild.id)]["searchEngines"][
+                    self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][
                         args[0].lower()
                     ] = True
                 elif bool(
                     re.search("^disable", args[1].lower())
                     or re.search("^off", args[1].lower())
                 ):
-                    self.server_settings[hex(self.ctx.guild.id)]["searchEngines"][
+                    self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][
                         args[0].lower()
                     ] = False
                 else:
                     embed = discord.Embed(
                         title=args[0].capitalize(),
-                        description=f"{'✅' if self.server_settings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}",
+                        description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}",
                     )
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
@@ -582,11 +606,11 @@ class Sudo:
                             "reaction_add", check=check, timeout=60
                         )
                         if str(reaction.emoji) == "✅":
-                            self.server_settings[hex(self.ctx.guild.id)][
+                            self.bot.serverSettings[hex(self.ctx.guild.id)][
                                 "searchEngines"
                             ][args[0].lower()] = True
                         elif str(reaction.emoji) == "❌":
-                            self.server_settings[hex(self.ctx.guild.id)][
+                            self.bot.serverSettings[hex(self.ctx.guild.id)][
                                 "searchEngines"
                             ][args[0].lower()] = False
                         await message.delete()
@@ -594,13 +618,13 @@ class Sudo:
                     except asyncio.TimeoutError:
                         await message.clear_reactions()
                 await self.ctx.send(
-                    f"{args[0].capitalize()} is {'enabled' if self.server_settings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else 'disabled'}"
+                    f"{args[0].capitalize()} is {'enabled' if self.bot.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else 'disabled'}"
                 )
             elif args[0].lower() == "safesearch":
                 if len(args) == 1:
                     embed = discord.Embed(
                         title=args[0],
-                        description=f"{'✅' if self.server_settings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}",
+                        description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}",
                     )
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
@@ -612,11 +636,11 @@ class Sudo:
                             "reaction_add", check=check, timeout=60
                         )
                         if str(reaction.emoji) == "✅":
-                            self.server_settings[hex(self.ctx.guild.id)][
+                            self.bot.serverSettings[hex(self.ctx.guild.id)][
                                 "safesearch"
                             ] = True
                         elif str(reaction.emoji) == "❌":
-                            self.server_settings[hex(self.ctx.guild.id)][
+                            self.bot.serverSettings[hex(self.ctx.guild.id)][
                                 "safesearch"
                             ] = False
                         await message.delete()
@@ -627,16 +651,16 @@ class Sudo:
                     re.search("^enable", args[1].lower())
                     or re.search("^on", args[1].lower())
                 ):
-                    self.server_settings[hex(self.ctx.guild.id)]["safesearch"] = True
+                    self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = True
                 elif bool(
                     re.search("^disable", args[1].lower())
                     or re.search("^off", args[1].lower())
                 ):
-                    self.server_settings[hex(self.ctx.guild.id)]["safesearch"] = False
+                    self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = False
                 else:
                     embed = discord.Embed(
                         title=args[0].capitalize(),
-                        description=f"{'✅' if self.server_settings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}",
+                        description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}",
                     )
                     embed.set_footer(text=f"React with ✅/❌ to enable/disable")
                     message = await self.ctx.send(embed=embed)
@@ -649,11 +673,11 @@ class Sudo:
                             "reaction_add", check=check, timeout=60
                         )
                         if str(reaction.emoji) == "✅":
-                            self.server_settings[hex(self.ctx.guild.id)][
+                            self.bot.serverSettings[hex(self.ctx.guild.id)][
                                 "safesearch"
                             ] = True
                         elif str(reaction.emoji) == "❌":
-                            self.server_settings[hex(self.ctx.guild.id)][
+                            self.bot.serverSettings[hex(self.ctx.guild.id)][
                                 "safesearch"
                             ] = False
                         await message.delete()
@@ -661,11 +685,11 @@ class Sudo:
                     except asyncio.TimeoutError:
                         await message.clear_reactions()
                 await self.ctx.send(
-                    f"{args[0].capitalize()} is {'enabled' if self.server_settings[hex(self.ctx.guild.id)]['safesearch'] == True else 'disabled'}"
+                    f"{args[0].capitalize()} is {'enabled' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else 'disabled'}"
                 )
             elif args[0].lower() == "adminrole":
                 if len(args) == 1:
-                    adminrole_id = self.server_settings[hex(self.ctx.guild.id)][
+                    adminrole_id = self.bot.serverSettings[hex(self.ctx.guild.id)][
                         "adminrole"
                     ]
 
@@ -696,7 +720,7 @@ class Sudo:
                 while error_count <= 1:
                     try:
                         adminrole = self.ctx.guild.get_role(int(response))
-                        self.server_settings[hex(self.ctx.guild.id)][
+                        self.bot.serverSettings[hex(self.ctx.guild.id)][
                             "adminrole"
                         ] = adminrole.id
                         await self.ctx.send(f"`{adminrole.name}` is now the admin role")
@@ -755,7 +779,7 @@ class Sudo:
                 if not args[1]:
                     embed = discord.Embed(
                         title="Prefix",
-                        description=f"{self.server_settings[hex(self.ctx.guild.id)]['commandprefix']}",
+                        description=f"{self.bot.serverSettings[hex(self.ctx.guild.id)]['commandprefix']}",
                     )
                     embed.set_footer(text=f"Reply with the prefix that you want to set")
                     message = await self.ctx.send(embed=embed)
@@ -775,7 +799,7 @@ class Sudo:
                 else:
                     response = args[1]
 
-                self.server_settings[hex(self.ctx.guild.id)]["commandprefix"] = response
+                self.bot.serverSettings[hex(self.ctx.guild.id)]["commandprefix"] = response
                 await self.ctx.send(f"`{response}` is now the guild prefix")
             # endregion
 
@@ -850,7 +874,7 @@ class Sudo:
                     await msg[0].edit(content=None, embed=embed)
 
                 elif len(result) == 1:
-                    self.user_settings[self.ctx.author.id]["locale"] = result[0]
+                    self.bot.userSettings[self.ctx.author.id]["locale"] = result[0]
                     await msg[0].edit(
                         content=f"Locale successfully set to `{result[0]}`"
                     )
@@ -982,7 +1006,7 @@ class Sudo:
                             except:
                                 pass
 
-                            self.user_settings[self.ctx.author.id]["locale"] = result[
+                            self.bot.userSettings[self.ctx.author.id]["locale"] = result[
                                 cur_page - 1
                             ][input]
                             await self.ctx.send(
@@ -1027,14 +1051,14 @@ class Sudo:
                         if response == "s":
                             raise AttributeError
                         elif response.lower() == "none":
-                            self.user_settings[self.ctx.author.id]["searchAlias"] = None
+                            self.bot.userSettings[self.ctx.author.id]["searchAlias"] = None
                             await self.ctx.send(
                                 f"Your alias has successfully been removed"
                             )
                         else:
                             getattr(dict(self.bot.cogs)["Search Engines"], response)
                             await self.ctx.send(f"`{response}` is now your alias")
-                            self.user_settings[self.ctx.author.id][
+                            self.bot.userSettings[self.ctx.author.id][
                                 "searchAlias"
                             ] = response
                         error_count = 2
@@ -1115,16 +1139,15 @@ class Sudo:
                 for message in msg:
                     await message.delete()
 
-            return self.server_settings, self.user_settings
+            return self.bot.serverSettings, self.bot.userSettings
         except Exception as e:
             args = args if len(args) > 0 else None
             await error_handler(self.bot, self.ctx, e, args)
-            return self.server_settings, self.user_settings
+            return self.bot.serverSettings, self.bot.userSettings
         finally:
             if args:
                 Log.append_to_log(self.ctx, "config", args)
-            return self.server_settings, self.user_settings
-
+            return self.bot.serverSettings, self.bot.userSettings
 
 class Log:
     @staticmethod
@@ -1217,7 +1240,7 @@ class Log:
                 )
             else:
                 # if guild owner/guild sudoer
-                if Sudo.is_sudoer(bot, ctx, server_settings):
+                if Sudo.is_sudoer(bot, ctx):
                     filename = f'{str(ctx.guild).replace(" ", "")}_guildLogs'
                     line = [
                         row

@@ -154,8 +154,7 @@ class YoutubeSearch:
                                                     user_, 
                                                     self.message, 
                                                     self.bot, 
-                                                    self.ctx, 
-                                                    self.serverSettings),
+                                                    self.ctx),
                                             timeout=60,
                                         )
                                     )

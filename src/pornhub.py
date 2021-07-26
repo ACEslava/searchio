@@ -90,8 +90,7 @@ class PornhubSearch:
                                 user_, 
                                 self.message, 
                                 self.bot, 
-                                self.ctx, 
-                                self.serverSettings),
+                                self.ctx),
                         timeout=60,
                     )
                     await self.message.remove_reaction(reaction, user)

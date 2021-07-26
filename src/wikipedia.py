@@ -81,8 +81,7 @@ class WikipediaSearch:
                                         user_, 
                                         self.message, 
                                         self.bot, 
-                                        self.ctx, 
-                                        self.serverSettings),
+                                        self.ctx),
                                 timeout=60,
                             )
                         )
@@ -151,8 +150,7 @@ class WikipediaSearch:
                                                 user_, 
                                                 self.message, 
                                                 self.bot, 
-                                                self.ctx, 
-                                                self.serverSettings),
+                                                self.ctx),
                                         timeout=60,
                                     )
                                     return

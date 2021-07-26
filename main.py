@@ -1,36 +1,52 @@
-from src.wikipedia import WikipediaSearch
-from src.google import GoogleSearch
-from src.myanimelist import MyAnimeListSearch
-from src.loadingmessage import get_loading_message
-from src.utils import Sudo, Log, error_handler
-from src.scholar import ScholarSearch
-from src.youtube import YoutubeSearch
-from src.xkcd import XKCDSearch
-from src.pornhub import PornhubSearch
-
+from src.utils import Sudo, error_handler
 from dotenv import load_dotenv
-from discord.ext import commands
 from os import getenv, path
-from asyncio import TimeoutError, create_task, wait
+
+from discord.ext import commands
+from asyncio import TimeoutError
 from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta, timezone
 from requests import get
-from time import sleep, time
-from copy import deepcopy
+from time import time
 
 import discord
 import asyncio
-import re
-import random
 
 def main():
-    global serverSettings, userSettings, bot
-    #region onlaunch code
+    # region utility functions
+    async def asyncTiming(interval, periodic_function): #handler for timed functions
+        while True:
+            print(round(time() - start_time, 1), "Starting periodic function")
+            await asyncio.gather(
+                asyncio.sleep(interval),
+                periodic_function(),
+            )
+
+    async def autosaveConfigs():
+        with open("serverSettings.yaml", "w") as data:
+            dump(bot.serverSettings, data, allow_unicode=True)
+        print('Server settings saved')
+
+        with open("userSettings.yaml", "w") as data:
+            dump(bot.userSettings, data, allow_unicode=True)
+        print('User settings saved')
+        return
+
+    def prefix(bot, message):   # handler for individual guild prefixes
+        try:
+            commandprefix: str = bot.serverSettings[hex(message.guild.id)]['commandprefix']
+        except Exception:
+            commandprefix:str = '&'
+        finally: return commandprefix
+    #endregion
     intents = discord.Intents.all()
+    bot = commands.Bot(
+        command_prefix=prefix, 
+        intents=intents, 
+        help_command=None)
 
-    bot = commands.Bot(command_prefix=prefix, intents=intents, help_command=None)
-
+    #region filecheck code
     #checks if required files exist
     if not path.exists('logs.csv'):
         with open('logs.csv', 'w') as file:
@@ -44,24 +60,22 @@ def main():
         with open('userSettings.yaml', 'w') as file:
             file.write('')
 
-    #loads serverSettings
     with open('serverSettings.yaml', 'r') as data:
-        serverSettings = load(data, FullLoader)
-        if serverSettings is None: serverSettings = {}
+        bot.serverSettings = load(data, FullLoader)
+        if bot.serverSettings is None: bot.serverSettings = {}
 
-    #loads userSettings
     with open('userSettings.yaml', 'r') as data:
-        userSettings = load(data, FullLoader)
-        if userSettings is None: userSettings = {}
+        bot.userSettings = load(data, FullLoader)
+        if bot.userSettings is None: bot.userSettings = {}
     #endregion
 
-    bot.add_cog(SearchEngines(bot))
-    bot.add_cog(Administration(bot))
-
+    bot.load_extension('src.search_engine_cog')
+    bot.load_extension('src.administration_cog')
+    
     @bot.event
     async def on_guild_join(guild):
         #Creates new settings entry for guild
-        Sudo.server_settings_check(serverSettings, hex(guild.id), bot)
+        Sudo.server_settings_check(hex(guild.id), bot)
         await autosaveConfigs()
 
         owner = await bot.fetch_user(guild.owner_id)
@@ -92,33 +106,30 @@ def main():
 
     @bot.event
     async def on_guild_remove(guild):
-        del serverSettings[hex(guild.id)]
+        del bot.serverSettings[hex(guild.id)]
         
         with open('serverSettings.yaml', 'w') as data:
-            dump(serverSettings, data, allow_unicode=True)
+            dump(bot.serverSettings, data, allow_unicode=True)
         return
 
     @bot.event
     async def on_connect():
-        global serverSettings
+        bot.botuser = await bot.application_info()
         await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="command prefix '&'"))
-
-        appInfo = await bot.application_info()
-        bot.owner_id = appInfo.owner.id
 
         #add new servers to settings
         for servers in bot.guilds:
-            serverSettings = Sudo.server_settings_check(serverSettings, hex(servers.id), bot)
+            bot.serverSettings = Sudo.server_settings_check(hex(servers.id), bot)
 
         #remove old servers from settings
         delete_queue = []
         guild_list = [g.id for g in bot.guilds]
-        for keys in serverSettings.keys():
+        for keys in bot.serverSettings.keys():
             if int(keys, 0) not in guild_list:
                 delete_queue.append(keys)
         
         for keys in delete_queue:
-            del serverSettings[keys]
+            del bot.serverSettings[keys]
 
         await autosaveConfigs()
 
@@ -140,7 +151,7 @@ def main():
         if isinstance(error, commands.errors.CommandNotFound):
             await ctx.send(embed=
                 discord.Embed(
-                    description=f"Command not found. Do {Sudo.print_prefix(serverSettings, ctx)}help for available commands"
+                    description=f"Command not found. Do {Sudo.print_prefix(bot.serverSettings, ctx)}help for available commands"
                 )
             )
 
@@ -158,7 +169,7 @@ def main():
         try:
             def check(reaction, user):
                 return user == ctx.author and str(reaction.emoji) in ["🗑️"]
-            commandPrefix = Sudo.print_prefix(ctx)
+            commandPrefix = Sudo.print_prefix(bot.serverSettings, ctx)
             searchEngineCog = dict(bot.cogs)['Search Engines']
             adminCog = dict(bot.cogs)['Administration']
 
@@ -166,7 +177,7 @@ def main():
             args = list(args)
 
             embed = discord.Embed(title="SearchIO", 
-                description="Search.io is a bot that searches through multiple search engines/APIs.\nIt is developed by ACEslava#9735, K1NG#6219, and Nanu#3294")
+                description="Search.io is a bot that searches through multiple search engines/APIs.\nIt is developed by ACEslava#1984, K1NG#6219, and Nanu#3294")
 
             embed.add_field(name="Administration", inline=False, value="\n".join([f'`{command.name:>{maxAdminCommandStrLength}}:` {command.brief}' for command in adminCog.get_commands()]))
 
@@ -174,7 +185,9 @@ def main():
                 name="Search Engines", 
                 inline=False, 
                 value='\n'.join([f"`{command.name:>10}:` {command.brief}" 
-                    for command in searchEngineCog.get_commands() if serverSettings[hex(ctx.guild.id)]['searchEngines'][command.name] == True]))
+                    for command in searchEngineCog.get_commands() 
+                    if command.enabled is True
+                    and bot.serverSettings[hex(ctx.guild.id)]['searchEngines'][command.name] is True]))
 
             embed.set_footer(text=f"Do {commandPrefix}help [command] for more information")
 
@@ -208,496 +221,55 @@ def main():
                 dm = await ctx.author.create_dm()
                 await dm.send(embed=embed)
                 await dm.send('\n'.join(['If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ',
-                'Want to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot%20applications.commands']))
+                f'Want to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id={bot.botuser.id}&permissions=4228381776&scope=bot%20applications.commands']))
 
         except discord.errors.Forbidden:
-            await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
+            await ctx.send(
+                embed=discord.Embed(
+                    description='Sorry, I cannot open a DM at this time. Please check your privacy settings'
+                )
+            )
+
         except Exception as e:
             await error_handler(bot, ctx, e)
         finally: return
 
+    @bot.command(hidden=True)
+    @commands.is_owner()
+    async def dev(ctx, *args):
+        args = ' '.join([x.strip() for x in list(args)]).split('--')
+        try:
+            if any('reload' in x for x in args):
+                cog = next((x for x in args if 'reload' in x), None).replace('reload ', '')
+                bot.reload_extension(cog)
+                await ctx.send(embed=discord.Embed(description=f'{cog} successfully reloaded'))
+            
+            elif any('unload' in x for x in args):
+                cog = next((x for x in args if 'unload' in x), None).replace('unload ', '')
+                bot.unload_extension(cog)
+                await ctx.send(embed=discord.Embed(description=f'{cog} successfully unloaded'))
+
+            elif any('load' in x for x in args):
+                cog = next((x for x in args if 'load' in x), None).replace('load ', '')
+                bot.load_extension(cog)
+                await ctx.send(embed=discord.Embed(description=f'{cog} successfully loaded'))
+        
+        except (commands.ExtensionNotFound, commands.ExtensionNotLoaded):
+            await ctx.send(embed=discord.Embed(description=f'{cog} not found'))
+
+        except Exception as e:
+            await error_handler(bot, ctx, e, args)
+            return
+
+    load_dotenv()
+    asyncio.ensure_future(bot.start(getenv("DISCORD_TOKEN")))
+
+    #autosave configs
+    asyncio.ensure_future(asyncTiming(3600, autosaveConfigs))
+
+    start_time = time()
+    asyncio.get_event_loop().run_forever()
     return
 
-# region utility functions
-def prefix(bot, message):   # handler for individual guild prefixes
-    try:
-        commandprefix: str = serverSettings[hex(message.guild.id)]['commandprefix']
-    except Exception:
-        commandprefix:str = '&'
-    finally: return commandprefix
-
-async def asyncTiming(interval, periodic_function): #handler for timed functions
-    while True:
-        print(round(time() - start_time, 1), "Starting periodic function")
-        await asyncio.gather(
-            asyncio.sleep(interval),
-            periodic_function(),
-        )
-
-async def autosaveConfigs():
-    global userSettings, serverSettings
-    with open("serverSettings.yaml", "w") as data:
-        dump(serverSettings, data, allow_unicode=True)
-    print('Server settings saved')
-
-    with open("userSettings.yaml", "w") as data:
-        dump(userSettings, data, allow_unicode=True)
-    print('User settings saved')
-    return
-
-async def genericSearch(bot, ctx, searchObject, args):
-    if Sudo.is_authorized_command(bot, ctx, serverSettings):
-        # region args parsing
-        UserCancel = KeyboardInterrupt
-        if not args: #checks if search is empty
-            await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-            try:
-                userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                if userquery.content.lower() == 'cancel': raise UserCancel
-                else: userquery = userquery.content.split('--')
-
-            except TimeoutError:
-                await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-            except UserCancel:
-                await ctx.send('Aborting')
-                return
-        else: 
-            userquery = ' '.join([query.strip() for query in list(args)]).split('--') #turns multiword search into single string.
-
-        if len(userquery) > 1:
-            args = userquery[1:]
-        else:
-            args = None
-
-        userquery = userquery[0]
-        #check if user actually searched something
-        if userquery is None: return
-        #endregion
-
-        #allows users to edit their search query after results are returned
-        continueLoop = True 
-        while continueLoop:
-            try:
-                message = await ctx.send(get_loading_message())
-                messageEdit = create_task(bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                
-                search = create_task(
-                    searchObject(
-                        bot=bot, 
-                        ctx=ctx,
-                        server_settings=serverSettings,
-                        user_settings=userSettings,
-                        message=message, 
-                        args=args, 
-                        query=userquery, 
-                    )()
-                )
-
-                #checks for message edit
-                waiting = [messageEdit, search]
-                done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
-
-                if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
-                    if type(messageEdit.exception()) == TimeoutError:
-                        raise TimeoutError
-                    await message.delete()
-                    messageEdit.cancel()
-                    search.cancel()
-
-                    messageEdit = messageEdit.result()
-                    userquery = messageEdit[1].content.replace(f'{prefix(bot, message)}{ctx.invoked_with} ', '') #finds the new user query
-                    continue
-                else: raise TimeoutError
-
-            except TimeoutError: #after a minute, everything cancels
-                await message.clear_reactions()
-                messageEdit.cancel()
-                search.cancel()
-                continueLoop = False
-                return
-
-            except (asyncio.CancelledError, discord.errors.NotFound):
-                pass
-
-            except Exception as e:
-                await error_handler(bot, ctx, e, userquery)
-                return
-
-#endregion
-class SearchEngines(commands.Cog, name="Search Engines"):
-    def __init__(self, bot):
-        self.bot = bot
-    
-    async def cog_before_invoke(self, ctx):
-        global userSettings
-        old_userSettings = deepcopy(userSettings)
-        userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
-        if old_userSettings != userSettings:
-            await autosaveConfigs()
-
-        #Leveling system
-        userSettings[ctx.author.id]['level']['xp'] += 1
-        if userSettings[ctx.author.id]['level']['xp'] >= userSettings[ctx.author.id]['level']['rank']*10:
-            userSettings[ctx.author.id]['level']['xp'] = 0
-            userSettings[ctx.author.id]['level']['rank'] += 1
-            
-            await autosaveConfigs()
-
-            await ctx.send(
-                embed=discord.Embed(
-                    description=f"Congratulations {ctx.author}, you are now level {userSettings[ctx.author.id]['level']['rank']}"
-                )
-            )
-
-        # if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
-        #     Log.append_to_log(ctx, userSettings[ctx.author.id]['searchAlias'])
-        # elif ctx.command.name == 's':
-        #     Log.append_to_log(ctx, 's', 'Not set')
-        # else:
-        Log.append_to_log(ctx)
-        return
-    
-    @commands.command(
-        name = 'wiki',
-        brief='Search through Wikipedia.',
-        usage='wiki [query] [optional flags]',
-        help='Wikipedia search.',
-        description='--lang [ISO Language Code]: Specifies a country code to search through Wikipedia. Use wikilang to see available codes.')
-    async def wiki(self, ctx, *args):
-        await genericSearch(bot, ctx, WikipediaSearch, args)  
-        return
-
-    @commands.command(
-        name= 'google',
-        brief='Search through Google',
-        usage='google [query]',
-        help='Google search. If a keyword is detected in [query], a special function will activate',
-        description='\n'.join(["translate: Uses Google Translate API to translate languages.",
-            "\n     Input auto detects language unless specified with 'from [language]'", 
-            "\n     Defaults to output English OR user locale if set, unless explicitly specified with 'to [language]'",
-            "\n     Example Query: translate مرحبا from arabic to spanish",
-            "\n\nimage: Searches only for image results.",
-            "\n\ndefine: Queries dictionaryapi.dev for an English definition of the word",
-            "\n\nweather: Queries openweathermap for weather information at the specified location"]),
-        aliases=[
-            'g',
-            'googel',
-            'googlr',
-            'googl',
-            'gogle',
-            'gogl',
-            'foogle'
-        ])
-    @commands.cooldown(1, 3, commands.BucketType.default)
-    async def google(self, ctx, *args):
-        global serverSettings, userSettings
-
-        if Sudo.is_authorized_command(self.bot, ctx, serverSettings):
-            # region args parsing
-            UserCancel = KeyboardInterrupt
-            if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    if userquery.content.lower() == 'cancel': raise UserCancel
-                    else: userquery = userquery.content.split('--')
-
-                except TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-                except UserCancel:
-                    await ctx.send('Aborting')
-                    return
-            else: 
-                userquery = ' '.join([query.strip() for query in list(args)]).split('--') #turns multiword search into single string.
-
-            if len(userquery) > 1:
-                args = userquery[1:]
-            else:
-                args = None
-
-            userquery = userquery[0]
-            #check if user actually searched something
-            if userquery is None: return
-            #endregion
-
-            continueLoop = True
-            while continueLoop:
-                try:
-                    message = await ctx.send(get_loading_message())
-                    searchClass = GoogleSearch(self.bot, ctx, serverSettings, userSettings, message, userquery)
-
-                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    if bool(re.search('translate', userquery.lower())): 
-                        search = create_task(searchClass.translate())
-                    
-                    elif bool(re.search('define', userquery.lower())):
-                        search = create_task(searchClass.define())
-
-                    elif bool(re.search('weather', userquery.lower())):
-                        search = create_task(searchClass.weather())
-                    
-                    else: search = create_task(searchClass.search())
-                    
-                    #checks for message edit
-                    waiting = [messageEdit, search]
-                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
-
-                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
-                        if type(messageEdit.exception()) == TimeoutError:
-                            raise TimeoutError
-                        await searchClass.message.delete()
-                        messageEdit.cancel()
-                        search.cancel()
-
-                        messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{prefix(self.bot, message)}{ctx.invoked_with} ', '') #finds the new user query
-                        continue
-                    else: raise TimeoutError
-                
-                except TimeoutError: #after a minute, everything cancels
-                    messageEdit.cancel()
-                    search.cancel()
-                    continueLoop = False
-                    return
-                
-                except asyncio.CancelledError:
-                    pass
-                
-                except Exception as e:
-                    await message.delete()
-                    await error_handler(self.bot, ctx, e, userquery)
-                    return
-
-    # @commands.command(
-    #     name= 'scholar',
-    #     brief='Search through Google Scholar',
-    #     usage='scholar [query] [flags]',
-    #     help='Google Scholar search',
-    #     description="""--author: Use [query] to search for a specific author. Cannot be used with --cite
-    #                     --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""")   
-    # async def scholar(self, ctx, *args):
-    #     await genericSearch(bot, ctx, ScholarSearch, args)
-    #     return
-
-    @commands.command(
-        name= 'youtube',
-        brief='Search through Youtube',
-        usage='youtube [query]',
-        help='Searches through Youtube videos')
-    async def youtube(self, ctx, *args):
-        await genericSearch(bot, ctx, YoutubeSearch, args)
-        return
-
-    @commands.command(
-        name= 'mal',
-        brief='Search through MyAnimeList',
-        usage='mal [query]',
-        help='Searches through MyAnimeList')
-    async def mal(self, ctx, *args):
-        await genericSearch(bot, ctx, MyAnimeListSearch, args)
-        return
-
-    @commands.command(
-        name='xkcd',
-        brief='Search for XKCD comics',
-        usage='xkcd [comic# OR random OR latest]',
-        help='Searches for an XKCD comic. Search query can be an XKCD comic number, random, or latest.')
-    async def xkcd(self, ctx, *args):
-        await genericSearch(bot, ctx, XKCDSearch, args)
-        return
-
-    @commands.command(
-        name='pornhub',
-        brief='Search through Pornhub',
-        usage='pornhub [query]',
-        help='Searches for Pornhub videos. Returns a maximum of 10 results')
-    async def pornhub(self, ctx, *args):
-        await genericSearch(bot, ctx, PornhubSearch, args)
-        return
-
-    #alias command (always last)
-    @commands.command(
-        name='s',
-        brief='A shortcut search function',
-        usage='s [query]',
-        help='A user-settable shortcut for any search function')
-    async def s(self, ctx, *args):
-        await ctx.send(embed=
-            discord.Embed(
-                description="""The alias system is now deprecated due to interference with other features.
-                As an alternative, &google can now be accessed with &g. Sorry for the inconvenience."""
-            )
-        )
-        return
-        # try:
-        #     if userSettings[ctx.author.id]['searchAlias'] is None:
-        #         embed = discord.Embed(description=f'Your shortcut is not set. React with 🔍 to set it now')
-        #         message = await ctx.send(embed=embed)
-        #         await message.add_reaction('🗑️')
-        #         await message.add_reaction('🔍')
-        #         reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) in ['🔍', '🗑️'], reaction.message == message]), timeout=60)
-                
-        #         if str(reaction.emoji) == '🗑️':
-        #             await message.delete() 
-        #             return  
-        #         elif str(reaction.emoji) == '🔍':  
-        #             await getattr(Administration, 'config').__call__(self, ctx, ('alias'))
-        #             await message.delete()      
-
-        #     await getattr(SearchEngines, userSettings[ctx.author.id]['searchAlias']).__call__(self, ctx, *args)
-        # except AttributeError:
-        #     embed = discord.Embed(description=f'Your shortcut is invalid. The shortcut must be typed exactly as shown in {Sudo.print_prefix(serverSettings, ctx)}help')
-        #     message = ctx.send(embed=embed)
-        #     await message.add_reaction('🗑️')
-        #     reaction, _ = await self.bot.wait_for("reaction_add", check=lambda reaction, user: all([user == ctx.author, str(reaction.emoji) == "🗑️", reaction.message == message]), timeout=60)
-        #     if str(reaction.emoji) == '🗑️':
-        #         await message.delete()
-        # except TimeoutError as e: 
-        #             await message.clear_reactions()
-        # except Exception as e:
-        #     await error_handler(self.bot, ctx, e, args)
-        # finally: return
-
-class Administration(commands.Cog, name="Administration"):
-    def __init__(self, bot):
-        self.bot = bot
-    
-    async def cog_before_invoke(self, ctx):
-        global userSettings
-        userSettings = Sudo.user_settings_check(userSettings, ctx.author.id)
-        await autosaveConfigs()
-        return
-    
-    @commands.command(
-        name='log',
-        brief='DMs a .csv file of all the logs that the bot has for your username or guild if a sudoer.',
-        usage='log')
-    async def logging(self, ctx): 
-        await Log.log_request(self.bot, ctx, serverSettings, userSettings)
-        return
-
-    @commands.command(
-        name='sudo',
-        brief='Various admin commands.',
-        usage=f'sudo [command] [args]',
-        help='Admin commands. Server owner has sudo privilege by default.',
-        description=f"""
-                echo: Have the bot say something. 
-                Args: message 
-                Optional flag: --channel [channelID]
-
-                blacklist: Block a user/role from using the bot. 
-                Args: userName OR userID OR roleID
-
-                whitelist: Unblock a user/role from using the bot. 
-                Args: userName OR userID OR roleID
-
-                sudoer: Add a user to the sudo list. Only guild owners can do this. 
-                Args: userName OR userID  
-
-                unsudoer: Remove a user from the sudo list. Only guild owners can do this. 
-                Args: userName OR userID""")
-    async def sudo(self, ctx, *args):
-        global serverSettings
-        global userSettings
-
-        if Sudo.is_sudoer(self.bot, ctx, serverSettings):
-            Log.append_to_log(ctx, None, args)
-            command = Sudo(self.bot, ctx, serverSettings, userSettings)
-            
-            serverSettings, userSettings = await command.sudo(list(args))
-            await autosaveConfigs()
-        else:
-            await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
-            Log.append_to_log(ctx, None, 'unauthorised')
-        return
-
-    @commands.command(
-        name='config',
-        brief='Views the guild configuration. Only sudoers can edit settings.',
-        usage='config [setting] [args]',
-        help=f"""Views the configuration menu.
-
-                Guild Configurations:
-                ```
-                Prefix: Command prefix that SearchIO uses
-                Adminrole: The role that is automatically given sudo permissions
-                Safesearch: Activates Google's safesearch. NSFW channels override this setting
-                
-                Guilds can deactivate each search engine if they choose to.
-                Requires sudo privileges to edit
-                ```
-                
-                User Configurations:
-                ```
-                Locale: Sets the user's locale for more accurate Google searches
-                Alias: Sets the search function's command to use.""")
-    async def config(self, ctx, *args):
-        args = list(args)
-        global serverSettings
-        global userSettings
-
-        command = Sudo(self.bot, ctx, serverSettings, userSettings)
-        if len(args) > 0:
-            localSetting = args[0] in ['locale', 'alias']
-        else: localSetting = False
-        
-        if Sudo.is_sudoer(self.bot, ctx, serverSettings) or localSetting:
-            serverSettings, userSettings = await command.config(args)
-        
-        else: serverSettings, userSettings = await command.config([])
-        await autosaveConfigs()
-        Log.append_to_log(ctx)
-
-    @commands.command(
-        name='invite',
-        brief="DMs SearchIO's invite link to the user",
-        usage='invite',
-        help="DMs SearchIO's invite link to the user")
-    async def invite(self, ctx):
-        try:
-            Log.append_to_log(ctx)
-            dm = await ctx.author.create_dm()
-            await dm.send('Here ya go: https://discord.com/api/oauth2/authorize?client_id=786356027099840534&permissions=4228381776&scope=bot%20applications.commands')
-        except discord.errors.Forbidden:
-            await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
-        except Exception as e:
-            await error_handler(self.bot, ctx, e)
-        finally: return
-
-    @commands.command(
-        name='ping',
-        brief="Sends SearchIO's DiscordAPI connection latency",
-        usage='ping',
-        help="Sends SearchIO's DiscordAPI connection latency")
-    async def ping(self, ctx):
-        try:
-            beforeTime = datetime.now()
-            message = await ctx.send('Testing')
-            serverLatency = datetime.now() - beforeTime
-            embed = discord.Embed(description='\n'.join(
-                            [f'Message Send Time: `{round(serverLatency.total_seconds()*1000, 2)}ms`',
-                            f'API Heartbeat: `{round(self.bot.latency, 2)*100}ms`']))
-            embed.set_footer(text=f'Requested by {ctx.author}')
-            await message.edit(content=None, embed=embed)
-        except Exception as e:
-            await error_handler(self.bot, ctx, e)
-        finally: return
-
-while 1:
-    try:
-        #bot starting code
-        main()
-        load_dotenv()
-        asyncio.ensure_future(bot.start(getenv("DISCORD_TOKEN")))
-
-        #autosave configs
-        asyncio.ensure_future(asyncTiming(3600, autosaveConfigs))
-
-        start_time = time()
-        asyncio.get_event_loop().run_forever()
-    except Exception as e:
-        sleep(30)
-        continue
+if __name__ == "__main__":
+    main()
