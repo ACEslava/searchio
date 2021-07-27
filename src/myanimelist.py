@@ -68,7 +68,7 @@ class MyAnimeListSearch:
                 while 1:
                     try:
                         await self.message.edit(
-                            content=None, embed=embeds[cur_page % len(embeds)]
+                            content='', embed=embeds[cur_page % len(embeds)]
                         )
                         emojitask = asyncio.create_task(
                             self.bot.wait_for(

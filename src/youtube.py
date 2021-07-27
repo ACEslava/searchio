@@ -82,7 +82,7 @@ class YoutubeSearch:
                 embed = discord.Embed(
                     description=f"No results found for: {self.query}"
                 )
-                await self.message.edit(content=None, embed=embed)
+                await self.message.edit(content='', embed=embed)
                 await asyncio.sleep(60)
                 await self.message.delete()
                 return
@@ -90,7 +90,7 @@ class YoutubeSearch:
             while not do_exit:
                 try:
                     await self.message.edit(
-                        content=None, embed=embeds[cur_page % len(embeds)]
+                        content='', embed=embeds[cur_page % len(embeds)]
                     )
                     reaction, user = await self.bot.wait_for(
                         "reaction_add",
@@ -143,7 +143,7 @@ class YoutubeSearch:
 
                                 while 1:
                                     await msg[0].edit(
-                                        content=None, embed=embeds[cur_page % len(embeds)]
+                                        content='', embed=embeds[cur_page % len(embeds)]
                                     )
                                     emojitask = asyncio.create_task(
                                         self.bot.wait_for(
@@ -274,7 +274,7 @@ class YoutubeSearch:
                                     f"no videos are eligible to download due to maximum filesize constraints (100MB)"
                                 )
                             )
-                            await msg[0].edit(content=None, embed=embed)
+                            await msg[0].edit(content='', embed=embed)
 
                 except asyncio.TimeoutError:
                     await self.message.clear_reactions()

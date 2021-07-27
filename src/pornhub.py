@@ -80,7 +80,7 @@ class PornhubSearch:
             while not do_exit:
                 try:
                     await self.message.edit(
-                        content=None, embed=embeds[cur_page % len(embeds)]
+                        content='', embed=embeds[cur_page % len(embeds)]
                     )
                     reaction, user = await self.bot.wait_for(
                         "reaction_add",

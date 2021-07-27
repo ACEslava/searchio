@@ -3,6 +3,9 @@ from dotenv import load_dotenv
 from os import getenv, path
 
 from discord.ext import commands
+from discord_slash import SlashCommand
+from discord_components import DiscordComponents
+
 from asyncio import TimeoutError
 from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
@@ -40,11 +43,22 @@ def main():
             commandprefix:str = '&'
         finally: return commandprefix
     #endregion
-    intents = discord.Intents.all()
     bot = commands.Bot(
         command_prefix=prefix, 
-        intents=intents, 
+        intents=discord.Intents.all(), 
         help_command=None)
+
+    slash = SlashCommand(
+        bot, 
+        sync_commands=True, 
+        sync_on_cog_reload=True,
+        override_type=True
+    )
+
+    bot.load_extension('src.search_engine_cog')
+    bot.load_extension('src.administration_cog')
+    bot.load_extension('src.administration_slashcog')
+    bot.load_extension('src.search_engine_slashcog')
 
     #region filecheck code
     #checks if required files exist
@@ -69,9 +83,6 @@ def main():
         if bot.userSettings is None: bot.userSettings = {}
     #endregion
 
-    bot.load_extension('src.search_engine_cog')
-    bot.load_extension('src.administration_cog')
-    
     @bot.event
     async def on_guild_join(guild):
         #Creates new settings entry for guild
@@ -100,6 +111,10 @@ def main():
 
             If you have any problems with Search.io, join the help server: https://discord.gg/YB8VGYMZSQ""")
             await dm.send(embed=embed)
+ 
+            #update guildid list for slash commands
+            bot.guild_ids.append(guild.id) 
+        
         except discord.errors.Forbidden:
             pass
         finally: return
@@ -117,9 +132,15 @@ def main():
         bot.botuser = await bot.application_info()
         await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="command prefix '&'"))
 
+        DiscordComponents(bot)
+        
         #add new servers to settings
+        bot.guild_ids = [s.id for s in bot.guilds]
         for servers in bot.guilds:
             bot.serverSettings = Sudo.server_settings_check(hex(servers.id), bot)
+
+        #sets bot globals
+        bot.devmode = False
 
         #remove old servers from settings
         delete_queue = []
@@ -239,28 +260,37 @@ def main():
     async def dev(ctx, *args):
         args = ' '.join([x.strip() for x in list(args)]).split('--')
         try:
+            if any('devmode' in x for x in args):
+                bot.devmode = bool(next((x for x in args if 'devmode' in x), None).replace('devmode ', '').strip())
+                await ctx.send(
+                    embed=discord.Embed(
+                        description=f'devmode {"enabled" if bot.devmode else "disabled"}'
+                    )
+                )
+
             if any('reload' in x for x in args):
-                cog = next((x for x in args if 'reload' in x), None).replace('reload ', '')
+                cog = next((x for x in args if 'reload' in x), None).replace('reload ', '').strip()
                 bot.reload_extension(cog)
                 await ctx.send(embed=discord.Embed(description=f'{cog} successfully reloaded'))
             
             elif any('unload' in x for x in args):
-                cog = next((x for x in args if 'unload' in x), None).replace('unload ', '')
+                cog = next((x for x in args if 'unload' in x), None).replace('unload ', '').strip()
                 bot.unload_extension(cog)
                 await ctx.send(embed=discord.Embed(description=f'{cog} successfully unloaded'))
 
             elif any('load' in x for x in args):
-                cog = next((x for x in args if 'load' in x), None).replace('load ', '')
+                cog = next((x for x in args if 'load' in x), None).replace('load ', '').strip()
                 bot.load_extension(cog)
                 await ctx.send(embed=discord.Embed(description=f'{cog} successfully loaded'))
-        
         except (commands.ExtensionNotFound, commands.ExtensionNotLoaded):
             await ctx.send(embed=discord.Embed(description=f'{cog} not found'))
 
+        except commands.errors.ExtensionAlreadyLoaded:
+            await ctx.send(embed=discord.Embed(description=f'{cog} already loaded'))
         except Exception as e:
             await error_handler(bot, ctx, e, args)
             return
-
+    
     load_dotenv()
     asyncio.ensure_future(bot.start(getenv("DISCORD_TOKEN")))
 

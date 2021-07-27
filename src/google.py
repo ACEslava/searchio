@@ -4,24 +4,26 @@ from re import findall, sub, search
 from string import ascii_uppercase, ascii_lowercase, digits
 from typing import List
 from bs4 import BeautifulSoup
-from discord import Embed
-from discord.ext import commands
+from PIL import Image, ImageFont, ImageDraw
+from datetime import datetime, timezone
+from dotenv import load_dotenv
+from os import getenv
 from iso639 import languages
 from langid import classify as detect
 from translate import Translator
+
+from discord import Embed
+from discord.ext import commands
+
 from src.utils import Log, error_handler, Sudo
 from src.loadingmessage import get_loading_message
-from PIL import Image, ImageFont, ImageDraw
-from yaml import load, FullLoader
-from datetime import datetime, timezone, timedelta
-from dotenv import load_dotenv
-from os import getenv
 
 import discord
 import aiohttp
 import aiofiles
 import os
 import io
+import re
 
 
 class GoogleSearch:
@@ -32,17 +34,30 @@ class GoogleSearch:
         server_settings: dict,
         user_settings: dict,
         message: discord.Message,
-        search_query: str
+        args: list,
+        query: str
     ):
         self.bot = bot
         self.ctx = ctx
         self.serverSettings = server_settings
         self.userSettings = user_settings
         self.message = message
-        self.search_query = search_query
+        self.args = args if args is not None else []
+        self.query = query
         return
 
-    async def search(self) -> None:
+    async def __call__(self) -> None:
+        if bool(re.search('translate', self.query.lower())) or 'translate' in self.args:
+            await self.translate()
+        elif bool(re.search('define', self.query.lower())) or 'define' in self.args:
+            await self.define()
+        elif bool(re.search('weather', self.query.lower())) or 'weather' in self.args:
+            await self.weather()
+        else: 
+            await self.google()
+        return
+    
+    async def google(self) -> None:
         # region utility functions
 
         # translates unicode codes in links
@@ -90,8 +105,8 @@ class GoogleSearch:
             try:
                 # creates and formats the embed
                 result_embed = Embed(
-                    title=f"Search results for: {self.search_query[:233]}"
-                    f'{"..." if len(self.search_query) > 233 else ""}'
+                    title=f"Search results for: {self.query[:233]}"
+                    f'{"..." if len(self.query) > 233 else ""}'
                 )
 
                 # sets the discord embed to the image
@@ -106,7 +121,7 @@ class GoogleSearch:
         def text_embed(result) -> Embed:
             # creates and formats the embed
             result_embed = Embed(
-                title=f'Search results for: {self.search_query[:233]}{"..." if len(self.search_query) > 233 else ""}'
+                title=f'Search results for: {self.query[:233]}{"..." if len(self.query) > 233 else ""}'
             )
 
             # google results are separated by divs
@@ -161,7 +176,7 @@ class GoogleSearch:
 
         try:
             # checks if image is in search query
-            if bool(search("image", self.search_query.lower())):
+            if bool(search("image", self.query.lower())):
                 has_found_image = True
             else:
                 has_found_image = False
@@ -178,7 +193,7 @@ class GoogleSearch:
             url = "".join(
                 [
                     "https://google.com/search?pws=0&q=",
-                    self.search_query.replace(" ", "+"),
+                    self.query.replace(" ", "+"),
                     f'{"+-stock+-pinterest" if has_found_image else ""}',
                     f"&uule={uule_parse}&num=5"
                     f"{'&safe=active' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] and not self.ctx.channel.nsfw else ''}",
@@ -245,7 +260,7 @@ class GoogleSearch:
                     embeds = list(map(text_embed, google_snippet_results))
 
                 print(
-                    self.ctx.author.name + " searched for: " + self.search_query[:233]
+                    self.ctx.author.name + " searched for: " + self.query[:233]
                 )
 
                 # adds the page numbering footer to the embeds
@@ -256,87 +271,37 @@ class GoogleSearch:
 
                 # sets the reactions for the search result
                 if len(embeds) > 1:
-                    await gather(
-                        self.message.add_reaction("🗑️"),
-                        self.message.add_reaction("◀️"),
-                        self.message.add_reaction("▶️"),
-                    )
+                    emojis = {"🗑️":None,"◀️":None,"▶️":None}
                 else:
-                    await self.message.add_reaction("🗑️")
+                    emojis = {"🗑️":None}
 
-                # multipage result display
-                do_exit, cur_page = False, 0
-                while not do_exit:
-                    try:
-                        await self.message.edit(
-                            content=None, embed=embeds[cur_page % len(embeds)]
-                        )
-
-                        reaction, user = await self.bot.wait_for(
-                            "reaction_add",
-                            check=
-                                lambda reaction_, user_: Sudo.pageTurnCheck(
-                                    reaction_, 
-                                    user_, 
-                                    self.message, 
-                                    self.bot, 
-                                    self.ctx),
-                            timeout=60,
-                        )
-                        await self.message.remove_reaction(reaction, user)
-
-                        if str(reaction.emoji) == "🗑️":
-                            await self.message.delete()
-                            do_exit = True
-                        elif str(reaction.emoji) == "◀️":
-                            cur_page -= 1
-                        elif str(reaction.emoji) == "▶️":
-                            cur_page += 1
-
-                    except TimeoutError:
-                        await self.message.clear_reactions()
-                        raise
-
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, embeds, emojis)
+                return
+            
             else:
                 embed = Embed(
-                    title=f'Search results for: {self.search_query[:233]}{"..." if len(self.search_query) > 233 else ""}',
+                    title=f'Search results for: {self.query[:233]}{"..." if len(self.query) > 233 else ""}',
                     description="No results found. Maybe try another search term.",
                 )
 
                 embed.set_footer(text=f"Requested by {self.ctx.author}")
-                await self.message.edit(content=None, embed=embed)
-                try:
-                    await self.message.add_reaction("🗑️")
-                    reaction, user = await self.bot.wait_for(
-                        "reaction_add",
-                        check=
-                            lambda reaction_, user_: Sudo.pageTurnCheck(
-                                reaction_, 
-                                user_, 
-                                self.message, 
-                                self.bot, 
-                                self.ctx),
-                        timeout=60,
-                    )
-                    if str(reaction.emoji) == "🗑️":
-                        await self.message.delete()
-
-                except TimeoutError:
-                    raise
+                emojis = {"🗑️":None}
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
+                return
 
         except TimeoutError:
             raise
 
         except Exception as e:
             await self.message.delete()
-            await error_handler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.query)
         finally:
             return
 
     async def translate(self) -> None:
         try:
             # translate string processing
-            query = self.search_query.lower().split(" ")
+            query = self.query.lower().split(" ")
 
             if len(query) > 1:
                 # processes keywords in query for language options
@@ -378,44 +343,17 @@ class GoogleSearch:
                     description=result + "\n\nReact with 🔍 to search Google",
                 )
                 embed.set_footer(text=f"Requested by {self.ctx.author}")
-                await self.message.edit(content=None, embed=embed)
-
-                # waits for user reaction options
-                await self.message.add_reaction("🗑️")
-                await self.message.add_reaction("🔍")
-                reaction, _ = await self.bot.wait_for(
-                    "reaction_add",
-                    check=
-                        lambda reaction_, user_: Sudo.pageTurnCheck(
-                            reaction_, 
-                            user_, 
-                            self.message, 
-                            self.bot, 
-                            self.ctx, 
-                            ["◀️", "▶️", "🗑️", "🔍"]),
-                    timeout=60,
-                )
-
-                if str(reaction.emoji) == "🗑️":
-                    await self.message.delete()
-                    return
-
-                # deletes translation and gives the user the Google results
-                elif str(reaction.emoji) == "🔍":
-                    await self.message.clear_reactions()
-                    await self.message.edit(
-                        content=f"{get_loading_message()} <a:loading:829119343580545074>",
-                        embed=None,
-                    )
-                    await self.search()
-                    pass
+                # sets the reactions for the search result
+                
+                emojis = {"🗑️":None, "🔍":self.search_google_handler}
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
 
             else:
                 await self.message.edit(
-                    content=f"{get_loading_message()} <a:loading:829119343580545074>",
+                    content=f"{get_loading_message()}",
                     embed=None,
                 )
-                await self.search()
+                await self.google()
 
         except KeyError:
             await self.message.clear_reactions()
@@ -423,19 +361,19 @@ class GoogleSearch:
                 content=f"{get_loading_message()}",
                 embed=None,
             )
-            await self.search()
+            await self.google()
 
         except TimeoutError:
             raise
 
         except Exception as e:
             await self.message.delete()
-            await error_handler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.query)
             await self.message.edit(
                 content=f"{get_loading_message()}",
                 embed=None,
             )
-            await self.search()
+            await self.google()
 
         finally:
             return
@@ -484,7 +422,7 @@ class GoogleSearch:
                 return embeds
 
             # definition string processing
-            query = self.search_query.lower().split(" ")
+            query = self.query.lower().split(" ")
 
             if len(query) > 1:
                 # queries dictionary API
@@ -511,57 +449,18 @@ class GoogleSearch:
                         f"Requested by: {str(self.ctx.author)}"
                     )
 
-                # user react option system
-                cur_page = 0
-                await self.message.add_reaction("🗑️")
-                await self.message.add_reaction("🔍")
-                if len(embeds) > 1:
-                    await self.message.add_reaction("◀️")
-                    await self.message.add_reaction("▶️")
-
-                # multipage definition display
-                while 1:
-                    await self.message.edit(
-                        content=None, embed=embeds[cur_page % len(embeds)]
-                    )
-                    reaction, user = await self.bot.wait_for(
-                        "reaction_add",
-                        check=
-                        lambda reaction_, user_: Sudo.pageTurnCheck(
-                            reaction_, 
-                            user_, 
-                            self.message, 
-                            self.bot, 
-                            self.ctx, 
-                            ["◀️", "▶️", "🗑️", "🔍"]),
-                        timeout=60,
-                    )
-                    await self.message.remove_reaction(reaction, user)
-
-                    if str(reaction.emoji) == "🗑️":
-                        await self.message.delete()
-                        return
-                    elif str(reaction.emoji) == "◀️":
-                        cur_page -= 1
-                    elif str(reaction.emoji) == "▶️":
-                        cur_page += 1
-
-                    # gives the user Google results
-                    elif str(reaction.emoji) == "🔍":
-                        await self.message.clear_reactions()
-                        await self.message.edit(
-                            content=f"{get_loading_message()}",
-                            embed=None,
-                        )
-                        await self.search()
-                        break
+                emojis = {
+                    "🗑️":None, "◀️": None, "▶️": None,
+                    "🔍":self.search_google_handler
+                }
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, embeds, emojis)
 
             else:
                 await self.message.edit(
                     content=f"{get_loading_message()}",
                     embed=None,
                 )
-                await self.search()
+                await self.google()
 
         except TimeoutError:
             raise
@@ -571,16 +470,16 @@ class GoogleSearch:
                 content=f"{get_loading_message()}",
                 embed=None,
             )
-            await self.search()
+            await self.google()
 
         except Exception as e:
             await self.message.delete()
-            await error_handler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.query)
             await self.message.edit(
                 content=f"{get_loading_message()}",
                 embed=None,
             )
-            await self.search()
+            await self.google()
 
         finally:
             return
@@ -588,10 +487,10 @@ class GoogleSearch:
     async def weather(self) -> None:
         try:
             load_dotenv()
-            query = self.search_query.lower().split(" ")
+            query = self.query.lower().split(" ")
 
             if len(query) <= 1:
-                await self.search()
+                await self.google()
                 return
 
             del query[0]
@@ -609,7 +508,7 @@ class GoogleSearch:
                     ]
                     if len(geocode) == 0:
                         #no results found
-                        await self.search()
+                        await self.google()
                         return
 
             coords = (round(float(geocode[0]['lat']), 4), round(float(geocode[0]['lon']), 4))
@@ -789,54 +688,19 @@ class GoogleSearch:
                 im.save(image_binary, 'PNG')
                 image_binary.seek(0)
 
-                await self.message.delete()
                 file = discord.File(fp=image_binary, filename='image.png')
                 embed = discord.Embed()
                 embed.set_image(url="attachment://image.png")
                 embed.set_footer(text=f"Requested by: {str(self.ctx.author)}")
                 
+                await self.message.delete()
                 self.message = await self.ctx.send(
                     embed=embed,
                     file=file
                 )
 
-                await self.message.add_reaction("🗑️")
-                await self.message.add_reaction("🔍")
-
-            reaction, user = await self.bot.wait_for(
-                "reaction_add",
-                check=
-                lambda reaction_, user_: Sudo.pageTurnCheck(
-                    reaction_, 
-                    user_, 
-                    self.message, 
-                    self.bot, 
-                    self.ctx, 
-                    ["🗑️", "🔍"]),
-                timeout=60,
-            )
-            await self.message.remove_reaction(reaction, user)
-
-            if str(reaction.emoji) == "🗑️":
-                await self.message.delete()
-                return
-
-            # gives the user Google results
-            elif str(reaction.emoji) == "🔍":
-                await self.message.clear_reactions()
-                await self.message.edit(
-                    content=f"{get_loading_message()}",
-                    embed=None,
-                    file=None
-                )
-                await self.search()
-
-            else:
-                await self.message.edit(
-                    content=f"{get_loading_message()}",
-                    embed=None,
-                )
-                await self.search()
+            emojis = {"🗑️":None, "🔍":self.search_google_handler}
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
 
         except TimeoutError:
             raise
@@ -846,16 +710,22 @@ class GoogleSearch:
                 content=f"{get_loading_message()}",
                 embed=None,
             )
-            await self.search()
+            await self.google()
 
         except Exception as e:
             await self.message.delete()
-            await error_handler(self.bot, self.ctx, e, self.search_query)
+            await error_handler(self.bot, self.ctx, e, self.query)
             await self.message.edit(
                 content=f"{get_loading_message()}",
                 embed=None,
             )
-            await self.search()
+            await self.google()
 
         finally:
             return
+
+    async def search_google_handler(self) -> None:
+        await self.message.delete()
+        self.message = await self.ctx.send(f"{get_loading_message()}")
+        await self.google()
+        return

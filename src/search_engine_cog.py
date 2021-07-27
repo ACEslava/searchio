@@ -15,7 +15,6 @@ from copy import deepcopy
 
 import discord
 import asyncio
-import re
 
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
@@ -83,82 +82,8 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         ])
     @commands.cooldown(1, 3, commands.BucketType.default)
     async def google(self, ctx, *args):
-        if Sudo.is_authorized_command(self.bot, ctx):
-            # region args parsing
-            UserCancel = KeyboardInterrupt
-            if not args: #checks if search is empty
-                await ctx.send("Enter search query or cancel") #if empty, asks user for search query
-                try:
-                    userquery = await self.bot.wait_for('message', check=lambda m: m.author == ctx.author, timeout = 30) # 30 seconds to reply
-                    if userquery.content.lower() == 'cancel': raise UserCancel
-                    else: userquery = userquery.content.split('--')
-
-                except TimeoutError:
-                    await ctx.send(f'{ctx.author.mention} Error: You took too long. Aborting') #aborts if timeout
-
-                except UserCancel:
-                    await ctx.send('Aborting')
-                    return
-            else: 
-                userquery = ' '.join([query.strip() for query in list(args)]).split('--') #turns multiword search into single string.
-
-            if len(userquery) > 1:
-                args = userquery[1:]
-            else:
-                args = None
-
-            userquery = userquery[0]
-            #check if user actually searched something
-            if userquery is None: return
-            #endregion
-
-            continueLoop = True
-            while continueLoop:
-                try:
-                    message = await ctx.send(get_loading_message())
-                    searchClass = GoogleSearch(self.bot, ctx, self.bot.serverSettings, self.bot.userSettings, message, userquery)
-
-                    messageEdit = create_task(self.bot.wait_for('message_edit', check=lambda var, m: m.author == ctx.author and m == ctx.message))
-                    if bool(re.search('translate', userquery.lower())): 
-                        search = create_task(searchClass.translate())
-
-                    elif bool(re.search('define', userquery.lower())):
-                        search = create_task(searchClass.define())
-
-                    elif bool(re.search('weather', userquery.lower())):
-                        search = create_task(searchClass.weather())
-
-                    else: search = create_task(searchClass.search())
-
-                    #checks for message edit
-                    waiting = [messageEdit, search]
-                    done, waiting = await wait(waiting, return_when=asyncio.FIRST_COMPLETED)
-
-                    if messageEdit in done: #if the message is edited, the search is cancelled, message deleted, and command is restarted
-                        if type(messageEdit.exception()) == TimeoutError:
-                            raise TimeoutError
-                        await searchClass.message.delete()
-                        messageEdit.cancel()
-                        search.cancel()
-
-                        messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{Sudo.prefix(self.bot, message, self.bot.serverSettings)}{ctx.invoked_with} ', '') #finds the new user query
-                        continue
-                    else: raise TimeoutError
-
-                except TimeoutError: #after a minute, everything cancels
-                    messageEdit.cancel()
-                    search.cancel()
-                    continueLoop = False
-                    return
-
-                except asyncio.CancelledError:
-                    pass
-
-                except Exception as e:
-                    await message.delete()
-                    await error_handler(self.bot, ctx, e, userquery)
-                    return
+        await self.genericSearch(ctx, GoogleSearch, args)
+        return
 
     @commands.command(
         name= 'scholar',
@@ -313,7 +238,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                         search.cancel()
 
                         messageEdit = messageEdit.result()
-                        userquery = messageEdit[1].content.replace(f'{Sudo.prefix(self.bot, message, self.bot.serverSettings)}{ctx.invoked_with} ', '') #finds the new user query
+                        userquery = messageEdit[1].content.replace(f'{Sudo.print_prefix(self.bot.serverSettings, ctx)}{ctx.invoked_with} ', '') #finds the new user query
                         continue
                     else: raise TimeoutError
 

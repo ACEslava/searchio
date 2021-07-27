@@ -3,15 +3,18 @@ import asyncio
 import csv
 import difflib
 from typing import List, Optional, Union, Tuple
+from discord import user
 from yaml import load, dump, FullLoader
-
 import discord
 import os
 import random
 import re
 import traceback
+
 from discord.errors import HTTPException
 from discord.ext import commands
+from discord_slash import SlashContext
+from discord_components import Button, ButtonStyle
 
 from src.loadingmessage import get_loading_message
 
@@ -143,24 +146,36 @@ class Sudo:
             return server_settings[hex(ctx.guild.id)]["commandprefix"]
 
     @staticmethod
-    def is_authorized_command(bot: commands.Bot, ctx: commands.Context) -> bool:
+    def is_authorized_command(bot: commands.Bot, ctx: Union[commands.Context, SlashContext]) -> bool:
         server_settings = bot.serverSettings
-
-        check = all(
-            [
-                ctx.author.id not in server_settings[hex(ctx.guild.id)]["blacklist"],
-                not any(
-                    role.id in server_settings[hex(ctx.guild.id)]["blacklist"]
-                    for role in ctx.author.roles
-                ),
-                server_settings[hex(ctx.guild.id)]["searchEngines"][ctx.command.name]
-                is not False,
-            ]
-        )
+        if type(ctx) is SlashContext:
+            check = all(
+                [
+                    ctx.author.id not in server_settings[hex(ctx.guild.id)]["blacklist"],
+                    not any(
+                        role.id in server_settings[hex(ctx.guild.id)]["blacklist"]
+                        for role in ctx.author.roles
+                    ),
+                    server_settings[hex(ctx.guild.id)]["searchEngines"][ctx.command]
+                    is not False,
+                ]
+            )
+        else:
+            check = all(
+                [
+                    ctx.author.id not in server_settings[hex(ctx.guild.id)]["blacklist"],
+                    not any(
+                        role.id in server_settings[hex(ctx.guild.id)]["blacklist"]
+                        for role in ctx.author.roles
+                    ),
+                    server_settings[hex(ctx.guild.id)]["searchEngines"][ctx.command.name]
+                    is not False,
+                ]
+            )
         return any([check, Sudo.is_sudoer(bot, ctx)])
 
     @staticmethod
-    def pageTurnCheck(reaction, user, message, bot, ctx, valid_emojis=["◀️", "▶️", "🗑️"]):
+    def pageTurnCheck(reaction, user, message, bot, ctx, valid_emojis=["◀️", "▶️", "🗑️"]) -> bool:
         server_settings = bot.serverSettings
 
         if server_settings is None:
@@ -197,13 +212,89 @@ class Sudo:
             )
 
     @staticmethod
-    def prefix(bot, message):   # handler for individual guild prefixes
-        try:
-            commandprefix: str = bot.serverSettings[hex(message.guild.id)]['commandprefix']
-        except Exception:
-            commandprefix:str = '&'
-        finally: return commandprefix
+    async def multi_page_system(
+        bot: commands.bot, 
+        ctx: Union[commands.Context, SlashContext],
+        message: discord.Message, 
+        embeds:'list[discord.Embed]',
+        emojis: 'dict[str:function]'):
 
+        def check(button_ctx):
+            server_settings = bot.serverSettings
+
+            if server_settings is None:
+                with open("serverSettings.yaml", "r") as data:
+                    server_settings = load(data, FullLoader)
+
+            # Checks if sudoer is owner
+            is_owner = button_ctx.author.id == bot.owner_id
+
+            # Checks if sudoer is server owner
+            if ctx.guild:
+                is_server_owner = button_ctx.author.id == ctx.guild.owner_id
+            else:
+                is_server_owner = False
+
+            # Checks if sudoer has the designated adminrole or is a sudoer
+            try:
+                role = next(
+                    (x for x in ctx.guild.roles if x.id == bot.serverSettings[hex(ctx.guild.id)]['adminrole']), 
+                    None
+                )
+                has_admin = button_ctx.author.id in [m.id for m in role.members] if role is not None else False
+                is_sudoer = button_ctx.author.id in server_settings[hex(ctx.guild.id)]["sudoer"]
+            except Exception as e:
+                print(e)
+            finally:
+                return all(
+                    [
+                        (
+                            button_ctx.author.id == ctx.author.id or 
+                            any([is_owner, is_server_owner, has_admin, is_sudoer])
+                        ),
+                        button_ctx.message.id == message.id
+                    ]
+                )
+
+        # multipage result display
+        cur_page = 0
+        
+        await message.edit(
+            content='',
+            embed=embeds[cur_page % len(embeds)],
+            components=[[
+                Button(style=ButtonStyle.blue, label=e, custom_id=e)
+                for e in list(emojis.keys())
+            ]]
+        )
+        while 1:
+            try:
+                resp = await bot.wait_for(
+                    "button_click",
+                    check=check,
+                    timeout=60
+                )
+
+                if str(resp.custom_id) == "🗑️":
+                    await message.delete()
+                    return
+                elif str(resp.custom_id) == "◀️":
+                    cur_page -= 1
+                elif str(resp.custom_id) == "▶️":
+                    cur_page += 1
+                elif str(resp.custom_id) in list(emojis.keys()):
+                    await emojis[str(resp.custom_id)]()
+                    return
+
+                await resp.respond(
+                    type=7,
+                    content=None,
+                    embed=embeds[cur_page % len(embeds)]
+                )
+
+            except TimeoutError:
+                return
+    
     @staticmethod
     async def save_configs(bot):
         with open("serverSettings.yaml", "w") as data:
@@ -1325,100 +1416,103 @@ async def error_handler(
             for lines in str(traceback.format_exc()).split("\n")
         ]
     )
-
-    # error message for the server
-    embed = discord.Embed(
-        description=f"An unknown error has occured, please try again later. \n If you wish to report this error, react with 🐛"
-    )
-    embed.set_footer(text=f"Error Code: {error_code}")
-    error_msg = await ctx.send(embed=embed)
-    await error_msg.add_reaction("🐛")
-
-    try:
-        # DMs a feedback form to the user
-        response = None
-        await bot.wait_for(
-            "reaction_add",
-            check=lambda reaction, user: user == ctx.author
-            and str(reaction.emoji) == "🐛",
-            timeout=60,
+    if bot.devmode is False:
+        # error message for the server
+        embed = discord.Embed(
+            description=f"An unknown error has occured, please try again later. \n If you wish to report this error, react with 🐛"
         )
-        await error_msg.clear_reactions()
-        dm = await ctx.author.create_dm()
-        err_form = await dm.send(
-            "Please send a message containing any feedback regarding this bug."
-        )
+        embed.set_footer(text=f"Error Code: {error_code}")
+        error_msg = await ctx.send(embed=embed)
+        await error_msg.add_reaction("🐛")
 
-        response = await bot.wait_for(
-            "message",
-            check=lambda m: m.author == ctx.author
-            and isinstance(m.channel, discord.DMChannel),
-            timeout=30,
-        )
-        response = response.content
-
-        await dm.send(
-            "Thank you for your feedback! If you want to see the status of SearchIO's bugs, join the Discord (https://discord.gg/fH4YTaGMRH).\nNote: this link is temporary"
-        )
-    except discord.errors.Forbidden:
-        await error_msg.edit(
-            embed=None,
-            content="Sorry, I cannot open a DM at this time. Please check your privacy settings",
-        )
-    except TimeoutError:
-        await err_form.delete()
-    finally:
-        #Error log in Discord server
-        #changes alias to command used
-        with open('userSettings.yaml', 'r') as data:
-            userSettings = load(data, FullLoader)
-
-        if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
-            command = userSettings[ctx.author.id]['searchAlias']
-        elif ctx.command.name == 's':
-            command = 'alias unset'
-        else:
-            command = ctx.command
-
-        # generates an error report for the tracker
-        string = "\n".join(
-            [
-                f"Error `{error_code}`",
-                f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
-                f"In Channel: {str(ctx.channel)} ({ctx.channel.id})",
-                f"By User: {str(ctx.author)}({ctx.author.id})",
-                f"Command: {command}",
-                f"Args: {args if len(args) != 0 else 'None'}",
-                f"{f'User Feedback: {response}' if response is not None else ''}",
-                "\n" f"{error_out}```",
-            ]
-        )
-
-        error_logging_channel = await bot.fetch_channel(829172391557070878)
         try:
-            err_report = await error_logging_channel.send(string)
-        except HTTPException as e:
-            if e.code == 50035:
-                with open(f"./src/cache/errorReport_{error_code}.txt", "w") as file:
-                    file.write(error_out)
-                
-                string = "\n".join(
-                    [
-                        f"Error `{error_code}`",
-                        f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
-                        f"In Channel: {str(ctx.channel)} ({ctx.channel.id})",
-                        f"By User: {str(ctx.author)}({ctx.author.id})",
-                        f"Command: {ctx.command}",
-                        f"Args: {args if len(args) != 0 else 'None'}",
-                        f"{f'User Feedback: {response}' if response is not None else ''}```"
-                    ]
-                )
-                await error_logging_channel.send(string)
-                await error_logging_channel.send(file=discord.File(f"./src/cache/errorReport_{error_code}.txt"))
-                os.remove(f"./src/cache/errorReport_{error_code}.txt")
-                return
-                
-        except Exception as e:
-            print(e)
-        await err_report.add_reaction("✅")
-        return
+            # DMs a feedback form to the user
+            response = None
+            await bot.wait_for(
+                "reaction_add",
+                check=lambda reaction, user: user == ctx.author
+                and str(reaction.emoji) == "🐛",
+                timeout=60,
+            )
+            await error_msg.clear_reactions()
+            dm = await ctx.author.create_dm()
+            err_form = await dm.send(
+                "Please send a message containing any feedback regarding this bug."
+            )
+
+            response = await bot.wait_for(
+                "message",
+                check=lambda m: m.author == ctx.author
+                and isinstance(m.channel, discord.DMChannel),
+                timeout=30,
+            )
+            response = response.content
+
+            await dm.send(
+                "Thank you for your feedback! If you want to see the status of SearchIO's bugs, join the Discord (https://discord.gg/fH4YTaGMRH).\nNote: this link is temporary"
+            )
+        except discord.errors.Forbidden:
+            await error_msg.edit(
+                embed=None,
+                content="Sorry, I cannot open a DM at this time. Please check your privacy settings",
+            )
+        except TimeoutError:
+            await err_form.delete()
+    else:
+        response = None
+    #Error log in Discord server
+    #changes alias to command used
+    with open('userSettings.yaml', 'r') as data:
+        userSettings = load(data, FullLoader)
+
+    if ctx.command.name == 's' and userSettings[ctx.author.id]['searchAlias'] is not None:
+        command = userSettings[ctx.author.id]['searchAlias']
+    elif ctx.command.name == 's':
+        command = 'alias unset'
+    else:
+        command = ctx.command
+
+    # generates an error report for the tracker
+    string = "\n".join(
+        [
+            f"Error `{error_code}`",
+            f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
+            f"In Channel: {str(ctx.channel)} ({ctx.channel.id})",
+            f"By User: {str(ctx.author)}({ctx.author.id})",
+            f"Command: {command}",
+            f"Args: {args if len(args) != 0 else 'None'}",
+            f"{f'User Feedback: {response}' if response is not None else ''}",
+            "\n" f"{error_out}```",
+        ]
+    )
+    if bot.devmode is True:
+        error_logging_channel = ctx.channel
+    else:
+        error_logging_channel = await bot.fetch_channel(829172391557070878)
+    try:
+        err_report = await error_logging_channel.send(string)
+    except HTTPException as e:
+        if e.code == 50035:
+            with open(f"./src/cache/errorReport_{error_code}.txt", "w") as file:
+                file.write(error_out)
+            
+            string = "\n".join(
+                [
+                    f"Error `{error_code}`",
+                    f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
+                    f"In Channel: {str(ctx.channel)} ({ctx.channel.id})",
+                    f"By User: {str(ctx.author)}({ctx.author.id})",
+                    f"Command: {ctx.command}",
+                    f"Args: {args if len(args) != 0 else 'None'}",
+                    f"{f'User Feedback: {response}' if response is not None else ''}```"
+                ]
+            )
+            await error_logging_channel.send(string)
+            await error_logging_channel.send(file=discord.File(f"./src/cache/errorReport_{error_code}.txt"))
+            os.remove(f"./src/cache/errorReport_{error_code}.txt")
+            return
+            
+    except Exception as e:
+        print(e)
+    await err_report.add_reaction("✅")
+    return

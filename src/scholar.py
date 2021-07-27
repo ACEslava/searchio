@@ -136,7 +136,7 @@ class ScholarSearch:
                 await self.message.add_reaction("▶️")
 
             while not do_exit:
-                await self.message.edit(content=None, embed=embeds[cur_page % len(embeds)])
+                await self.message.edit(content='', embed=embeds[cur_page % len(embeds)])
                 reaction, user = await self.bot.wait_for(
                     "reaction_add",
                     check=

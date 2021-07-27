@@ -45,7 +45,7 @@ class XKCDSearch:
                 embed.set_image(url=x.img_url)
                 embed.set_footer(text=f"Requested by {self.ctx.author}")
 
-                await self.message.edit(content=None, embed=embed)
+                await self.message.edit(content='', embed=embed)
                 Log.append_to_log(self.ctx, f"{self.ctx.command} result", x.url)
 
                 await self.message.add_reaction("🗑️")
