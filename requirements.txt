@@ -16,7 +16,8 @@ chardet==4.0.0
 click==7.1.2
 colorama==0.4.4
 cryptography==3.4.7
-discord-py-slash-command==2.2.0
+discord-components==1.1.4
+discord-py-slash-command==2.3.2
 discord.py==1.7.1
 distlib==0.3.2
 docutils==0.16
