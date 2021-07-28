@@ -2,9 +2,9 @@ from datetime import datetime, timedelta, date, timezone
 import asyncio
 import csv
 import difflib
-from typing import List, Optional, Union, Tuple
-from discord import user
+from typing import Optional, Union, Tuple
 from yaml import load, dump, FullLoader
+from concurrent.futures._base import TimeoutError
 import discord
 import os
 import random
@@ -288,11 +288,14 @@ class Sudo:
 
                 await resp.respond(
                     type=7,
-                    content=None,
+                    content='',
                     embed=embeds[cur_page % len(embeds)]
                 )
 
             except TimeoutError:
+                await message.edit(
+                    components=[]
+                )
                 return
     
     @staticmethod
@@ -549,8 +552,8 @@ class Sudo:
             return self.bot.serverSettings, self.bot.userSettings
 
     async def config(self, args: list) -> Tuple[dict, dict]:
-        def check(reaction_: discord.Reaction, user_: discord.User) -> bool:
-            return user_ == self.ctx.author and str(reaction_.emoji) in ["✅", "❌"]
+        def check(button_ctx) -> bool:
+            return button_ctx.author.id == self.ctx.author.id and button_ctx.message.id == message.id
 
         UserCancel = KeyboardInterrupt
         try:
@@ -609,26 +612,30 @@ class Sudo:
                     )
 
                     embed.set_thumbnail(url=self.ctx.author.avatar_url)
-                    config_message = await self.ctx.send(embed=embed)
-
-                    await config_message.add_reaction("🗑️")
-                    reaction, user = await self.bot.wait_for(
-                        "reaction_add",
-                        check=lambda reaction_, user_: all(
+                    config_message = await self.ctx.send(
+                        embed=embed,
+                        components=[
+                            Button(style=ButtonStyle.blue, label="🗑️", custom_id="🗑️")
+                        ]
+                    )
+            
+                    resp = await self.bot.wait_for(
+                        "button_click",
+                        check=lambda button_ctx: all(
                             [
-                                user_ == self.ctx.author,
-                                str(reaction_.emoji) == "🗑️",
-                                reaction_.message == config_message,
+                                button_ctx.author.id == self.ctx.author.id,
+                                button_ctx.message.id == config_message.id
                             ]
                         ),
                         timeout=60,
                     )
 
-                    if str(reaction.emoji) == "🗑️":
+                    if str(resp.custom_id) == "🗑️":
                         await config_message.delete()
+                        return
 
                 except asyncio.TimeoutError:
-                    await config_message.clear_reactions()
+                    pass
                 except Exception as e:
                     await error_handler(self.bot, self.ctx, e)
                 finally:
@@ -647,27 +654,36 @@ class Sudo:
                         title=args[0],
                         description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}",
                     )
-                    embed.set_footer(text=f"React with ✅/❌ to enable/disable")
-                    message = await self.ctx.send(embed=embed)
-                    try:
-                        await message.add_reaction("✅")
-                        await message.add_reaction("❌")
 
-                        reaction, user = await self.bot.wait_for(
-                            "reaction_add", check=check, timeout=60
+                    message = await self.ctx.send(
+                        embed=embed,
+                        components=[[
+                            Button(style=ButtonStyle.green, label='Enable', custom_id='enable'),
+                            Button(style=ButtonStyle.red, label='Disable', custom_id='disable')
+                        ]]
                         )
-                        if str(reaction.emoji) == "✅":
-                            self.bot.serverSettings[hex(self.ctx.guild.id)][
-                                "searchEngines"
-                            ][args[0].lower()] = True
-                        elif str(reaction.emoji) == "❌":
-                            self.bot.serverSettings[hex(self.ctx.guild.id)][
-                                "searchEngines"
-                            ][args[0].lower()] = False
-                        await message.delete()
+                    try:
+                        resp = await self.bot.wait_for(
+                            "button_click",
+                            check=check,
+                            timeout=60
+                        )
+
+                        if str(resp.custom_id) == "enable":
+                            self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][args[0].lower()] = True
+                        
+                        elif str(resp.custom_id) == "disable":
+                            self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][args[0].lower()] = False
+                        await resp.respond(
+                            type=7,
+                            embed=discord.Embed(
+                                description=f'{args[0].capitalize()} {"enabled" if resp.custom_id == "enable" else "disabled"}'
+                            ),
+                            components = []
+                        )
                         return
                     except asyncio.TimeoutError:
-                        await message.clear_reactions()
+                        pass
                 elif bool(
                     re.search("^enable", args[1].lower())
                     or re.search("^on", args[1].lower())
@@ -684,61 +700,75 @@ class Sudo:
                     ] = False
                 else:
                     embed = discord.Embed(
-                        title=args[0].capitalize(),
+                        title=args[0],
                         description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}",
                     )
-                    embed.set_footer(text=f"React with ✅/❌ to enable/disable")
-                    message = await self.ctx.send(embed=embed)
 
-                    try:
-                        await message.add_reaction("✅")
-                        await message.add_reaction("❌")
-
-                        reaction, user = await self.bot.wait_for(
-                            "reaction_add", check=check, timeout=60
+                    message = await self.ctx.send(
+                        embed=embed,
+                        components=[[
+                            Button(style=ButtonStyle.green, label='Enable', custom_id='enable'),
+                            Button(style=ButtonStyle.red, label='Disable', custom_id='disable')
+                        ]]
                         )
-                        if str(reaction.emoji) == "✅":
-                            self.bot.serverSettings[hex(self.ctx.guild.id)][
-                                "searchEngines"
-                            ][args[0].lower()] = True
-                        elif str(reaction.emoji) == "❌":
-                            self.bot.serverSettings[hex(self.ctx.guild.id)][
-                                "searchEngines"
-                            ][args[0].lower()] = False
-                        await message.delete()
+                    try:
+                        resp = await self.bot.wait_for(
+                            "button_click",
+                            check=check,
+                            timeout=60
+                        )
+
+                        if str(resp.custom_id) == "enable":
+                            self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][args[0].lower()] = True
+
+                        elif str(resp.custom_id) == "disable":
+                            self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][args[0].lower()] = False
+                        await resp.respond(
+                            type=7,
+                            embed=discord.Embed(
+                                description=f'{args[0].capitalized()} {"enabled" if resp.custom_id == "enable" else "disabled"}'
+                            ),
+                            components = []
+                        )
                         return
                     except asyncio.TimeoutError:
-                        await message.clear_reactions()
-                await self.ctx.send(
-                    f"{args[0].capitalize()} is {'enabled' if self.bot.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else 'disabled'}"
-                )
+                        pass
             elif args[0].lower() == "safesearch":
                 if len(args) == 1:
                     embed = discord.Embed(
                         title=args[0],
                         description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}",
                     )
-                    embed.set_footer(text=f"React with ✅/❌ to enable/disable")
-                    message = await self.ctx.send(embed=embed)
-                    try:
-                        await message.add_reaction("✅")
-                        await message.add_reaction("❌")
 
-                        reaction, user = await self.bot.wait_for(
-                            "reaction_add", check=check, timeout=60
+                    message = await self.ctx.send(
+                        embed=embed,
+                        components=[[
+                            Button(style=ButtonStyle.green, label='Enable', custom_id='enable'),
+                            Button(style=ButtonStyle.red, label='Disable', custom_id='disable')
+                        ]]
                         )
-                        if str(reaction.emoji) == "✅":
-                            self.bot.serverSettings[hex(self.ctx.guild.id)][
-                                "safesearch"
-                            ] = True
-                        elif str(reaction.emoji) == "❌":
-                            self.bot.serverSettings[hex(self.ctx.guild.id)][
-                                "safesearch"
-                            ] = False
-                        await message.delete()
+                    try:
+                        resp = await self.bot.wait_for(
+                            "button_click",
+                            check=check,
+                            timeout=60
+                        )
+
+                        if str(resp.custom_id) == "enable":
+                            self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = True
+
+                        elif str(resp.custom_id) == "disable":
+                            self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = False
+                        await resp.respond(
+                            type=7,
+                            embed=discord.Embed(
+                                description=f'Safesearch {"enabled" if resp.custom_id == "enable" else "disabled"}'
+                            ),
+                            components = []
+                        )
                         return
                     except asyncio.TimeoutError:
-                        await message.clear_reactions()
+                        pass
                 elif bool(
                     re.search("^enable", args[1].lower())
                     or re.search("^on", args[1].lower())
@@ -751,34 +781,39 @@ class Sudo:
                     self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = False
                 else:
                     embed = discord.Embed(
-                        title=args[0].capitalize(),
+                        title=args[0],
                         description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}",
                     )
-                    embed.set_footer(text=f"React with ✅/❌ to enable/disable")
-                    message = await self.ctx.send(embed=embed)
 
-                    try:
-                        await message.add_reaction("✅")
-                        await message.add_reaction("❌")
-
-                        reaction, user = await self.bot.wait_for(
-                            "reaction_add", check=check, timeout=60
+                    message = await self.ctx.send(
+                        embed=embed,
+                        components=[[
+                            Button(style=ButtonStyle.green, label='Enable', custom_id='enable'),
+                            Button(style=ButtonStyle.red, label='Disable', custom_id='disable')
+                        ]]
                         )
-                        if str(reaction.emoji) == "✅":
-                            self.bot.serverSettings[hex(self.ctx.guild.id)][
-                                "safesearch"
-                            ] = True
-                        elif str(reaction.emoji) == "❌":
-                            self.bot.serverSettings[hex(self.ctx.guild.id)][
-                                "safesearch"
-                            ] = False
-                        await message.delete()
+                    try:
+                        resp = await self.bot.wait_for(
+                            "button_click",
+                            check=check,
+                            timeout=60
+                        )
+
+                        if str(resp.custom_id) == "enable":
+                            self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = True
+
+                        elif str(resp.custom_id) == "disable":
+                            self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = False
+                        await resp.respond(
+                            type=7,
+                            embed=discord.Embed(
+                                description=f'Safesearch {"enabled" if resp.custom_id == "enable" else "disabled"}'
+                            ),
+                            components = []
+                        )
                         return
                     except asyncio.TimeoutError:
-                        await message.clear_reactions()
-                await self.ctx.send(
-                    f"{args[0].capitalize()} is {'enabled' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else 'disabled'}"
-                )
+                        pass
             elif args[0].lower() == "adminrole":
                 if len(args) == 1:
                     adminrole_id = self.bot.serverSettings[hex(self.ctx.guild.id)][

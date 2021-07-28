@@ -20,10 +20,6 @@ class AdministrationSlash(commands.Cog, name="Administration Slash"):
         await Sudo.save_configs(self.bot)
         return
 
-    def cog_unload(self):
-        self.bot.slash.remove_cog_commands(self)
-        pass
-
     @cog_ext.cog_slash(
         name='ping',
         description="Sends SearchIO's DiscordAPI connection latency")
@@ -36,7 +32,7 @@ class AdministrationSlash(commands.Cog, name="Administration Slash"):
                             [f'Message Send Time: `{round(serverLatency.total_seconds()*1000, 2)}ms`',
                             f'API Heartbeat: `{round(self.bot.latency, 2)*100}ms`']))
             embed.set_footer(text=f'Requested by {ctx.author}')
-            await message.edit(content=None, embed=embed)
+            await message.edit(content='', embed=embed)
         except Exception as e:
             await error_handler(self.bot, ctx, e)
         finally: return

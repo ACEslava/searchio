@@ -29,34 +29,6 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
         self.bot = bot
         return
 
-    # async def cog_before_invoke(self, ctx):
-    #     old_userSettings = deepcopy(self.bot.userSettings)
-    #     self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
-    #     if old_userSettings != self.bot.userSettings:
-    #         await Sudo.save_configs(self.bot)
-
-    #     #Leveling system
-    #     self.bot.userSettings[ctx.author.id]['level']['xp'] += 1
-    #     if self.bot.userSettings[ctx.author.id]['level']['xp'] >= self.bot.userSettings[ctx.author.id]['level']['rank']*10:
-    #         self.bot.userSettings[ctx.author.id]['level']['xp'] = 0
-    #         self.bot.userSettings[ctx.author.id]['level']['rank'] += 1
-
-    #         await Sudo.save_configs(self.bot)
-
-    #         await ctx.send(
-    #             embed=discord.Embed(
-    #                 description=f"Congratulations {ctx.author}, you are now level {self.bot.userSettings[ctx.author.id]['level']['rank']}"
-    #             )
-    #         )
-
-    #     # if ctx.command.name == 's' and self.bot.userSettings[ctx.author.id]['searchAlias'] is not None:
-    #     #     Log.append_to_log(ctx, self.bot.userSettings[ctx.author.id]['searchAlias'])
-    #     # elif ctx.command.name == 's':
-    #     #     Log.append_to_log(ctx, 's', 'Not set')
-    #     # else:
-    #     Log.append_to_log(ctx)
-    #     return
-
     @cog_ext.cog_slash(
         name = 'wiki',
         description='Search through Wikipedia.',
@@ -157,6 +129,32 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
 
     async def genericSearch(self, ctx, searchObject, query:str, optionals:str=None):
         if Sudo.is_authorized_command(self.bot, ctx):
+            old_userSettings = deepcopy(self.bot.userSettings)
+            self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
+            if old_userSettings != self.bot.userSettings:
+                await Sudo.save_configs(self.bot)
+
+            #Leveling system
+            self.bot.userSettings[ctx.author.id]['level']['xp'] += 1
+            if self.bot.userSettings[ctx.author.id]['level']['xp'] >= self.bot.userSettings[ctx.author.id]['level']['rank']*10:
+                self.bot.userSettings[ctx.author.id]['level']['xp'] = 0
+                self.bot.userSettings[ctx.author.id]['level']['rank'] += 1
+
+                await Sudo.save_configs(self.bot)
+
+                await ctx.send(
+                    embed=discord.Embed(
+                        description=f"Congratulations {ctx.author}, you are now level {self.bot.userSettings[ctx.author.id]['level']['rank']}"
+                    )
+                )
+
+            # if ctx.command.name == 's' and self.bot.userSettings[ctx.author.id]['searchAlias'] is not None:
+            #     Log.append_to_log(ctx, self.bot.userSettings[ctx.author.id]['searchAlias'])
+            # elif ctx.command.name == 's':
+            #     Log.append_to_log(ctx, 's', 'Not set')
+            # else:
+            Log.append_to_log(ctx)
+            
             #allows users to edit their search query after results are returned
             continueLoop = True 
             while continueLoop:

@@ -129,34 +129,14 @@ class ScholarSearch:
                 return
             # endregion
 
-            do_exit, cur_page = False, 0
-            await self.message.add_reaction("🗑️")
+            # sets the reactions for the search result
             if len(embeds) > 1:
-                await self.message.add_reaction("◀️")
-                await self.message.add_reaction("▶️")
+                emojis = {"🗑️":None,"◀️":None,"▶️":None}
+            else:
+                emojis = {"🗑️":None}
 
-            while not do_exit:
-                await self.message.edit(content='', embed=embeds[cur_page % len(embeds)])
-                reaction, user = await self.bot.wait_for(
-                    "reaction_add",
-                    check=
-                        lambda reaction_, user_: Sudo.pageTurnCheck(
-                            reaction_, 
-                            user_, 
-                            self.message, 
-                            self.bot, 
-                            self.ctx),
-                    timeout=60,
-                )
-                await self.message.remove_reaction(reaction, user)
-
-                if str(reaction.emoji) == "🗑️":
-                    await self.message.delete()
-                    do_exit = True
-                elif str(reaction.emoji) == "◀️":
-                    cur_page -= 1
-                elif str(reaction.emoji) == "▶️":
-                    cur_page += 1
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, embeds, emojis)
+            return
 
         except asyncio.TimeoutError:
             raise

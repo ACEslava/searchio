@@ -44,24 +44,12 @@ class XKCDSearch:
                 embed.url = x.url
                 embed.set_image(url=x.img_url)
                 embed.set_footer(text=f"Requested by {self.ctx.author}")
-
-                await self.message.edit(content='', embed=embed)
                 Log.append_to_log(self.ctx, f"{self.ctx.command} result", x.url)
 
-                await self.message.add_reaction("🗑️")
-                reaction, _ = await self.bot.wait_for(
-                    "reaction_add",
-                    check=
-                        lambda reaction_, user_: Sudo.pageTurnCheck(
-                            reaction_, 
-                            user_, 
-                            self.message, 
-                            self.bot, 
-                            self.ctx),
-                    timeout=60,
-                )
-                if str(reaction.emoji) == "🗑️":
-                    await self.message.delete()
+                # sets the reactions for the search result
+                emojis = {"🗑️":None}
+
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
                 return
 
             except UserCancel:
@@ -75,14 +63,14 @@ class XKCDSearch:
 
                 self.message_edit = asyncio.create_task(
                     self.bot.wait_for(
-                        "self.message_edit",
+                        "message_edit",
                         check=lambda var, m: m.author == self.ctx.author,
                         timeout=60,
                     )
                 )
                 reply = asyncio.create_task(
                     self.bot.wait_for(
-                        "self.message", check=lambda m: m.author == self.ctx.author, timeout=60
+                        "message", check=lambda m: m.author == self.ctx.author, timeout=60
                     )
                 )
 

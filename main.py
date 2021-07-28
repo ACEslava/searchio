@@ -261,11 +261,11 @@ def main():
     async def dev(ctx, *args):
         args = ' '.join([x.strip() for x in list(args)]).split('--')
         try:
-            if any('devmode' in x for x in args):
-                bot.devmode = bool(next((x for x in args if 'devmode' in x), None).replace('devmode ', '').strip())
+            if any('debug' in x for x in args):
+                bot.devmode = eval(next((x for x in args if 'debug' in x), None).replace('debug ', '').strip())
                 await ctx.send(
                     embed=discord.Embed(
-                        description=f'devmode {"enabled" if bot.devmode else "disabled"}'
+                        description=f'debug log {"enabled" if bot.devmode else "disabled"}'
                     )
                 )
 
