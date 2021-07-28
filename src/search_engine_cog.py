@@ -84,7 +84,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
     async def google(self, ctx, *args):
         await self.genericSearch(ctx, GoogleSearch, args)
         return
-
+        
     @commands.command(
         name= 'scholar',
         brief='Search through Google Scholar',
@@ -255,6 +255,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                 except Exception as e:
                     await error_handler(self.bot, ctx, e, userquery)
                     return
+        return
 
 def setup(bot):
     bot.add_cog(SearchEngines(bot))

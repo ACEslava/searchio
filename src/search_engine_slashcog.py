@@ -24,7 +24,7 @@ import asyncio
 with open('serverSettings.yaml', 'r') as data:
     guild_ids = [int(x,0) for x in list(load(data, FullLoader).keys())]
 
-class SearchEngines(commands.Cog, name="Search Engines Slash"):
+class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
     def __init__(self, bot):
         self.bot = bot
         return
@@ -60,7 +60,6 @@ class SearchEngines(commands.Cog, name="Search Engines Slash"):
     @cog_ext.cog_slash(
         name = 'wiki',
         description='Search through Wikipedia.',
-        guild_ids=guild_ids,
         options=[create_option(
             name='query',
             description='Search query',
@@ -74,7 +73,6 @@ class SearchEngines(commands.Cog, name="Search Engines Slash"):
     @cog_ext.cog_slash(
         name = 'google',
         description='Search through Google.',
-        guild_ids=guild_ids,
         options=[
             create_option(
                 name='query',
@@ -209,5 +207,5 @@ class SearchEngines(commands.Cog, name="Search Engines Slash"):
                     return
 
 def setup(bot):
-    bot.add_cog(SearchEngines(bot))
+    bot.add_cog(SearchEnginesSlash(bot))
     return

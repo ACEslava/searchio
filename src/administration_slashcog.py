@@ -26,8 +26,7 @@ class AdministrationSlash(commands.Cog, name="Administration Slash"):
 
     @cog_ext.cog_slash(
         name='ping',
-        description="Sends SearchIO's DiscordAPI connection latency",
-        guild_ids=guild_ids)
+        description="Sends SearchIO's DiscordAPI connection latency")
     async def ping(self, ctx:SlashContext):
         try:
             beforeTime = datetime.now()

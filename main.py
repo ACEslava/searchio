@@ -1,3 +1,4 @@
+import discord_slash
 from src.utils import Sudo, error_handler
 from dotenv import load_dotenv
 from os import getenv, path
@@ -54,11 +55,6 @@ def main():
         sync_on_cog_reload=True,
         override_type=True
     )
-
-    bot.load_extension('src.search_engine_cog')
-    bot.load_extension('src.administration_cog')
-    bot.load_extension('src.administration_slashcog')
-    bot.load_extension('src.search_engine_slashcog')
 
     #region filecheck code
     #checks if required files exist
@@ -134,8 +130,12 @@ def main():
 
         DiscordComponents(bot)
         
+        bot.load_extension('src.search_engine_cog')
+        bot.load_extension('src.administration_cog')
+        bot.load_extension('src.administration_slashcog')
+        bot.load_extension('src.search_engine_slashcog')
+
         #add new servers to settings
-        bot.guild_ids = [s.id for s in bot.guilds]
         for servers in bot.guilds:
             bot.serverSettings = Sudo.server_settings_check(hex(servers.id), bot)
 
@@ -165,6 +165,7 @@ def main():
 
         with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
             file.write(get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)         
+
         return
 
     @bot.event
