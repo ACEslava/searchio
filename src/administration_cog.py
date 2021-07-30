@@ -10,7 +10,7 @@ class Administration(commands.Cog, name="Administration"):
 
     async def cog_before_invoke(self, ctx):
         self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
-        await Sudo.save_configs(self.bot)
+        Sudo.save_configs(self.bot)
         return
 
     @commands.command(
@@ -49,7 +49,7 @@ class Administration(commands.Cog, name="Administration"):
             command = Sudo(self.bot, ctx)
 
             self.bot.serverSettings, self.bot.userSettings = await command.sudo(list(args))
-            await Sudo.save_configs(self.bot)
+            Sudo.save_configs(self.bot)
         else:
             await ctx.send(f"`{ctx.author}` is not in the sudoers file.  This incident will be reported.")
             Log.append_to_log(ctx, None, 'unauthorised')
@@ -87,7 +87,7 @@ class Administration(commands.Cog, name="Administration"):
             self.bot.serverSettings, self.bot.userSettings = await command.config(args)
 
         else: self.bot.serverSettings, self.bot.userSettings = await command.config([])
-        await Sudo.save_configs(self.bot)
+        Sudo.save_configs(self.bot)
         Log.append_to_log(ctx)
 
     @commands.command(
@@ -99,7 +99,7 @@ class Administration(commands.Cog, name="Administration"):
         try:
             Log.append_to_log(ctx)
             dm = await ctx.author.create_dm()
-            await dm.send(f'Here ya go: https://discord.com/api/oauth2/authorize?client_id={self.bot.botuser.id}&permissions=4228381776&scope=bot%20applications.commands')
+            await dm.send(discord.utils.oauth_url(client_id=self.bot.botuser.id, permissions=discord.Permissions(4228381776), scopes=['bot','applications.commands']))
         except discord.errors.Forbidden:
             await ctx.send('Sorry, I cannot open a DM at this time. Please check your privacy settings')
         except Exception as e:

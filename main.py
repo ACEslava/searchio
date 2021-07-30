@@ -3,7 +3,7 @@ from src.utils import Sudo, error_handler
 from dotenv import load_dotenv
 from os import getenv, path
 
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord_slash import SlashCommand
 from discord_components import DiscordComponents
 
@@ -18,32 +18,13 @@ import discord
 import asyncio
 
 def main():
-    # region utility functions
-    async def asyncTiming(interval, periodic_function): #handler for timed functions
-        while True:
-            print(round(time() - start_time, 1), "Starting periodic function")
-            await asyncio.gather(
-                asyncio.sleep(interval),
-                periodic_function(),
-            )
-
-    async def autosaveConfigs():
-        with open("serverSettings.yaml", "w") as data:
-            dump(bot.serverSettings, data, allow_unicode=True)
-        print('Server settings saved')
-
-        with open("userSettings.yaml", "w") as data:
-            dump(bot.userSettings, data, allow_unicode=True)
-        print('User settings saved')
-        return
-
     def prefix(bot, message):   # handler for individual guild prefixes
         try:
             commandprefix: str = bot.serverSettings[hex(message.guild.id)]['commandprefix']
         except Exception:
             commandprefix:str = '&'
         finally: return commandprefix
-    #endregion
+
     bot = commands.Bot(
         command_prefix=prefix, 
         intents=discord.Intents.all(), 
@@ -134,6 +115,7 @@ def main():
         bot.load_extension('src.administration_cog')
         bot.load_extension('src.administration_slashcog')
         bot.load_extension('src.search_engine_slashcog')
+        autosave.start()
 
         #add new servers to settings
         for servers in bot.guilds:
@@ -152,7 +134,7 @@ def main():
         for keys in delete_queue:
             del bot.serverSettings[keys]
 
-        await autosaveConfigs()
+        Sudo.save_configs(bot)
 
         with open("logs.csv", "r", newline='', encoding='utf-8-sig') as file:
             lines = [dict(row) for row in DictReader(file) if datetime.now(timezone.utc)-datetime.fromisoformat(row["Time"]) < timedelta(weeks=8)]
@@ -240,10 +222,15 @@ def main():
                         await helpMessage.clear_reactions()
                 else: pass
             else:
+                invite_link=discord.utils.oauth_url(
+                    client_id=bot.botuser.id, 
+                    permissions=discord.Permissions(4228381776), 
+                    scopes=['bot','applications.commands']
+                )
                 dm = await ctx.author.create_dm()
                 await dm.send(embed=embed)
                 await dm.send('\n'.join(['If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ',
-                f'Want to add the bot to your server? Use this invite link: https://discord.com/api/oauth2/authorize?client_id={bot.botuser.id}&permissions=4228381776&scope=bot%20applications.commands']))
+                f'Want to add the bot to your server? Use this invite link: {invite_link}']))
 
         except discord.errors.Forbidden:
             await ctx.send(
@@ -291,14 +278,23 @@ def main():
         except Exception as e:
             await error_handler(bot, ctx, e, args)
             return
-    
+
+    @tasks.loop(minutes=60.0)
+    async def autosave():
+        Sudo.save_configs(bot)
+        return
+
     load_dotenv()
-    asyncio.ensure_future(bot.start(getenv("DISCORD_TOKEN")))
 
-    #autosave configs
-    asyncio.ensure_future(asyncTiming(3600, autosaveConfigs))
-
-    start_time = time()
+    async def startup():
+        while 1:
+            try:
+                await bot.login(token=getenv("DISCORD_TOKEN"), bot=True)
+                await bot.connect(reconnect=True)
+            except discord.errors.ConnectionClosed:
+                await asyncio.sleep(10)
+                continue
+    asyncio.ensure_future(startup())
     asyncio.get_event_loop().run_forever()
     return
 

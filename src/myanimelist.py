@@ -3,9 +3,9 @@ from typing import Optional
 
 import discord
 from discord.ext import commands
-from discord.ext.commands import bot, context
-from mal import AnimeSearch
+from discord_components import Button, ButtonStyle
 
+from mal import AnimeSearch
 from src.utils import Log, error_handler, Sudo
 
 class MyAnimeListSearch:
@@ -60,29 +60,36 @@ class MyAnimeListSearch:
                         text=f"Please choose option or cancel\nPage {index+1}/{len(embeds)}"
                     )
 
-                await self.message.add_reaction("🗑️")
                 if len(embeds) > 1:
-                    await self.message.add_reaction("◀️")
-                    await self.message.add_reaction("▶️")
+                    emojis = ["🗑️","◀️","▶️"]
+                else:
+                    emojis = ["🗑️"]
+
+                await self.message.edit(
+                    content='', 
+                    embed=embeds[cur_page % len(embeds)],
+                    components=[[
+                        Button(style=ButtonStyle.blue, label=e, custom_id=e)
+                        for e in emojis
+                    ]]
+                )
 
                 while 1:
                     try:
-                        await self.message.edit(
-                            content='', embed=embeds[cur_page % len(embeds)]
-                        )
                         emojitask = asyncio.create_task(
                             self.bot.wait_for(
-                                "reaction_add",
+                                "button_click",
                                 check=
-                                    lambda reaction_, user_: Sudo.pageTurnCheck(
-                                        reaction_, 
-                                        user_, 
-                                        self.message, 
-                                        self.bot, 
-                                        self.ctx),
+                                    lambda b_ctx: Sudo.pageTurnCheck(
+                                        bot=self.bot,
+                                        ctx=self.ctx,
+                                        button_ctx=b_ctx,
+                                        message=self.message
+                                    ),
                                 timeout=60,
                             )
                         )
+
                         responsetask = asyncio.create_task(
                             self.bot.wait_for(
                                 "message",
@@ -95,18 +102,24 @@ class MyAnimeListSearch:
                         done, waiting = await asyncio.wait(
                             waiting, return_when=asyncio.FIRST_COMPLETED
                         )  # 30 seconds wait either reply or react
-                        if emojitask in done:
-                            reaction, user = emojitask.result()
-                            await self.message.remove_reaction(reaction, user)
 
-                            if str(reaction.emoji) == "🗑️":
+                        if emojitask in done:
+                            emojitask = emojitask.result()
+
+                            if str(emojitask.custom_id) == "🗑️":
                                 await self.message.delete()
                                 return
-                            elif str(reaction.emoji) == "◀️":
+                            elif str(emojitask.custom_id) == "◀️":
                                 cur_page -= 1
-                            elif str(reaction.emoji) == "▶️":
+                            elif str(emojitask.custom_id) == "▶️":
                                 cur_page += 1
 
+                            await emojitask.respond(
+                                type=7,
+                                content='',
+                                embed=embeds[cur_page % len(embeds)]
+                            )
+                        
                         elif responsetask in done:
                             try:
                                 emojitask.cancel()
@@ -146,22 +159,23 @@ class MyAnimeListSearch:
                                 embed.set_footer(text=f"Requested by {self.ctx.author}")
 
                                 Log.append_to_log(self.ctx, f"{self.ctx.command} result", anime_item.title)
-                                await self.message.clear_reactions()
-                                await self.message.edit(embed=embed)
-                                await self.message.add_reaction("🗑️")
-                                reaction, user = await self.bot.wait_for(
-                                    "reaction_add",
+                                await self.message.edit(
+                                    embed=embed,
+                                    components=[
+                                        Button(style=ButtonStyle.blue, label="🗑️", custom_id="🗑️")
+                                    ]
+                                )
+                                await self.bot.wait_for(
+                                    "button_click",
                                     check=
-                                        lambda reaction_, user_: Sudo.pageTurnCheck(
-                                            reaction_, 
-                                            user_, 
-                                            self.message, 
-                                            self.bot, 
-                                            self.ctx),
+                                        lambda button_ctx: Sudo.pageTurnCheck(
+                                            bot=self.bot,
+                                            ctx=self.ctx,
+                                            button_ctx=button_ctx,
+                                            message=self.message
+                                        ),
                                     timeout=60,
                                 )
-                                if str(reaction.emoji) == "🗑️":
-                                    await self.message.delete()
                                 return
 
                             except (ValueError, IndexError):
@@ -169,11 +183,12 @@ class MyAnimeListSearch:
                                 continue
 
                             except asyncio.TimeoutError:
-                                await self.message.clear_reactions()
+                                await self.message.edit(
+                                    components=[]
+                                )
                                 return
 
                     except UserCancel:
-
                         await self.message.delete()
 
                     except asyncio.TimeoutError:

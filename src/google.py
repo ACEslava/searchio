@@ -301,7 +301,7 @@ class GoogleSearch:
     async def translate(self) -> None:
         try:
             # translate string processing
-            query = self.query.lower().split(" ")
+            query = self.query.lower().replace('translate ','').split(" ")
 
             if len(query) > 1:
                 # processes keywords in query for language options
@@ -339,10 +339,11 @@ class GoogleSearch:
                     result = "\n".join(result)
                 embed = Embed(
                     title=f"{languages.get(alpha2=translator.from_lang).name}"
-                    + f" to {languages.get(alpha2=translator.to_lang).name} Translation",
-                    description=result + "\n\nReact with 🔍 to search Google",
+                    + f" to {languages.get(alpha2=translator.to_lang).name} Translation"
                 )
-                embed.set_footer(text=f"Requested by {self.ctx.author}")
+                embed.add_field(name=languages.get(alpha2=translator.from_lang).name, value=query)
+                embed.add_field(name=languages.get(alpha2=translator.to_lang).name, value=result)
+                embed.set_footer(text='\n'.join(["React with 🔍 to search Google",f"Requested by {self.ctx.author}"]))
                 # sets the reactions for the search result
                 
                 emojis = {"🗑️":None, "🔍":self.search_google_handler}
@@ -422,45 +423,36 @@ class GoogleSearch:
                 return embeds
 
             # definition string processing
-            query = self.query.lower().split(" ")
-
-            if len(query) > 1:
-                # queries dictionary API
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query[1:])}'
-                    ) as data:
-                        
-                        response = await data.json()
-                response = response[0]
-                # creates embed
-                embeds = [
-                    item
-                    for sublist in [
-                        definition_embed(word, response)
-                        for word in response["meanings"]
-                    ]
-                    for item in sublist
+            query = self.query.lower().replace('define ','').split(" ")
+            # queries dictionary API
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query)}'
+                ) as data:
+                    
+                    response = await data.json()
+            response = response[0]
+            # creates embed
+            embeds = [
+                item
+                for sublist in [
+                    definition_embed(word, response)
+                    for word in response["meanings"]
                 ]
-                for index, item in enumerate(embeds):
-                    item.set_footer(
-                        text=f"Page {index+1}/{len(embeds)}\n"
-                        f"React with 🔍 to search Google\n"
-                        f"Requested by: {str(self.ctx.author)}"
-                    )
-
-                emojis = {
-                    "🗑️":None, "◀️": None, "▶️": None,
-                    "🔍":self.search_google_handler
-                }
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, embeds, emojis)
-
-            else:
-                await self.message.edit(
-                    content=f"{get_loading_message()}",
-                    embed=None,
+                for item in sublist
+            ]
+            for index, item in enumerate(embeds):
+                item.set_footer(
+                    text=f"Page {index+1}/{len(embeds)}\n"
+                    f"React with 🔍 to search Google\n"
+                    f"Requested by: {str(self.ctx.author)}"
                 )
-                await self.google()
+
+            if len(embeds) > 1:
+                emojis = {"🗑️":None,"◀️":None,"▶️":None, "🔍":self.search_google_handler}
+            else:
+                emojis = {"🗑️":None, "🔍":self.search_google_handler}
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, embeds, emojis)
 
         except TimeoutError:
             raise
@@ -487,13 +479,8 @@ class GoogleSearch:
     async def weather(self) -> None:
         try:
             load_dotenv()
-            query = self.query.lower().split(" ")
+            query = self.query.lower().replace('weather ','').split(" ")
 
-            if len(query) <= 1:
-                await self.google()
-                return
-
-            del query[0]
             OPENWEATHERMAP_TOKEN = getenv("OPENWEATHERMAP_TOKEN")
             async with aiohttp.ClientSession() as session:
                 async with session.get(

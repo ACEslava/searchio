@@ -17,7 +17,7 @@ class AdministrationSlash(commands.Cog, name="Administration Slash"):
 
     async def cog_before_invoke(self, ctx):
         self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
-        await Sudo.save_configs(self.bot)
+        Sudo.save_configs(self.bot)
         return
 
     @cog_ext.cog_slash(

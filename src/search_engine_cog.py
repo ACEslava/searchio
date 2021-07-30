@@ -25,7 +25,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         old_userSettings = deepcopy(self.bot.userSettings)
         self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
         if old_userSettings != self.bot.userSettings:
-            await Sudo.save_configs(self.bot)
+            Sudo.save_configs(self.bot)
 
         #Leveling system
         self.bot.userSettings[ctx.author.id]['level']['xp'] += 1
@@ -33,7 +33,7 @@ class SearchEngines(commands.Cog, name="Search Engines"):
             self.bot.userSettings[ctx.author.id]['level']['xp'] = 0
             self.bot.userSettings[ctx.author.id]['level']['rank'] += 1
 
-            await Sudo.save_configs(self.bot)
+            Sudo.save_configs(self.bot)
 
             await ctx.send(
                 embed=discord.Embed(

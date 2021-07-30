@@ -54,14 +54,10 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
             ),
             create_option(
                 name='special',
-                description='Optional special modes',
+                description='Special functions',
                 option_type=3,
-                required=False,
+                required=True,
                 choices=[
-                    create_choice(
-                        name='translate',
-                        value='translate'
-                    ),
                     create_choice(
                         name='define',
                         value='define'
@@ -76,6 +72,35 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
     @commands.cooldown(1, 3, commands.BucketType.default)
     async def google(self, ctx, query:str, special:str=None):
         await self.genericSearch(ctx, GoogleSearch, query, special)
+        return
+
+    @cog_ext.cog_slash(
+        name = 'translate',
+        description='Use Google Translate',
+        options=[
+            create_option(
+                name='query',
+                description='Thing to translate',
+                option_type=3,
+                required=True
+            ),
+            create_option(
+                name='language_to',
+                description='Language to translate into',
+                option_type=3,
+                required=True
+            ),
+            create_option(
+                name='language_from',
+                description='Language to translate from',
+                option_type=3,
+                required=False
+            )
+        ])
+    @commands.cooldown(1, 3, commands.BucketType.default)
+    async def translate(self, ctx, query:str, language_to:str, language_from:str=None):
+        query = f'translate {query}{f" from {language_from}" if language_from is not None else ""} to {language_to}'
+        await self.genericSearch(ctx, GoogleSearch, query, 'translate')
         return
 
     # @commands.command(
@@ -132,7 +157,7 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
             old_userSettings = deepcopy(self.bot.userSettings)
             self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
             if old_userSettings != self.bot.userSettings:
-                await Sudo.save_configs(self.bot)
+                Sudo.save_configs(self.bot)
 
             #Leveling system
             self.bot.userSettings[ctx.author.id]['level']['xp'] += 1
@@ -140,7 +165,7 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
                 self.bot.userSettings[ctx.author.id]['level']['xp'] = 0
                 self.bot.userSettings[ctx.author.id]['level']['rank'] += 1
 
-                await Sudo.save_configs(self.bot)
+                Sudo.save_configs(self.bot)
 
                 await ctx.send(
                     embed=discord.Embed(
@@ -191,7 +216,9 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
                     else: raise TimeoutError
 
                 except TimeoutError: #after a minute, everything cancels
-                    await message.clear_reactions()
+                    await message.edit(
+                        components=[]
+                    )
                     messageEdit.cancel()
                     search.cancel()
                     continueLoop = False

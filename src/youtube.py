@@ -1,17 +1,17 @@
 from datetime import datetime, timedelta
-
-import asyncio
-import discord
-import os
-from discord import message
-from discord.ext.commands import bot, context
-import requests
-from requests.models import HTTPError
-import yaml
-from discord.ext import commands
-from pytube import YouTube as YoutubeDownload, query
+from pytube import YouTube as YoutubeDownload
 from youtube_search import YoutubeSearch as YTSearch
-from urllib import error as URLError
+import asyncio
+import os
+import requests
+import yaml
+
+import discord
+from discord import message
+from discord.ext.commands import bot
+from discord.ext import commands
+from discord_components import Button, ButtonStyle
+
 from src.loadingmessage import get_loading_message
 from src.utils import error_handler, Sudo
 
@@ -57,7 +57,7 @@ class YoutubeSearch:
             embed_.set_thumbnail(url=result_["thumbnails"][0])
             embed_.set_footer(text=f"Requested by {self.ctx.author}")
             return embed_
-        
+      
         def download_embed(result_) -> discord.Embed:
             return discord.Embed(
                 title=f"Available Videos",
@@ -67,60 +67,64 @@ class YoutubeSearch:
             )
 
         try:
-            result = YTSearch(self.query
-    , max_results=10).to_dict()
+            result = YTSearch(
+                self.query, 
+                max_results=10
+            ).to_dict()
 
             embeds = list(map(result_embed, result))
-
-            do_exit, cur_page = False, 0
-            await self.message.add_reaction("🗑️")
-            await self.message.add_reaction("⬇️")
-            if len(embeds) > 1:
-                await self.message.add_reaction("◀️")
-                await self.message.add_reaction("▶️")
-            elif len(embeds) == 0:
+            if len(embeds) == 0:
                 embed = discord.Embed(
                     description=f"No results found for: {self.query}"
                 )
                 await self.message.edit(content='', embed=embed)
                 await asyncio.sleep(60)
-                await self.message.delete()
                 return
+            elif len(embeds) == 1:
+                emojis = ["🗑️", "⬇️"]
+            else:
+                emojis = ["🗑️","◀️","▶️", "⬇️"]
             
-            while not do_exit:
+            cur_page = 0
+            await self.message.edit(
+                content='',
+                embed=embeds[cur_page % len(embeds)],
+                components=[[
+                    Button(style=ButtonStyle.blue, label=e, custom_id=e)
+                    for e in emojis
+                ]]
+            )
+            while 1:
                 try:
-                    await self.message.edit(
-                        content='', embed=embeds[cur_page % len(embeds)]
+                    resp = await self.bot.wait_for(
+                        "button_click",
+                        check=lambda b_ctx: b_ctx.message.id == self.message.id,
+                        timeout=60
                     )
-                    reaction, user = await self.bot.wait_for(
-                        "reaction_add",
-                        check=lambda reaction_, user_: all(
-                            [
-                                str(reaction_.emoji) in ["◀️", "▶️", "🗑️", "⬇️"],
-                                reaction_.message == self.message,
-                                not user_.self.bot,
-                            ]
-                        ),
-                        timeout=60,
-                    )
-                    await self.message.remove_reaction(reaction, user)
-                    if str(reaction.emoji) == "🗑️":
+
+                    if str(resp.custom_id) == "🗑️":
                         await self.message.delete()
-                        do_exit = True
-                    elif str(reaction.emoji) == "◀️":
+                        return
+                    elif str(resp.custom_id) == "◀️":
                         cur_page -= 1
-                    elif str(reaction.emoji) == "▶️":
+                    elif str(resp.custom_id) == "▶️":
                         cur_page += 1
-                    elif (
-                        str(reaction.emoji) == "⬇️"
-                        and self.userSettings[user.id]["downloadquota"]["dailyDownload"]
-                        < 50
-                    ):
-                        await self.message.remove_reaction(reaction, self.bot.user)
+                    elif str(resp.custom_id) in emojis:
+                        await resp.respond(
+                            type=7,
+                            content='',
+                            embed=embeds[cur_page % len(embeds)],
+                            components=[[
+                                Button(style=ButtonStyle.blue, label=e, custom_id=e)
+                                for e in emojis
+                                if e != '⬇️'
+                            ]]
+                        )
+
                         msg = [await self.ctx.send(
                             f"{get_loading_message()}"
                         )]
-                        yt = YoutubeDownload(embeds[cur_page].url)
+                        yt = YoutubeDownload(embeds[cur_page % len(embeds)].url)
 
                         download = yt.streams.filter(file_extension='mp4', progressive=True).order_by('resolution').fmt_streams
                         download = [vid for vid in download if round(vid.filesize_approx / 1000000, 2) < 100]
@@ -132,35 +136,41 @@ class YoutubeSearch:
 
                                 for index, item in enumerate(embeds):
                                     item.set_footer(
-                                        text=f"Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}"
+                                        text=f"Please choose option or cancel\nPage {index+1}/{len(embeds)}"
                                     )
 
-                                await msg[0].add_reaction("🗑️")
                                 if len(embeds) > 1:
-                                    await msg[0].add_reaction("◀️")
-                                    await msg[0].add_reaction("▶️")
-                                msg.append(await self.ctx.send("Please choose option or cancel"))
+                                    emojis = ["🗑️","◀️","▶️"]
+                                else:
+                                    emojis = ["🗑️"]
+
+                                await msg[0].edit(
+                                    content='', 
+                                    embed=embeds[cur_page % len(embeds)],
+                                    components=[[
+                                        Button(style=ButtonStyle.blue, label=e, custom_id=e)
+                                        for e in emojis
+                                    ]]
+                                )
 
                                 while 1:
-                                    await msg[0].edit(
-                                        content='', embed=embeds[cur_page % len(embeds)]
-                                    )
                                     emojitask = asyncio.create_task(
                                         self.bot.wait_for(
-                                            "reaction_add",
+                                            "button_click",
                                             check=
-                                                lambda reaction_, user_: Sudo.pageTurnCheck(
-                                                    reaction_, 
-                                                    user_, 
-                                                    self.message, 
-                                                    self.bot, 
-                                                    self.ctx),
+                                                lambda b_ctx: Sudo.pageTurnCheck(
+                                                    bot=self.bot,
+                                                    ctx=resp,
+                                                    button_ctx=b_ctx,
+                                                    message=msg[0]
+                                                ),
                                             timeout=60,
                                         )
                                     )
+
                                     responsetask = asyncio.create_task(
                                         self.bot.wait_for(
-                                            "self.message",
+                                            "message",
                                             check=lambda m: m.author == self.ctx.author,
                                             timeout=30,
                                         )
@@ -170,116 +180,101 @@ class YoutubeSearch:
                                     done, waiting = await asyncio.wait(
                                         waiting, return_when=asyncio.FIRST_COMPLETED
                                     )  # 30 seconds wait either reply or react
-                                    if emojitask in done:
-                                        reaction, user = emojitask.result()
-                                        await msg[0].remove_reaction(reaction, user)
 
-                                        if str(reaction.emoji) == "🗑️":
-                                            await msg[0].delete()
+                                    if emojitask in done:
+                                        emojitask = emojitask.result()
+
+                                        if str(emojitask.custom_id) == "🗑️":
+                                            await self.message.delete()
                                             return
-                                        elif str(reaction.emoji) == "◀️":
+                                        elif str(emojitask.custom_id) == "◀️":
                                             cur_page -= 1
-                                        elif str(reaction.emoji) == "▶️":
+                                        elif str(emojitask.custom_id) == "▶️":
                                             cur_page += 1
+
+                                        await emojitask.respond(
+                                            type=7,
+                                            content='',
+                                            embed=embeds[cur_page % len(embeds)]
+                                        )
 
                                     elif responsetask in done:
                                         try:
-                                            try:
-                                                emojitask.cancel()
-                                                input = responsetask.result()
-                                                await input.delete()
-                                                if input.content.lower() == "cancel":
-                                                    raise UserCancel
+                                            emojitask.cancel()
+                                            input = responsetask.result()
+                                            await input.delete()
+                                            if input.content.lower() == "cancel":
+                                                raise UserCancel
 
-                                                input = int(input.content)
+                                            input = int(input.content)
 
-                                            except (ValueError, IndexError):
-                                                await msg[-1].edit(
-                                                    content="Invalid choice. Please choose a number between 0-9 or cancel"
-                                                )
-                                                continue
+                                        except (ValueError, IndexError):
+                                            await msg[-1].edit(
+                                                content="Invalid choice. Please choose a number between 0-9 or cancel"
+                                            )
+                                            continue
 
-                                            try:
-                                                for self.message in msg: await self.message.delete()
-                                                msg = [await self.ctx.send(f"{get_loading_message()}")]
-                                                download = download[cur_page][input]
+                                        for self.message in msg: await self.message.delete()
+                                        msg = [await self.ctx.send(f"{get_loading_message()}")]
+                                        download = download[cur_page][input]
 
-                                                self.userSettings[user.id]["downloadquota"]["dailyDownload"] += round(download.filesize_approx / 1000000, 2)
-                                                self.userSettings[user.id]["downloadquota"]["lifetimeDownload"] += round(download.filesize_approx / 1000000, 2)
-                                                download.download(output_path="./src/cache")
+                                        self.userSettings[resp.author.id]["downloadquota"]["dailyDownload"] += round(download.filesize_approx / 1000000, 2)
+                                        self.userSettings[resp.author.id]["downloadquota"]["lifetimeDownload"] += round(download.filesize_approx / 1000000, 2)
+                                        download.download(output_path="./src/cache")
 
-                                                best_server = requests.get(
-                                                    url="https://api.gofile.io/getServer"
-                                                ).json()["data"]["server"]
+                                        best_server = requests.get(
+                                            url="https://api.gofile.io/getServer"
+                                        ).json()["data"]["server"]
 
-                                                with open(
-                                                    f'{os.path.abspath(f"./src/cache/{download.default_filename}")}',
-                                                    "rb",
-                                                ) as f:
-                                                    url = f"https://{best_server}.gofile.io/uploadFile"
-                                                    params = {
-                                                        "expire": round(
-                                                            datetime.timestamp(
-                                                                datetime.now() + timedelta(minutes=10)
-                                                            )
-                                                        )
-                                                    }
-                                                    share_link = requests.post(
-                                                        url=url,
-                                                        params=params,
-                                                        files={
-                                                            f'@{os.path.abspath(f"./src/cache/{download.default_filename}")}': f
-                                                        },
-                                                    ).json()["data"]["downloadPage"]
-
-                                                os.remove(f"./src/cache/{download.default_filename}")
-                                                embed = discord.Embed(
-                                                    description=(
-                                                        f"{share_link}\n\n"
-                                                        "You now have "
-                                                        f"{50 - round(self.userSettings[user.id]['downloadquota']['dailyDownload'], 3)}MB "
-                                                        f"left in your daily quota. "
-                                                        "Negative values mean your daily quota for the next day will be subtracted."
+                                        with open(
+                                            f'{os.path.abspath(f"./src/cache/{download.default_filename}")}',
+                                            "rb",
+                                        ) as f:
+                                            url = f"https://{best_server}.gofile.io/uploadFile"
+                                            params = {
+                                                "expire": round(
+                                                    datetime.timestamp(
+                                                        datetime.now() + timedelta(minutes=10)
                                                     )
                                                 )
-                                                embed.set_footer(text=f"Requested by {user}")
-                                                for self.message in msg: await self.message.delete()
-                                                await self.ctx.send(embed=embed)
+                                            }
+                                            share_link = requests.post(
+                                                url=url,
+                                                params=params,
+                                                files={
+                                                    f'@{os.path.abspath(f"./src/cache/{download.default_filename}")}': f
+                                                },
+                                            ).json()["data"]["downloadPage"]
 
-                                                with open("userSettings.yaml", "w") as data:
-                                                    yaml.dump(self.userSettings, data, allow_unicode=True)
+                                        os.remove(f"./src/cache/{download.default_filename}")
+                                        embed = discord.Embed(
+                                            description=(
+                                                f"{share_link}\n\n"
+                                                "You now have "
+                                                f"{50 - round(self.userSettings[resp.author.id]['downloadquota']['dailyDownload'], 3)}MB "
+                                                f"left in your daily quota. "
+                                                "Negative values mean your daily quota for the next day will be subtracted."
+                                            )
+                                        )
+                                        embed.set_footer(text=f"Requested by {resp.author}")
+                                        for self.message in msg: await self.message.delete()
+                                        await self.ctx.send(embed=embed)
 
-                                                return
-                                            except asyncio.TimeoutError:
-                                                await msg[0].clear_reactions()
-                                                return
+                                        with open("userSettings.yaml", "w") as data:
+                                            yaml.dump(self.userSettings, data, allow_unicode=True)
+                        return
 
-                                        except (UserCancel, asyncio.TimeoutError):
-                                            for self.message in msg:
-                                                await self.message.delete()
-                                            return
+                    await resp.respond(
+                        type=7,
+                        content='',
+                        embed=embeds[cur_page % len(embeds)]
+                    )
 
-                                        except asyncio.CancelledError:
-                                            pass
-
-                                        except Exception:
-                                            for self.message in msg:
-                                                await self.message.delete()
-                                            raise
-
-                        else:
-                            embed = discord.Embed(
-                                description=(
-                                    f"{user}, "
-                                    f"no videos are eligible to download due to maximum filesize constraints (100MB)"
-                                )
-                            )
-                            await msg[0].edit(content='', embed=embed)
-
-                except asyncio.TimeoutError:
-                    await self.message.clear_reactions()
-                except (asyncio.CancelledError, discord.errors.NotFound):
-                    pass
+                except TimeoutError:
+                    await self.message.edit(
+                        components=[]
+                    )
+                    return
 
         except UserCancel:
             await self.ctx.send(f"Cancelled")
@@ -288,7 +283,7 @@ class YoutubeSearch:
             await self.ctx.send(f"Search timed out. Aborting")
 
         except Exception as e:
-            await error_handler(self.bot, self.ctx, e, self.query
-    )
+            await error_handler(self.bot, self.ctx, e, self.query)
         finally:
             return
+      

@@ -149,13 +149,16 @@ class Sudo:
     def is_authorized_command(bot: commands.Bot, ctx: Union[commands.Context, SlashContext]) -> bool:
         server_settings = bot.serverSettings
         if type(ctx) is SlashContext:
+            role = next(
+                (x for x in ctx.guild.roles if x.id == bot.serverSettings[hex(ctx.guild.id)]['blacklist']), 
+                None
+            )
+            if ctx.command in ['translate', 'weather', 'define']:
+                ctx.command = 'google'
             check = all(
                 [
                     ctx.author.id not in server_settings[hex(ctx.guild.id)]["blacklist"],
-                    not any(
-                        role.id in server_settings[hex(ctx.guild.id)]["blacklist"]
-                        for role in ctx.author.roles
-                    ),
+                    ctx.author.id not in [m.id for m in role.members] if role is not None else True,
                     server_settings[hex(ctx.guild.id)]["searchEngines"][ctx.command]
                     is not False,
                 ]
@@ -175,7 +178,7 @@ class Sudo:
         return any([check, Sudo.is_sudoer(bot, ctx)])
 
     @staticmethod
-    def pageTurnCheck(reaction, user, message, bot, ctx, valid_emojis=["◀️", "▶️", "🗑️"]) -> bool:
+    def pageTurnCheck(bot, ctx, button_ctx, message) -> bool:
         server_settings = bot.serverSettings
 
         if server_settings is None:
@@ -183,34 +186,34 @@ class Sudo:
                 server_settings = load(data, FullLoader)
 
         # Checks if sudoer is owner
-        is_owner = user.id == bot.owner_id
+        is_owner = button_ctx.author.id == bot.owner_id
 
         # Checks if sudoer is server owner
         if ctx.guild:
-            is_server_owner = user.id == ctx.guild.owner_id
+            is_server_owner = button_ctx.author.id == ctx.guild.owner_id
         else:
             is_server_owner = False
 
         # Checks if sudoer has the designated adminrole or is a sudoer
         try:
-            has_admin = server_settings[hex(ctx.guild.id)]["adminrole"] in [
-                role.id for role in user.roles
-            ]
-            is_sudoer = user.id in server_settings[hex(ctx.guild.id)]["sudoer"]
+            role = discord.utils.find(
+                lambda r: r.id == bot.serverSettings[hex(ctx.guild.id)]['adminrole'],
+                ctx.guild.roles)
+            has_admin = button_ctx.author.id in [m.id for m in role.members] if role is not None else False
+            is_sudoer = button_ctx.author.id in server_settings[hex(ctx.guild.id)]["sudoer"]
         except Exception as e:
             print(e)
         finally:
             return all(
                 [
                     (
-                        user == ctx.author or 
+                        button_ctx.author.id == ctx.author.id or 
                         any([is_owner, is_server_owner, has_admin, is_sudoer])
                     ),
-                    str(reaction.emoji) in valid_emojis,
-                    reaction.message == message,
+                    button_ctx.message.id == message.id
                 ]
             )
-
+    
     @staticmethod
     async def multi_page_system(
         bot: commands.bot, 
@@ -218,43 +221,6 @@ class Sudo:
         message: discord.Message, 
         embeds:'list[discord.Embed]',
         emojis: 'dict[str:function]'):
-
-        def check(button_ctx):
-            server_settings = bot.serverSettings
-
-            if server_settings is None:
-                with open("serverSettings.yaml", "r") as data:
-                    server_settings = load(data, FullLoader)
-
-            # Checks if sudoer is owner
-            is_owner = button_ctx.author.id == bot.owner_id
-
-            # Checks if sudoer is server owner
-            if ctx.guild:
-                is_server_owner = button_ctx.author.id == ctx.guild.owner_id
-            else:
-                is_server_owner = False
-
-            # Checks if sudoer has the designated adminrole or is a sudoer
-            try:
-                role = next(
-                    (x for x in ctx.guild.roles if x.id == bot.serverSettings[hex(ctx.guild.id)]['adminrole']), 
-                    None
-                )
-                has_admin = button_ctx.author.id in [m.id for m in role.members] if role is not None else False
-                is_sudoer = button_ctx.author.id in server_settings[hex(ctx.guild.id)]["sudoer"]
-            except Exception as e:
-                print(e)
-            finally:
-                return all(
-                    [
-                        (
-                            button_ctx.author.id == ctx.author.id or 
-                            any([is_owner, is_server_owner, has_admin, is_sudoer])
-                        ),
-                        button_ctx.message.id == message.id
-                    ]
-                )
 
         # multipage result display
         cur_page = 0
@@ -271,7 +237,12 @@ class Sudo:
             try:
                 resp = await bot.wait_for(
                     "button_click",
-                    check=check,
+                    check=lambda b_ctx: Sudo.pageTurnCheck(
+                        bot=bot,
+                        ctx=ctx,
+                        button_ctx=b_ctx,
+                        message=message
+                    ),
                     timeout=60
                 )
 
@@ -299,7 +270,7 @@ class Sudo:
                 return
     
     @staticmethod
-    async def save_configs(bot):
+    def save_configs(bot):
         with open("serverSettings.yaml", "w") as data:
             dump(bot.serverSettings, data, allow_unicode=True)
         print('Server settings saved')
@@ -1457,19 +1428,20 @@ async def error_handler(
             description=f"An unknown error has occured, please try again later. \n If you wish to report this error, react with 🐛"
         )
         embed.set_footer(text=f"Error Code: {error_code}")
-        error_msg = await ctx.send(embed=embed)
-        await error_msg.add_reaction("🐛")
-
+        error_msg = await ctx.send(
+            embed=embed,
+            components=[Button(style=ButtonStyle.red, label="🐛", custom_id="🐛")])
+        
         try:
             # DMs a feedback form to the user
             response = None
             await bot.wait_for(
                 "reaction_add",
-                check=lambda reaction, user: user == ctx.author
-                and str(reaction.emoji) == "🐛",
+                check=lambda b_ctx: b_ctx.user.id == ctx.author.id,
                 timeout=60,
             )
-            await error_msg.clear_reactions()
+            await error_msg.edit(components=[])
+            
             dm = await ctx.author.create_dm()
             err_form = await dm.send(
                 "Please send a message containing any feedback regarding this bug."
@@ -1524,6 +1496,7 @@ async def error_handler(
         error_logging_channel = ctx.channel
     else:
         error_logging_channel = await bot.fetch_channel(829172391557070878)
+    
     try:
         err_report = await error_logging_channel.send(string)
     except HTTPException as e:
@@ -1545,9 +1518,9 @@ async def error_handler(
             await error_logging_channel.send(string)
             await error_logging_channel.send(file=discord.File(f"./src/cache/errorReport_{error_code}.txt"))
             os.remove(f"./src/cache/errorReport_{error_code}.txt")
-            return
-            
+            return       
     except Exception as e:
         print(e)
+    
     await err_report.add_reaction("✅")
     return
