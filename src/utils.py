@@ -745,11 +745,21 @@ class Sudo:
                     or re.search("^on", args[1].lower())
                 ):
                     self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = True
+                    await self.ctx.send(
+                        embed=discord.Embed(
+                            description='Safesearch enabled'
+                        ),
+                    )
                 elif bool(
                     re.search("^disable", args[1].lower())
                     or re.search("^off", args[1].lower())
                 ):
                     self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = False
+                    await self.ctx.send(
+                        embed=discord.Embed(
+                            description='Safesearch disabled'
+                        ),
+                    )
                 else:
                     embed = discord.Embed(
                         title=args[0],
@@ -821,7 +831,11 @@ class Sudo:
                         self.bot.serverSettings[hex(self.ctx.guild.id)][
                             "adminrole"
                         ] = adminrole.id
-                        await self.ctx.send(f"`{adminrole.name}` is now the admin role")
+                        await self.ctx.send(
+                            embed=discord.Embed(
+                                description=f"`{adminrole.name}` is now the admin role"
+                            )
+                        )
                         break
                     except (ValueError, AttributeError):
                         error_msg = await self.ctx.send(
@@ -898,7 +912,11 @@ class Sudo:
                     response = args[1]
 
                 self.bot.serverSettings[hex(self.ctx.guild.id)]["commandprefix"] = response
-                await self.ctx.send(f"`{response}` is now the guild prefix")
+                await self.ctx.send(
+                    embed=discord.Embed(
+                        description=f"`{response}` is now the guild prefix"
+                    )
+                )
             # endregion
 
             # region user config settings

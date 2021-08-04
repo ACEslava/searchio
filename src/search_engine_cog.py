@@ -22,32 +22,33 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         return
 
     async def cog_before_invoke(self, ctx):
-        old_userSettings = deepcopy(self.bot.userSettings)
-        self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
-        if old_userSettings != self.bot.userSettings:
-            Sudo.save_configs(self.bot)
+        if Sudo.is_authorized_command(self.bot, ctx):
+            old_userSettings = deepcopy(self.bot.userSettings)
+            self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
+            if old_userSettings != self.bot.userSettings:
+                Sudo.save_configs(self.bot)
 
-        #Leveling system
-        self.bot.userSettings[ctx.author.id]['level']['xp'] += 1
-        if self.bot.userSettings[ctx.author.id]['level']['xp'] >= self.bot.userSettings[ctx.author.id]['level']['rank']*10:
-            self.bot.userSettings[ctx.author.id]['level']['xp'] = 0
-            self.bot.userSettings[ctx.author.id]['level']['rank'] += 1
+            #Leveling system
+            self.bot.userSettings[ctx.author.id]['level']['xp'] += 1
+            if self.bot.userSettings[ctx.author.id]['level']['xp'] >= self.bot.userSettings[ctx.author.id]['level']['rank']*10:
+                self.bot.userSettings[ctx.author.id]['level']['xp'] = 0
+                self.bot.userSettings[ctx.author.id]['level']['rank'] += 1
 
-            Sudo.save_configs(self.bot)
+                Sudo.save_configs(self.bot)
 
-            await ctx.send(
-                embed=discord.Embed(
-                    description=f"Congratulations {ctx.author}, you are now level {self.bot.userSettings[ctx.author.id]['level']['rank']}"
+                await ctx.send(
+                    embed=discord.Embed(
+                        description=f"Congratulations {ctx.author}, you are now level {self.bot.userSettings[ctx.author.id]['level']['rank']}"
+                    )
                 )
-            )
 
-        # if ctx.command.name == 's' and self.bot.userSettings[ctx.author.id]['searchAlias'] is not None:
-        #     Log.append_to_log(ctx, self.bot.userSettings[ctx.author.id]['searchAlias'])
-        # elif ctx.command.name == 's':
-        #     Log.append_to_log(ctx, 's', 'Not set')
-        # else:
-        Log.append_to_log(ctx)
-        return
+            # if ctx.command.name == 's' and self.bot.userSettings[ctx.author.id]['searchAlias'] is not None:
+            #     Log.append_to_log(ctx, self.bot.userSettings[ctx.author.id]['searchAlias'])
+            # elif ctx.command.name == 's':
+            #     Log.append_to_log(ctx, 's', 'Not set')
+            # else:
+            Log.append_to_log(ctx)
+            return
 
     @commands.command(
         name = 'wiki',
