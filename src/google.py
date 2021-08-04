@@ -47,11 +47,23 @@ class GoogleSearch:
         return
 
     async def __call__(self) -> None:
-        if bool(re.search('translate', self.query.lower())) or 'translate' in self.args:
+        if any([
+            bool(re.search('translate', self.query.lower())),
+            'translate' in self.args
+        ]):
             await self.translate()
-        elif bool(re.search('define', self.query.lower())) or 'define' in self.args:
+
+        elif any([
+            bool(re.search('define', self.query.lower())), 
+            bool(re.search('meaning', self.query.lower())),
+            'define' in self.args
+        ]):
             await self.define()
-        elif bool(re.search('weather', self.query.lower())) or 'weather' in self.args:
+
+        elif any([
+            bool(re.search('weather', self.query.lower())),
+            'weather' in self.args
+        ]):
             await self.weather()
         else: 
             await self.google()
@@ -479,13 +491,15 @@ class GoogleSearch:
     async def weather(self) -> None:
         try:
             load_dotenv()
-            query = self.query.lower().replace('weather ','').split(" ")
+            query = self.query.lower().replace('weather','').strip()
 
             OPENWEATHERMAP_TOKEN = getenv("OPENWEATHERMAP_TOKEN")
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f'https://nominatim.openstreetmap.org/search.php?q={" ".join(query).replace(" ", "+")}&format=jsonv2',
-                    headers={'Accept-Language':'en-US'}
+                    f'https://nominatim.openstreetmap.org/search.php?city={query.replace(" ", "+")}&format=jsonv2&limit=10',
+                    headers={
+                        'Accept-Language':'en-US'
+                    }
                 ) as data:
 
                     geocode = await data.json()
@@ -589,35 +603,35 @@ class GoogleSearch:
             font = ImageFont.truetype("./src/cache/NotoSans-Bold.ttf", 48)
 
             draw.text(
-                (1100, 265),
+                (1200, 265),
                 weekDayCodes[datetime.fromtimestamp(json["current"]['dt']+json['timezone_offset'], timezone.utc).weekday()],
                 (255,255,255),
                 font=font
             )
 
             draw.text(
-                (1100, 315),
+                (1200, 315),
                 f'Precipitation: {json["hourly"][0]["pop"]*100}%',
                 (255,255,255),
                 font=font
             )
 
             draw.text(
-                (1100, 365),
+                (1200, 365),
                 f'Humidity: {json["current"]["humidity"]}%',
                 (255,255,255),
                 font=font
             )
 
             draw.text(
-                (1100, 415),
+                (1200, 415),
                 f'Wind: {json["current"]["wind_speed"]}m/s @ {json["current"]["wind_deg"]}°',
                 (255,255,255),
                 font=font
             )
 
             draw.text(
-                (1100, 465),
+                (1200, 465),
                 json["current"]["weather"][0]["main"],
                 (255,255,255),
                 font=font
