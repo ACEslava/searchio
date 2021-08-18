@@ -65,6 +65,7 @@ class GoogleSearch:
             'weather' in self.args
         ]):
             await self.weather()
+        
         else: 
             await self.google()
         return
@@ -204,17 +205,21 @@ class GoogleSearch:
             # format: https://google.com/search?pws=0&q=[query]&uule=[uule string]&num=[number of results]&safe=[safesearch status]
             url = "".join(
                 [
-                    "https://google.com/search?pws=0&q=",
-                    self.query.replace(" ", "+"),
-                    f'{"+-stock+-pinterest" if has_found_image else ""}',
-                    f"&uule={uule_parse}&num=5"
-                    f"{'&safe=active' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] and not self.ctx.channel.nsfw else ''}",
+                "https://google.com/search?pws=0&q=",
+                self.query.replace(" ", "+"),
+                f'{"+-stock+-pinterest" if has_found_image else ""}',
+                f"&uule={uule_parse}&num=5"
+                f"{'&safe=active' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] and not self.ctx.channel.nsfw else ''}"
                 ]
             )
 
             # gets the webscraped html of the google search
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers={'User-Agent':'python-requests/2.25.1'}) as data:
+                async with session.get(
+                    url, 
+                    headers={'User-Agent':'python-requests/2.25.1'}
+                ) as data:
+
                     soup, index = BeautifulSoup(await data.text(), features="lxml"), 3
 
             # Debug HTML output
@@ -313,7 +318,12 @@ class GoogleSearch:
     async def translate(self) -> None:
         try:
             # translate string processing
-            query = self.query.lower().replace('translate ','').split(" ")
+            query = self.query \
+                .lower() \
+                .replace('translate','') \
+                .strip() \
+                .split(" ")
+
 
             if len(query) > 1:
                 # processes keywords in query for language options
@@ -412,16 +422,18 @@ class GoogleSearch:
                             ),
                         )
                     )
+
                     embeds[-1].add_field(
                         name="Synonyms",
-                        value=", ".join(definition["synonyms"])
-                        if "synonyms" in definition.keys()
-                        else "None",
+                        value=
+                            ", ".join(definition["synonyms"])
+                            if "synonyms" in definition.keys() and len(definition["synonyms"]) > 0
+                            else "None"
                     )
                     embeds[-1].add_field(
                         name="Example",
                         value=definition["example"]
-                        if "example" in definition.keys()
+                        if "example" in definition.keys() and len(definition["example"]) > 0
                         else "None",
                     )
                     embeds[-1].add_field(
@@ -435,7 +447,12 @@ class GoogleSearch:
                 return embeds
 
             # definition string processing
-            query = self.query.lower().replace('define ','').split(" ")
+            query = self.query \
+                .lower() \
+                .replace('define','') \
+                .strip() \
+                .split(" ")
+
             # queries dictionary API
             async with aiohttp.ClientSession() as session:
                 async with session.get(
@@ -453,6 +470,7 @@ class GoogleSearch:
                 ]
                 for item in sublist
             ]
+
             for index, item in enumerate(embeds):
                 item.set_footer(
                     text=f"Page {index+1}/{len(embeds)}\n"
@@ -491,7 +509,10 @@ class GoogleSearch:
     async def weather(self) -> None:
         try:
             load_dotenv()
-            query = self.query.lower().replace('weather','').strip()
+            query = self.query \
+                .lower() \
+                .replace('weather','') \
+                .strip()
 
             OPENWEATHERMAP_TOKEN = getenv("OPENWEATHERMAP_TOKEN")
             async with aiohttp.ClientSession() as session:

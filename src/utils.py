@@ -319,11 +319,13 @@ class Sudo:
         try:
             if len(args) == 1:
                 user = await self.user_search(" ".join(args))
-                role = self.ctx.guild.get_role(int("".join(args)))
+                role = self.ctx.guild \
+                    .get_role(int("".join(args)))
+                
                 if user is not None:
-                    self.bot.serverSettings[hex(self.ctx.guild.id)]["blacklist"].append(
-                        user.id
-                    )
+                    self.bot.serverSettings \
+                        [hex(self.ctx.guild.id)]["blacklist"] \
+                        .append(user.id)
                     await self.ctx.send(
                         embed=discord.Embed(
                             description=f"`{str(user)}` blacklisted"
@@ -331,9 +333,9 @@ class Sudo:
                     )
                 
                 elif role is not None:
-                    self.bot.serverSettings[hex(self.ctx.guild.id)]["blacklist"].append(
-                        role.id
-                    )
+                    self.bot.serverSettings \
+                        [hex(self.ctx.guild.id)]["blacklist"] \
+                        .append(role.id)
                     
                     await self.ctx.send(
                         embed=discord.Embed(
@@ -357,11 +359,12 @@ class Sudo:
             if len(args) == 1:
                 try:
                     user = await self.user_search(" ".join(args))
-                    role = self.ctx.guild.get_role(int("".join(args)))
+                    role = self.ctx.guild \
+                        .get_role(int("".join(args)))
                     if user is not None:
-                        self.bot.serverSettings[hex(self.ctx.guild.id)][
-                            "blacklist"
-                        ].remove(user.id)
+                        self.bot.serverSettings \
+                            [hex(self.ctx.guild.id)]["blacklist"] \
+                            .remove(user.id)
                         
                         await self.ctx.send(
                             embed=discord.Embed(
@@ -371,9 +374,9 @@ class Sudo:
                     
                     elif role is not None:
                         
-                        self.bot.serverSettings[hex(self.ctx.guild.id)][
-                            "blacklist"
-                        ].remove(role.id)
+                        self.bot.serverSettings \
+                            [hex(self.ctx.guild.id)]["blacklist"] \
+                            .remove(role.id)
                         
                         await self.ctx.send(
                             embed=discord.Embed(
@@ -397,16 +400,17 @@ class Sudo:
         try:
             if (
                 self.ctx.author.id == self.bot.owner_id
-                or self.ctx.author.id == self.ctx.guild.owner_id
-            ):
+                or self.ctx.author.id == self.ctx.guild.owner_id):
+
                 user = await self.user_search(" ".join(args))
                 if (
                     user.id
-                    not in self.bot.serverSettings[hex(self.ctx.guild.id)]["sudoer"]
-                ):
-                    self.bot.serverSettings[hex(self.ctx.guild.id)]["sudoer"].append(
-                        user.id
-                    )
+                    not in self.bot.serverSettings \
+                        [hex(self.ctx.guild.id)]["sudoer"]):
+
+                    self.bot.serverSettings \
+                        [hex(self.ctx.guild.id)]["sudoer"] \
+                        .append(user.id)
                     
                     await self.ctx.send(
                         embed=discord.Embed(
@@ -429,18 +433,23 @@ class Sudo:
         try:
             if (
                 self.ctx.author.id == self.bot.owner_id
-                or self.ctx.author.id == self.ctx.guild.owner_id
-            ):
+                or self.ctx.author.id == self.ctx.guild.owner_id):
+
                 user = await self.user_search(" ".join(args))
-                if user.id in self.bot.serverSettings[hex(self.ctx.guild.id)]["sudoer"]:
-                    self.bot.serverSettings[hex(self.ctx.guild.id)]["sudoer"].remove(
-                        user.id
-                    )
+                
+                if user.id in self.bot.serverSettings \
+                    [hex(self.ctx.guild.id)]["sudoer"]:
+                    
+                    self.bot.serverSettings \
+                        [hex(self.ctx.guild.id)]["sudoer"] \
+                        .remove(user.id)
+
                     await self.ctx.send(
                         embed=discord.Embed(
                             description=f"`{str(user)}` has been removed from sudo"
                         )
                     )
+                
                 else:
                     await self.ctx.send(
                         embed=discord.Embed(
@@ -1443,7 +1452,7 @@ async def error_handler(
     if bot.devmode is False:
         # error message for the server
         embed = discord.Embed(
-            description=f"An unknown error has occured, please try again later. \n If you wish to report this error, react with 🐛"
+            description=f"An unknown error has occured, please try again later. \n If you wish to report this error, press 🐛"
         )
         embed.set_footer(text=f"Error Code: {error_code}")
         error_msg = await ctx.send(
@@ -1454,7 +1463,7 @@ async def error_handler(
             # DMs a feedback form to the user
             response = None
             await bot.wait_for(
-                "reaction_add",
+                "button_click",
                 check=lambda b_ctx: b_ctx.user.id == ctx.author.id,
                 timeout=60,
             )
