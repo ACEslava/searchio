@@ -12,3 +12,4 @@ __pycache__/
 .python-version
 .replit
 .breakpoints
+src/cache/

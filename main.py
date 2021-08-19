@@ -1,6 +1,8 @@
 from src.utils import Sudo, error_handler
 from dotenv import load_dotenv
-from os import getenv, path, listdir, remove
+from pathlib import Path
+from shutil import rmtree
+import os
 
 from discord.ext import commands, tasks
 from discord_slash import SlashCommand
@@ -36,15 +38,17 @@ def main():
 
     #region filecheck code
     #checks if required files exist
-    if not path.exists('logs.csv'):
+    Path("./src/cache").mkdir(parents=True, exist_ok=True)
+
+    if not os.path.exists('logs.csv'):
         with open('logs.csv', 'w') as file:
             file.write('Time,Guild,User,User_Plaintext,Command,Args')
 
-    if not path.exists('serverSettings.yaml'):
+    if not os.path.exists('serverSettings.yaml'):
         with open('serverSettings.yaml', 'w') as file:
             file.write('')
 
-    if not path.exists('userSettings.yaml'):
+    if not os.path.exists('userSettings.yaml'):
         with open('userSettings.yaml', 'w') as file:
             file.write('')
 
@@ -278,17 +282,16 @@ def main():
     
     @tasks.loop(minutes=120.0)
     async def cache_clear():
-        files = [f for f in listdir('./src/cache') if path.isfile(path.join('./src/cache', f))]
-        files.remove('.gitignore')
-        for f in files: 
-            remove(f'./src/cache/{f}') #os.remove
+        rmtree('./src/cache')
+        Path("./src/cache").mkdir(parents=True, exist_ok=True)
+        return
 
     load_dotenv()
 
     async def startup():
         while 1:
             try:
-                await bot.login(token=getenv("DISCORD_TOKEN"), bot=True)
+                await bot.login(token=os.getenv("DISCORD_TOKEN"), bot=True)
                 await bot.connect(reconnect=True)
             except discord.errors.ConnectionClosed:
                 await asyncio.sleep(10)
