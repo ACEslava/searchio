@@ -56,7 +56,7 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
                 name='special',
                 description='Special functions',
                 option_type=3,
-                required=True,
+                required=False,
                 choices=[
                     create_choice(
                         name='define',

@@ -1,6 +1,6 @@
 from src.utils import Sudo, Log, error_handler
 from discord.ext import commands
-from datetime import datetime
+from time import time
 import discord
 
 class Administration(commands.Cog, name="Administration"):
@@ -16,9 +16,10 @@ class Administration(commands.Cog, name="Administration"):
     @commands.command(
         name='log',
         brief='DMs a .csv file of all the logs that the bot has for your username or guild if a sudoer.',
-        usage='log')
+        usage='log',
+        aliases=['logs'])
     async def logging(self, ctx): 
-        await Log.log_request(self.bot, ctx, self.bot.serverSettings, self.bot.userSettings)
+        await Log.log_request(self.bot, ctx)
         return
 
     @commands.command(
@@ -113,9 +114,9 @@ class Administration(commands.Cog, name="Administration"):
         help="Sends SearchIO's DiscordAPI connection latency")
     async def ping(self, ctx):
         try:
-            beforeTime = datetime.now()
+            beforeTime = time()
             message = await ctx.send('Testing')
-            serverLatency = datetime.now() - beforeTime
+            serverLatency = time() - beforeTime
             embed = discord.Embed(description='\n'.join(
                             [f'Message Send Time: `{round(serverLatency.total_seconds()*1000, 2)}ms`',
                             f'API Heartbeat: `{round(self.bot.latency, 2)*100}ms`']))

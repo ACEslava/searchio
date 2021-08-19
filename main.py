@@ -1,7 +1,6 @@
-import discord_slash
 from src.utils import Sudo, error_handler
 from dotenv import load_dotenv
-from os import getenv, path
+from os import getenv, path, listdir, remove
 
 from discord.ext import commands, tasks
 from discord_slash import SlashCommand
@@ -11,8 +10,6 @@ from asyncio import TimeoutError
 from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta, timezone
-from requests import get
-from time import time
 
 import discord
 import asyncio
@@ -30,7 +27,7 @@ def main():
         intents=discord.Intents.all(), 
         help_command=None)
 
-    slash = SlashCommand(
+    SlashCommand(
         bot, 
         sync_commands=True, 
         sync_on_cog_reload=True,
@@ -64,7 +61,7 @@ def main():
     async def on_guild_join(guild):
         #Creates new settings entry for guild
         Sudo.server_settings_check(hex(guild.id), bot)
-        await autosaveConfigs()
+        Sudo.save_configs(bot)
 
         owner = await bot.fetch_user(guild.owner_id)
         dm = await owner.create_dm()
@@ -88,9 +85,6 @@ def main():
 
             If you have any problems with Search.io, join the help server: https://discord.gg/YB8VGYMZSQ""")
             await dm.send(embed=embed)
- 
-            #update guildid list for slash commands
-            bot.guild_ids.append(guild.id) 
         
         except discord.errors.Forbidden:
             pass
@@ -115,7 +109,8 @@ def main():
         bot.load_extension('src.administration_cog')
         bot.load_extension('src.administration_slashcog')
         bot.load_extension('src.search_engine_slashcog')
-        autosave.start()
+        auto_save.start()
+        cache_clear.start()
 
         #add new servers to settings
         for servers in bot.guilds:
@@ -143,10 +138,7 @@ def main():
             logFieldnames = ["Time", "Guild", "User", "User_Plaintext", "Command", "Args"]
             writer = DictWriter(file, fieldnames=logFieldnames, extrasaction='ignore')
             writer.writeheader()
-            writer.writerows(lines)
-
-        with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
-            file.write(get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text)         
+            writer.writerows(lines)         
 
         return
 
@@ -280,9 +272,16 @@ def main():
             return
 
     @tasks.loop(minutes=60.0)
-    async def autosave():
+    async def auto_save():
         Sudo.save_configs(bot)
         return
+    
+    @tasks.loop(minutes=120.0)
+    async def cache_clear():
+        files = [f for f in listdir('./src/cache') if path.isfile(path.join('./src/cache', f))]
+        files.remove('.gitignore')
+        for f in files: 
+            remove(f'./src/cache/{f}') #os.remove
 
     load_dotenv()
 
@@ -294,6 +293,7 @@ def main():
             except discord.errors.ConnectionClosed:
                 await asyncio.sleep(10)
                 continue
+    
     asyncio.ensure_future(startup())
     asyncio.get_event_loop().run_forever()
     return

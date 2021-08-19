@@ -5,6 +5,7 @@ import difflib
 from typing import Optional, Union, Tuple
 from yaml import load, dump, FullLoader
 from concurrent.futures._base import TimeoutError
+from requests import get
 import discord
 import os
 import random
@@ -930,6 +931,11 @@ class Sudo:
 
             # region user config settings
             elif args[0].lower() == "locale":
+                if not os.path.exists('./src/cache/googleUULE.csv'):
+                    with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
+                        file.write(
+                            get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text
+                        )
                 msg = [
                     await self.ctx.send(
                         f"{get_loading_message()} <a:loading:829119343580545074>"
@@ -1324,9 +1330,7 @@ class Log:
     @staticmethod
     async def log_request(
         bot: commands.Bot,
-        ctx: commands.Context,
-        server_settings: dict,
-        user_settings: dict,
+        ctx: commands.Context
     ) -> None:
         try:
             log_fieldnames = [
@@ -1342,8 +1346,7 @@ class Log:
                 log_list = [
                     dict(row)
                     for row in csv.DictReader(file)
-                    if datetime.utcnow() - datetime.fromisoformat(dict(row)["Time"])
-                    < timedelta(weeks=8)
+                    if datetime.now(timezone.utc) - datetime.fromisoformat(dict(row)["Time"]) < timedelta(weeks=8)
                 ]
 
             with open("logs.csv", "w", encoding="utf-8-sig") as file:
@@ -1354,7 +1357,7 @@ class Log:
                 writer.writerows(log_list)
 
             with open(f"./src/cache/{ctx.author}_userSettings.yaml", "w") as file:
-                dump(user_settings[ctx.author.id], file, allow_unicode=True)
+                dump(bot.userSettings[ctx.author.id], file, allow_unicode=True)
 
             # if bot owner
             if await bot.is_owner(ctx.author):
@@ -1395,8 +1398,9 @@ class Log:
                 await dm.send(
                     file=discord.File(f"./src/cache/{ctx.author}_userSettings.yaml")
                 )
-                os.remove(f"./src/cache/{ctx.author}_userSettings.yaml")
                 os.remove(f"./src/cache/{filename}.csv")
+            
+            os.remove(f"./src/cache/{ctx.author}_userSettings.yaml")
 
         except Exception as e:
             await error_handler(bot, ctx, e)

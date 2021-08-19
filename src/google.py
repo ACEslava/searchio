@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 from PIL import Image, ImageFont, ImageDraw
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from os import getenv
+from os import getenv, path
 from iso639 import languages
 from langid import classify as detect
 from translate import Translator
@@ -515,6 +515,21 @@ class GoogleSearch:
                 .strip()
 
             OPENWEATHERMAP_TOKEN = getenv("OPENWEATHERMAP_TOKEN")
+
+            #get font from cdn
+            if not path.exists('./src/cache/NotoSans-Bold.ttf'):
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Bold.ttf'
+                    ) as resp:
+                        if resp.status == 200:
+                            file = await aiofiles.open(
+                                file=f'./src/cache/NotoSans-Bold.ttf',
+                                mode='wb'
+                                )
+                            await file.write(await resp.read())
+                            await file.close()
+
             async with aiohttp.ClientSession() as session:
                 async with session.get(
                     f'https://nominatim.openstreetmap.org/search.php?city={query.replace(" ", "+")}&format=jsonv2&limit=10',
@@ -542,7 +557,6 @@ class GoogleSearch:
                         f'&exclude=minutely&units=metric&appid={OPENWEATHERMAP_TOKEN}'
                     ])
                 ) as data:
-
                     json = await data.json()
 
             #weekdays as integers
