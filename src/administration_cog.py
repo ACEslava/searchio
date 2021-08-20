@@ -118,7 +118,7 @@ class Administration(commands.Cog, name="Administration"):
             message = await ctx.send('Testing')
             serverLatency = time() - beforeTime
             embed = discord.Embed(description='\n'.join(
-                            [f'Message Send Time: `{round(serverLatency.total_seconds()*1000, 2)}ms`',
+                            [f'Message Send Time: `{round(serverLatency*1000, 2)}ms`',
                             f'API Heartbeat: `{round(self.bot.latency, 2)*100}ms`']))
             embed.set_footer(text=f'Requested by {ctx.author}')
             await message.edit(content=None, embed=embed)
