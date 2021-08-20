@@ -30,7 +30,7 @@ class FinancialSearch:
         return
 
     async def __call__(self):
-        if self.args[0] == 'stock':
+        if self.query.split(' ')[0] == 'stock':
             await self.stock_market()
         else:
             await self.message.edit(
