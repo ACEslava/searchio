@@ -1,4 +1,4 @@
-from discord import user
+from src.finances import FinancialSearch
 from src.wikipedia import WikipediaSearch
 from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
@@ -135,6 +135,62 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         await self.genericSearch(ctx, PornhubSearch, args)
         return
 
+    @commands.command(
+        name='finance',
+        brief='Search for financial data',
+        usage='finance [type] [type args]',
+        help="""For more info, do finance help [type]
+        
+        Types:
+        `stock [ticker] [range] [interval] [display] [moving average values]`""")   
+    async def finance(self, ctx, *args):
+        args = list(args)
+        if args[0] == 'help' or len(args) == 1:
+            if len(args) == 1:
+                helpmessage = discord.Embed(
+                    title='finance',
+                    description=ctx.command.help
+                )
+
+            elif args[1] == 'stock':
+                helpmessage = discord.Embed(
+                    title='Stock',
+                    description="""
+                finance stock [ticker] [range] [interval] [display] [moving average values]
+                
+                Ex: finance stock AAPL 1y 1d candle 2 3 5
+                Example creates a candle chart displaying 1 year of AAPL with 1 day data points and MAV lines of 2, 3, and 5 days.
+                """)
+                helpmessage.add_field(name='ticker', value='Symbol')
+                helpmessage.add_field(name='range', value='Length of time for data')
+                helpmessage.add_field(name='interval', value='Time between data points')
+                helpmessage.add_field(name='display', value='candle OR line')
+                helpmessage.add_field(name='moving average values', value='number of days for a simple moving average line')  
+
+            await ctx.send(embed=helpmessage)
+            try:
+                resp = await self.bot.wait_for(
+                    "button_click",
+                    check=lambda b_ctx: Sudo.pageTurnCheck(
+                        bot=self.bot,
+                        ctx=ctx,
+                        button_ctx=b_ctx,
+                        message=helpmessage
+                    ),
+                    timeout=60
+                )
+
+                if str(resp.custom_id) == "🗑️":
+                    await helpmessage.delete()
+                    return
+
+            except TimeoutError:
+                await helpmessage.edit(
+                    components=[]
+                )
+                return
+        else:
+            await self.genericSearch(ctx, FinancialSearch, args)
     #alias command (always last)
     @commands.command(
         name='s',

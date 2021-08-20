@@ -12,6 +12,7 @@ from asyncio import TimeoutError
 from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta, timezone
+from aiohttp import client_exceptions
 
 import discord
 import asyncio
@@ -293,7 +294,7 @@ def main():
             try:
                 await bot.login(token=os.getenv("DISCORD_TOKEN"), bot=True)
                 await bot.connect(reconnect=True)
-            except discord.errors.ConnectionClosed:
+            except (discord.errors.ConnectionClosed, client_exceptions.ClientConnectorError):
                 await asyncio.sleep(10)
                 continue
     

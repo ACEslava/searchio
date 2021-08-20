@@ -1,5 +1,4 @@
-from discord_slash.client import SlashCommand
-from src.utils import Sudo, Log, error_handler
+from src.utils import Sudo, error_handler
 from datetime import datetime
 from yaml import load, FullLoader
 
