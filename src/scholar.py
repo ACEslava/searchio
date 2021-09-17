@@ -135,7 +135,7 @@ class ScholarSearch:
             else:
                 emojis = {"🗑️":None}
 
-            await Sudo.multi_page_system(self.bot, self.ctx, self.message, embeds, emojis)
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), emojis)
             return
 
         except asyncio.TimeoutError:

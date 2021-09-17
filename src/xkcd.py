@@ -49,7 +49,7 @@ class XKCDSearch:
                 # sets the reactions for the search result
                 emojis = {"🗑️":None}
 
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
                 return
 
             except UserCancel:

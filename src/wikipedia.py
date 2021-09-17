@@ -195,9 +195,6 @@ class WikipediaSearch:
                     except (UserCancel, asyncio.TimeoutError):
                         await self.message.delete()
 
-                    except (asyncio.CancelledError, discord.errors.NotFound):
-                        pass
-
                     except Exception:
                         raise
 

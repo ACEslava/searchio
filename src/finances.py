@@ -1,12 +1,11 @@
-import requests
-import pandas as pd
-import io
-import matplotlib.pyplot as plt
-import mplfinance as mpf
+from requests import get
+from pandas import read_csv
+from io import StringIO, BytesIO
+from matplotlib.pyplot import savefig, close
+from mplfinance import make_marketcolors, make_mpf_style, plot
 
 import discord
 from discord.ext import commands
-
 from src.utils import Sudo, Log
 
 class FinancialSearch:
@@ -99,14 +98,14 @@ class FinancialSearch:
                     'events' : 'history',
                 }
 
-                response = requests.get(stock_url.format(tokens['ticker']), headers=headers, params=params)
+                response = get(stock_url.format(tokens['ticker']), headers=headers, params=params)
 
                 if response.status_code == 404:
-                    raise Exception("Error 404; please try again with another ticker/range/interval.")
+                    raise TypeError("Error 404; please try again with another ticker/range/interval.")
 
                 # Parse response into dataframe
-                file = io.StringIO(response.text)
-                return pd.read_csv(file, index_col=0, parse_dates=True)
+                file = StringIO(response.text)
+                return read_csv(file, index_col=0, parse_dates=True)
             except Exception:
                 raise
 
@@ -118,7 +117,7 @@ class FinancialSearch:
             dc_gray = '#36393E'     # Discord's background gray
 
             # Sets the colors of the candlesticks, wicks, and volume bars
-            mc = mpf.make_marketcolors(
+            mc = make_marketcolors(
                 up = dc_gray,
                 down = down_color,
                 wick = {'up' : up_color, 'down' : down_color},
@@ -127,7 +126,7 @@ class FinancialSearch:
             )
 
             # Sets the colors of the background, text, and moving average lines
-            s = mpf.make_mpf_style(
+            s = make_mpf_style(
                 marketcolors = mc, 
                 base_mpl_style = 'dark_background',
                 facecolor = dc_gray,
@@ -150,7 +149,7 @@ class FinancialSearch:
                 }
 
                 # Plot graph
-                _fig, axes = mpf.plot(data, **setup, returnfig=True)
+                _fig, axes = plot(data, **setup, returnfig=True)
 
                 # Select the correct plot
                 ax = axes[0]
@@ -171,9 +170,9 @@ class FinancialSearch:
                         ax.text(0.02, 0.94-0.04*i, MA_string, transform=ax.transAxes, color=s["mavcolors"][i%len(s["mavcolors"])])
 
                 # Save figure, 'tight' setting prevents labels from being cut off
-                b = io.BytesIO()
-                plt.savefig(b, bbox_inches = 'tight', dpi=300)
-                plt.close()
+                b = BytesIO()
+                savefig(b, bbox_inches = 'tight', dpi=300)
+                close()
                 return b
             except Exception:
                 raise
@@ -190,13 +189,14 @@ class FinancialSearch:
             embed.set_footer(text=f"Requested by: {str(self.ctx.author)}")
 
             await self.message.delete()
+            Log.append_to_log(self.ctx, f"{self.ctx.command} results", f'stock {tokens["ticker"]}')
             self.message = await self.ctx.send(
                 embed=embed,
                 file=file
             )
 
             emojis = {"🗑️":None}
-            await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
             return
 
         except TypeError as e:

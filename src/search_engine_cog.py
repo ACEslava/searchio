@@ -4,7 +4,7 @@ from src.google import GoogleSearch
 from src.myanimelist import MyAnimeListSearch
 from src.loadingmessage import get_loading_message
 from src.utils import Sudo, Log, error_handler
-from src.scholar import ScholarSearch
+# from src.scholar import ScholarSearch
 from src.youtube import YoutubeSearch
 from src.xkcd import XKCDSearch
 from src.pornhub import PornhubSearch
@@ -86,17 +86,17 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         await self.genericSearch(ctx, GoogleSearch, args)
         return
         
-    @commands.command(
-        name= 'scholar',
-        brief='Search through Google Scholar',
-        usage='scholar [query] [flags]',
-        help='Google Scholar search',
-        description="""--author: Use [query] to search for a specific author. Cannot be used with --cite
-                        --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""",
-        enabled=False)   
-    async def scholar(self, ctx, *args):
-        await self.genericSearch(ctx, ScholarSearch, args)
-        return
+    # @commands.command(
+    #     name= 'scholar',
+    #     brief='Search through Google Scholar',
+    #     usage='scholar [query] [flags]',
+    #     help='Google Scholar search',
+    #     description="""--author: Use [query] to search for a specific author. Cannot be used with --cite
+    #                     --cite: Outputs a citation for [query] in BibTex. Cannot be used with --author""",
+    #     enabled=False)   
+    # async def scholar(self, ctx, *args):
+    #     await self.genericSearch(ctx, ScholarSearch, args)
+    #     return
 
     @commands.command(
         name= 'youtube',
@@ -305,9 +305,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
                     search.cancel()
                     continueLoop = False
                     return
-
-                except (asyncio.CancelledError, discord.errors.NotFound):
-                    pass
 
                 except Exception as e:
                     await error_handler(self.bot, ctx, e, userquery)

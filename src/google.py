@@ -161,7 +161,7 @@ class GoogleSearch:
             result_embed.description = sub("\n\n+", "\n\n", printstring)
 
             # searches for link in div
-            find_link = result.findAll("a", href_="")
+            find_link = result.find_all("a", href_="")
             link_list = tuple(a for a in find_link if not a.find("img"))
             if len(link_list) != 0:
                 try:
@@ -275,16 +275,16 @@ class GoogleSearch:
 
                 if embeds is None:
                     embeds = list(map(text_embed, google_snippet_results))
-
-                print(
-                    self.ctx.author.name + " searched for: " + self.query[:233]
-                )
-
+                
                 # adds the page numbering footer to the embeds
                 for index, item in enumerate(embeds):
                     item.set_footer(
                         text=f"Page {index+1}/{len(embeds)}\nRequested by: {str(self.ctx.author)}"
                     )
+
+                print(
+                    self.ctx.author.name + " searched for: " + self.query[:233]
+                )
 
                 # sets the reactions for the search result
                 if len(embeds) > 1:
@@ -292,7 +292,7 @@ class GoogleSearch:
                 else:
                     emojis = {"🗑️":None}
 
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, embeds, emojis)
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), emojis)
                 return
             
             else:
@@ -303,7 +303,7 @@ class GoogleSearch:
 
                 embed.set_footer(text=f"Requested by {self.ctx.author}")
                 emojis = {"🗑️":None}
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
                 return
 
         except TimeoutError:
@@ -369,7 +369,7 @@ class GoogleSearch:
                 # sets the reactions for the search result
                 
                 emojis = {"🗑️":None, "🔍":self.search_google_handler}
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
 
             else:
                 await self.message.edit(
@@ -482,7 +482,7 @@ class GoogleSearch:
                 emojis = {"🗑️":None,"◀️":None,"▶️":None, "🔍":self.search_google_handler}
             else:
                 emojis = {"🗑️":None, "🔍":self.search_google_handler}
-            await Sudo.multi_page_system(self.bot, self.ctx, self.message, embeds, emojis)
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), emojis)
 
         except TimeoutError:
             raise
@@ -736,7 +736,7 @@ class GoogleSearch:
                 )
 
             emojis = {"🗑️":None, "🔍":self.search_google_handler}
-            await Sudo.multi_page_system(self.bot, self.ctx, self.message, [embed], emojis)
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
 
         except TimeoutError:
             raise

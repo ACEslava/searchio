@@ -220,7 +220,7 @@ class Sudo:
         bot: commands.bot, 
         ctx: Union[commands.Context, SlashContext],
         message: discord.Message, 
-        embeds:'list[discord.Embed]',
+        embeds:'tuple[discord.Embed]',
         emojis: 'dict[str:function]'):
 
         # multipage result display
@@ -1407,13 +1407,22 @@ class Log:
         finally:
             return
 
-
 async def error_handler(
     bot: commands.Bot,
     ctx: commands.Context,
     error: Exception,
     args: Optional[Union[list, str]] = None,
 ) -> None:
+
+    allowedErrors = [
+        asyncio.CancelledError, 
+        discord.errors.NotFound,
+        asyncio.TimeoutError
+    ]
+
+    if error in allowedErrors:
+        return
+    
     if args is None:
         if ctx.args is None:
             args = "None"

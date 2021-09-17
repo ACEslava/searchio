@@ -224,9 +224,6 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
                     continueLoop = False
                     return
 
-                except (asyncio.CancelledError, discord.errors.NotFound):
-                    pass
-
                 except Exception as e:
                     await error_handler(self.bot, ctx, e, userquery)
                     return
