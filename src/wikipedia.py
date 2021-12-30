@@ -125,65 +125,65 @@ class WikipediaSearch:
 
                         elif responsetask in done:
                             try:
-                                try:
-                                    emojitask.cancel()
-                                    input = responsetask.result()
-                                    await input.delete()
-                                    if input.content.lower() == "cancel":
-                                        raise UserCancel
+                                emojitask.cancel()
+                                input = responsetask.result()
+                                await input.delete()
+                                if input.content.lower() == "cancel":
+                                    raise UserCancel
 
-                                    input = int(input.content)
-                                    
-                                    if errorMessage is not None:
-                                        await errorMessage.delete()
-
-                                    self.query = result[cur_page][input]
-                                    page = Wikipedia.WikipediaPage(
-                                        title=self.query
-                                    )
-                                    summary = page.summary[
-                                        : page.summary.find(". ") + 1
-                                    ]
-                                    embed = discord.Embed(
-                                        title=f"Wikipedia Article: {page.original_title}",
-                                        description=summary,
-                                        url=page.url,
-                                    )  # outputs wikipedia article
-                                    embed.set_footer(
-                                        text=f"Requested by {self.ctx.author}"
-                                    )
-
-                                    await self.message.edit(
-                                        embed=embed,
-                                        components=[
-                                            Button(style=ButtonStyle.blue, label="🗑️", custom_id="🗑️")
-                                        ]
-                                    )
-                                    await self.bot.wait_for(
-                                        "button_click",
-                                        check=
-                                            lambda button_ctx: Sudo.pageTurnCheck(
-                                                bot=self.bot,
-                                                ctx=self.ctx,
-                                                button_ctx=button_ctx,
-                                                message=self.message
-                                            ),
-                                        timeout=60,
-                                    )
-                                    return
-
-                                except Wikipedia.DisambiguationError as e:
-                                    result = str(e).split("\n")
-                                    result.pop(0)
-                                    await self.message.edit(
-                                        content=f"{get_loading_message()}",
-                                        components=[])
-                                    break
+                                input = int(input.content)
                                 
-                                except (ValueError, IndexError):
-                                    errorMessage = await self.ctx.send(
-                                        "Invalid choice. Please choose a number between 0-9 or cancel"
-                                    )
+                                if errorMessage is not None:
+                                    await errorMessage.delete()
+
+                                self.query = result[cur_page][input]
+                                page = Wikipedia.WikipediaPage(
+                                    title=self.query
+                                )
+                                summary = page.summary[
+                                    : page.summary.find(". ") + 1
+                                ]
+                                embed = discord.Embed(
+                                    title=f"Wikipedia Article: {page.original_title}",
+                                    description=summary,
+                                    url=page.url,
+                                )  # outputs wikipedia article
+                                embed.set_footer(
+                                    text=f"Requested by {self.ctx.author}"
+                                )
+
+                                await self.message.edit(
+                                    embed=embed,
+                                    components=[
+                                        Button(style=ButtonStyle.blue, label="🗑️", custom_id="🗑️")
+                                    ]
+                                )
+                                await self.bot.wait_for(
+                                    "button_click",
+                                    check=
+                                        lambda button_ctx: Sudo.pageTurnCheck(
+                                            bot=self.bot,
+                                            ctx=self.ctx,
+                                            button_ctx=button_ctx,
+                                            message=self.message
+                                        ),
+                                    timeout=60,
+                                )
+                                await self.message.delete()
+                                return
+
+                            except Wikipedia.DisambiguationError as e:
+                                result = str(e).split("\n")
+                                result.pop(0)
+                                await self.message.edit(
+                                    content=f"{get_loading_message()}",
+                                    components=[])
+                                break
+                            
+                            except (ValueError, IndexError):
+                                errorMessage = await self.ctx.send(
+                                    "Invalid choice. Please choose a number between 0-9 or cancel"
+                                )
                                 continue
 
                             except asyncio.TimeoutError:

@@ -3,7 +3,7 @@ from base64 import standard_b64encode
 from re import findall, sub, search
 from string import ascii_uppercase, ascii_lowercase, digits
 from typing import List
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, SoupStrainer
 from PIL import Image, ImageFont, ImageDraw
 from datetime import datetime, timezone
 from dotenv import load_dotenv
@@ -19,11 +19,11 @@ from src.utils import Log, error_handler, Sudo
 from src.loadingmessage import get_loading_message
 
 import discord
-import aiohttp
 import aiofiles
 import os
 import io
 import re
+import time
 
 
 class GoogleSearch:
@@ -126,7 +126,7 @@ class GoogleSearch:
                 result_embed.set_image(url=image_url_parser(image))
                 result_embed.url = url
             except:
-                result_embed.description = "Image failed to load"
+                result_embed.set_image(url="https://external-preview.redd.it/9HZBYcvaOEnh4tOp5EqgcCr_vKH7cjFJwkvw-45Dfjs.png?auto=webp&s=ade9b43592942905a45d04dbc5065badb5aa3483")
             finally:
                 return result_embed
 
@@ -208,21 +208,24 @@ class GoogleSearch:
                 "https://google.com/search?pws=0&q=",
                 self.query.replace(" ", "+"),
                 f'{"+-stock+-pinterest" if has_found_image else ""}',
-                f"&uule={uule_parse}&num=5"
+                f"&uule={uule_parse}&num=6"
                 f"{'&safe=active' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] and not self.ctx.channel.nsfw else ''}"
                 ]
             )
 
             # gets the webscraped html of the google search
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    url, 
-                    headers={'User-Agent':'python-requests/2.25.1'}
-                ) as data:
-
-                    soup, index = BeautifulSoup(await data.text(), features="lxml"), 3
-
-            # Debug HTML output
+            async with self.bot.session.get(
+                url, 
+                headers={'User-Agent':'python-requests/2.25.1'}
+            ) as data:
+                html = await data.text()
+                soup, index = BeautifulSoup(
+                    html, 
+                    features="lxml",
+                    parse_only=SoupStrainer('div',{'id': 'main'})
+                ), 3
+            
+            #Debug HTML output
             # with open('test.html', 'w', encoding='utf-8-sig') as file:
             #    file.write(soup.prettify())
 
@@ -244,8 +247,8 @@ class GoogleSearch:
                     "Showing results for ",
                     "Tip: ",
                     "See results about",
-                    "Including results for ",
                     "Related searches",
+                    "Including results for ",
                     "Top stories",
                     "People also ask",
                     "Next >",
@@ -262,19 +265,50 @@ class GoogleSearch:
                 # endregion
 
                 # checks if user searched specifically for images
-                images, embeds = None, None
+                embeds = None
                 if has_found_image:
                     # searches for the "images for" search result div
                     for results in google_snippet_results:
                         if "Images" in results.strings:
                             images = results.findAll("img", recursive=True)
-                            embeds = list(map(image_embed, images))
+                            
+                            #checks if image wont embed properly
+                            bad_urls = [] 
+                            async def http_req(index, url):
+                                try:
+                                    url = image_url_parser(url)
+                                except: return
+                                
+                                async with self.bot.session.get(url, allow_redirects=False) as resp:
+                                    if resp.status == 301 or resp.status == 302:
+                                        bad_urls.append(index)
+
+                            await gather(
+                                *[
+                                    http_req(index, url) 
+                                    for index, url in enumerate(images)
+                                ]
+                            )
+                            if len(bad_urls) > 0:
+                                images = [img for idx, img in enumerate(images) if idx not in bad_urls]
+                            
+                            #creates embed list
+                            embeds = [
+                                embed 
+                                for embed in list(map(image_embed, images))
+                                if embed.description is not (None or '')
+                            ]
+                            
                             if len(embeds) > 0:
                                 del embeds[-1]
                             break
 
-                if embeds is None:
-                    embeds = list(map(text_embed, google_snippet_results))
+                if embeds is None or len(embeds) == 0:
+                    embeds = [
+                        embed 
+                        for embed in list(map(text_embed, google_snippet_results))
+                        if embed.description is not (None or '')
+                    ]
                 
                 # adds the page numbering footer to the embeds
                 for index, item in enumerate(embeds):
@@ -291,7 +325,7 @@ class GoogleSearch:
                     emojis = {"🗑️":None,"◀️":None,"▶️":None}
                 else:
                     emojis = {"🗑️":None}
-
+                    
                 await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), emojis)
                 return
             
@@ -454,12 +488,11 @@ class GoogleSearch:
                 .split(" ")
 
             # queries dictionary API
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query)}'
-                ) as data:
-                    
-                    response = await data.json()
+            async with self.bot.session.get(
+                f'https://api.dictionaryapi.dev/api/v2/entries/en_US/{" ".join(query)}'
+            ) as data:
+                
+                response = await data.json()
             response = response[0]
             # creates embed
             embeds = [
@@ -507,6 +540,25 @@ class GoogleSearch:
             return
 
     async def weather(self) -> None:
+        #get necessary images
+        async def getImages(imageList:'list[str]'):
+            async def http_req(url):
+                async with self.bot.session.get(url) as resp:
+                    if resp.status == 200:
+                        file = await aiofiles.open(
+                            file=f'./src/cache/{url.split("/")[-1]}',
+                            mode='wb'
+                            )
+                        await file.write(await resp.read())
+                        await file.close()
+
+            await gather(
+                *[
+                    http_req(url) 
+                    for url in imageList
+                ]
+            )
+            
         try:
             load_dotenv()
             query = self.query \
@@ -518,46 +570,43 @@ class GoogleSearch:
 
             #get font from cdn
             if not path.exists('./src/cache/NotoSans-Bold.ttf'):
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Bold.ttf'
-                    ) as resp:
-                        if resp.status == 200:
-                            file = await aiofiles.open(
-                                file=f'./src/cache/NotoSans-Bold.ttf',
-                                mode='wb'
-                                )
-                            await file.write(await resp.read())
-                            await file.close()
+                async with self.bot.session.get(
+                    'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Bold.ttf'
+                ) as resp:
+                    if resp.status == 200:
+                        file = await aiofiles.open(
+                            file=f'./src/cache/NotoSans-Bold.ttf',
+                            mode='wb'
+                            )
+                        await file.write(await resp.read())
+                        await file.close()
 
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f'https://nominatim.openstreetmap.org/search.php?city={query.replace(" ", "+")}&format=jsonv2&limit=10',
-                    headers={
-                        'Accept-Language':'en-US'
-                    }
-                ) as data:
+            async with self.bot.session.get(
+                f'https://nominatim.openstreetmap.org/search.php?city={query.replace(" ", "+")}&format=jsonv2&limit=10',
+                headers={
+                    'Accept-Language':'en-US'
+                }
+            ) as data:
 
-                    geocode = await data.json()
-                    geocode = [
-                        g for g in geocode 
-                        if g["type"] =='administrative'
-                    ]
-                    if len(geocode) == 0:
-                        #no results found
-                        await self.google()
-                        return
+                geocode = await data.json()
+                geocode = [
+                    g for g in geocode 
+                    if g["type"] =='administrative'
+                ]
+                if len(geocode) == 0:
+                    #no results found
+                    await self.google()
+                    return
 
             coords = (round(float(geocode[0]['lat']), 4), round(float(geocode[0]['lon']), 4))
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    ''.join([
-                        f'https://api.openweathermap.org/data/2.5/onecall?',
-                        f'lat={coords[0]}&lon={coords[1]}',
-                        f'&exclude=minutely&units=metric&appid={OPENWEATHERMAP_TOKEN}'
-                    ])
-                ) as data:
-                    json = await data.json()
+            async with self.bot.session.get(
+                ''.join([
+                    f'https://api.openweathermap.org/data/2.5/onecall?',
+                    f'lat={coords[0]}&lon={coords[1]}',
+                    f'&exclude=minutely&units=metric&appid={OPENWEATHERMAP_TOKEN}'
+                ])
+            ) as data:
+                json = await data.json()
 
             #weekdays as integers
             weekDayCodes = {
@@ -581,50 +630,30 @@ class GoogleSearch:
                 size=(1920,1080),
                 color = (47,47,47)
             )
-
-            #get necessary images
-            async def getImages(imageList:'list[str]'):
-                async def http_req(session, url):
-                    async with session.get(url) as resp:
-                        if resp.status == 200:
-                            file = await aiofiles.open(
-                                file=f'./src/cache/{url.split("/")[-1]}',
-                                mode='wb'
-                                )
-                            await file.write(await resp.read())
-                            await file.close()
-
-                async with aiohttp.ClientSession() as session:
-                    await gather(
-                        *[
-                            http_req(session, url) 
-                            for url in imageList
-                        ]
-                    )
-
+            
             iconCodes = [json["current"]["weather"][0]["icon"]]+[w["weather"][0]["icon"] for w in forecast.values()]
             imageList = set([
                 f'https://openweathermap.org/img/wn/{i}@4x.png' 
                 for i in iconCodes
                 if not os.path.exists(f'./src/cache/{i}@4x.png')
             ])
-
+            
             await getImages(imageList)
-
+            
             #current data
             todayImage = Image.open(f'./src/cache/{json["current"]["weather"][0]["icon"]}@4x.png')
             todayImage = todayImage.resize(
                 (int(todayImage.width * 2), int(todayImage.height * 2)),
                 resample=Image.ANTIALIAS
             )
-
+            
             im.paste(
                 todayImage, 
                 (740,200), 
                 todayImage
             )
             font = ImageFont.truetype("./src/cache/NotoSans-Bold.ttf", 200)
-
+            
             draw = ImageDraw.Draw(im)
             #region text formatting
             draw.text(

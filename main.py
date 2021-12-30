@@ -12,12 +12,12 @@ from asyncio import TimeoutError
 from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta, timezone
-from aiohttp import client_exceptions
+from aiohttp import client_exceptions, ClientSession
 
 import discord
 import asyncio
 
-def main():
+def main() -> None:
     def prefix(bot, message):   # handler for individual guild prefixes
         try:
             commandprefix: str = bot.serverSettings[hex(message.guild.id)]['commandprefix']
@@ -119,7 +119,7 @@ def main():
 
         #add new servers to settings
         for servers in bot.guilds:
-            bot.serverSettings = Sudo.server_settings_check(hex(servers.id), bot)
+            bot.serverSettings = Sudo.server_settings_check(servers.id, bot)
 
         #sets bot globals
         bot.devmode = False
@@ -145,6 +145,7 @@ def main():
             writer.writeheader()
             writer.writerows(lines)         
 
+        bot.session = ClientSession()
         return
 
     @bot.event

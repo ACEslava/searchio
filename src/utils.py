@@ -3,6 +3,7 @@ import asyncio
 import csv
 import difflib
 from typing import Optional, Union, Tuple
+from discord_components.component import SelectOption
 from yaml import load, dump, FullLoader
 from concurrent.futures._base import TimeoutError
 from requests import get
@@ -15,7 +16,8 @@ import traceback
 from discord.errors import HTTPException
 from discord.ext import commands
 from discord_slash import SlashContext
-from discord_components import Button, ButtonStyle
+from discord_components import Button, ButtonStyle, Select, SelectOption
+import discord_components
 
 from src.loadingmessage import get_loading_message
 
@@ -33,8 +35,20 @@ class Sudo:
     # region database correction/query code
     @staticmethod
     def server_settings_check(server_id: int, bot: commands.Bot) -> dict:
-        server_settings = bot.serverSettings
+        '''Verifies if a serverSettings entry is valid.
+        
+        Args:
+            server_id: int - Discord server ID
+            bot: discord.commands.Bot
+        
+        Raises:
+            None
 
+        Returns:
+            serverSettings: dict
+        '''
+        server_settings = bot.serverSettings
+        server_id = hex(server_id)
         command_list = dict(bot.cogs)["Search Engines"].get_commands()
 
         if server_id not in server_settings.keys():
@@ -80,6 +94,19 @@ class Sudo:
 
     @staticmethod
     def user_settings_check(user_settings: dict, user_id: int) -> dict:
+        '''Verifies if a userSettings entry is valid.
+
+        Args:
+            user_settings: dict - The userSettings dict
+            user_id: int - Discord user ID
+
+        Raises:
+            None
+
+        Returns:
+            userSettings: dict
+        '''
+
         if user_id not in user_settings.keys():
             user_settings[user_id] = {}
 
@@ -114,6 +141,18 @@ class Sudo:
 
     @staticmethod
     def is_sudoer(bot: commands.Bot, ctx: commands.Context) -> bool:
+        '''Determines whether or not the context.author is a sudoer
+        
+        Args:
+            bot: discord.commands.Bot
+            ctx: discord.commands.Context
+
+        Raises:
+            None
+
+        Returns:
+            bool
+        '''
         server_settings = bot.serverSettings
         if server_settings is None:
             with open("serverSettings.yaml", "r") as data:
@@ -141,6 +180,18 @@ class Sudo:
 
     @staticmethod
     def print_prefix(server_settings: dict, ctx: Optional[commands.Context] = None) -> str:
+        '''Determines the guild-set prefix (or & if unset)
+        
+        Args:
+            server_settings: dict - The serverSettings dict
+            ctx: discord.commands.Context [Optional]
+
+        Raises:
+            None
+
+        Returns:
+            prefix: str
+        '''
         if ctx is None or ctx.guild is None:
             return "&"
         else:
@@ -148,6 +199,18 @@ class Sudo:
 
     @staticmethod
     def is_authorized_command(bot: commands.Bot, ctx: Union[commands.Context, SlashContext]) -> bool:
+        '''Determines whether or not the context.author is authorised to use the command
+        
+        Args:
+            bot: discord.commands.Bot
+            ctx: discord.commands.Context OR discord_slash.SlashContext
+
+        Raises:
+            None
+
+        Returns:
+            bool
+        '''
         server_settings = bot.serverSettings
         if type(ctx) is SlashContext:
             role = next(
@@ -179,7 +242,25 @@ class Sudo:
         return any([check, Sudo.is_sudoer(bot, ctx)])
 
     @staticmethod
-    def pageTurnCheck(bot, ctx, button_ctx, message) -> bool:
+    def pageTurnCheck(
+        bot: commands.Bot, 
+        ctx: commands.Context, 
+        button_ctx: discord_components.interaction.Interaction, 
+        message) -> bool:
+        '''Determines whether or not the button interaction is from a permitted source
+
+        Args:
+            bot: discord.commands.Bot
+            ctx: discord.commands.Context
+            button_ctx: discord_components.context.Context
+            message: discord.Message
+
+        Raises:
+            None
+
+        Returns:
+            bool
+        '''
         server_settings = bot.serverSettings
 
         if server_settings is None:
@@ -221,7 +302,23 @@ class Sudo:
         ctx: Union[commands.Context, SlashContext],
         message: discord.Message, 
         embeds:'tuple[discord.Embed]',
-        emojis: 'dict[str:function]'):
+        emojis: 'dict[str:function]') -> None:
+
+        '''Handler for the multi-page system used by various search functions
+
+        Args:
+            bot: discord.commands.Bot
+            ctx: discord.commands.Context OR discord_slash.SlashContext
+            message: discord.Message
+            embeds: list[discord.Embed]
+            emojis: dict[str:function]
+
+        Raises:
+            None
+
+        Returns:
+            None
+        '''
 
         # multipage result display
         cur_page = 0
@@ -272,6 +369,16 @@ class Sudo:
     
     @staticmethod
     def save_configs(bot):
+        '''Handler to save serverSettings and userSettings
+        
+        Args:
+            bot: discord.commands.Bot
+            
+        Raises:
+            None
+            
+        Returns:
+            None'''
         with open("serverSettings.yaml", "w") as data:
             dump(bot.serverSettings, data, allow_unicode=True)
         print('Server settings saved')
@@ -282,6 +389,16 @@ class Sudo:
         return
     
     async def user_search(self, search: Union[int, str]) -> Optional[discord.Member]:
+        '''Handler to search and return a discord.User object
+        
+        Args:
+            search: int OR str
+        
+        Raises:
+            Exception
+            
+        Returns:
+            discord.User'''
         try:
             if search.isnumeric():
                 return self.ctx.guild.get_member(int(search))
@@ -539,13 +656,16 @@ class Sudo:
         UserCancel = KeyboardInterrupt
         try:
             # region config menu
-            if not args:
+            if not args or args[0].isdigit():
                 try:
+                    if len(args)>0 and await self.user_search(args[0]) is not None and int(args[0]) in self.bot.userSettings.keys():
+                        self.ctx.author = await self.user_search(args[0])
+                    
                     levelInfo = self.bot.userSettings[self.ctx.author.id]['level']
                     level_arithmeticSum = int(((levelInfo['rank']-1)*10)/2*levelInfo['rank'])
 
-                    embed = discord.Embed(title=f"{self.ctx.author} Configuration")
-                    embed.add_field(
+                    userembed = discord.Embed(title=f"{self.ctx.author} Configuration")
+                    userembed.add_field(
                         name="User Statistics",
                         value=f"""
                         `              Level:` {levelInfo['rank']}
@@ -557,7 +677,7 @@ class Sudo:
                         inline=False,
                     )
 
-                    embed.add_field(
+                    userembed.add_field(
                         name="User Configuration",
                         value=f"""
                         `             Locale:` {self.bot.userSettings[self.ctx.author.id]['locale'] if self.bot.userSettings[self.ctx.author.id]['locale'] is not None else 'None Set'}
@@ -565,7 +685,14 @@ class Sudo:
                         inline=False
                     )
 
-                    embed.add_field(
+                    userembed.set_footer(
+                        text=f"Do {self.print_prefix(self.bot.serverSettings)}config [setting] to change a specific setting"
+                    )
+                    
+                    userembed.set_thumbnail(url=self.ctx.author.avatar_url)
+                    
+                    guildembed = discord.Embed(title=f"{self.ctx.guild} Configuration")
+                    guildembed.add_field(
                         name="Guild Administration",
                         value=f"""
                         ` adminrole:` {self.ctx.guild.get_role(self.bot.serverSettings[hex(self.ctx.guild.id)]['adminrole']) if self.bot.serverSettings[hex(self.ctx.guild.id)]['adminrole'] is not None else 'None set'}
@@ -573,7 +700,7 @@ class Sudo:
                         `    prefix:` {self.bot.serverSettings[hex(self.ctx.guild.id)]['commandprefix']}""",
                     )
 
-                    embed.add_field(
+                    guildembed.add_field(
                         name="Guild Search Engines",
                         value="\n".join(
                             [
@@ -588,32 +715,65 @@ class Sudo:
                         ),
                     )
 
-                    embed.set_footer(
+                    guildembed.set_footer(
                         text=f"Do {self.print_prefix(self.bot.serverSettings)}config [setting] to change a specific setting"
                     )
 
-                    embed.set_thumbnail(url=self.ctx.author.avatar_url)
+                    guildembed.set_thumbnail(url=self.ctx.guild.icon_url)
+                    
                     config_message = await self.ctx.send(
-                        embed=embed,
+                        embed=userembed,
                         components=[
+                            Select(placeholder="Page", options=[
+                                SelectOption(label='Guild', value='guild'),
+                                SelectOption(label='User', value='user')
+                            ]),
                             Button(style=ButtonStyle.blue, label="🗑️", custom_id="🗑️")
                         ]
                     )
-            
-                    resp = await self.bot.wait_for(
-                        "button_click",
-                        check=lambda button_ctx: all(
-                            [
-                                button_ctx.author.id == self.ctx.author.id,
-                                button_ctx.message.id == config_message.id
-                            ]
-                        ),
-                        timeout=60,
-                    )
-
-                    if str(resp.custom_id) == "🗑️":
-                        await config_message.delete()
-                        return
+                    
+                    while 1:
+                        buttonresp = asyncio.create_task(self.bot.wait_for(
+                            "button_click",
+                            check=lambda button_ctx: all(
+                                [
+                                    button_ctx.author.id == self.ctx.author.id,
+                                    button_ctx.message.id == config_message.id
+                                ]
+                            ),
+                            timeout=60
+                        ))
+                        
+                        selectresp = asyncio.create_task(self.bot.wait_for(
+                            "select_option",
+                            timeout=60
+                        ))
+                        
+                        waiting = [buttonresp, selectresp]
+                        done, waiting = await asyncio.wait(
+                            waiting, return_when=asyncio.FIRST_COMPLETED
+                        )
+                        
+                        if buttonresp in done:
+                            buttonresp = buttonresp.result()
+                            if str(buttonresp.custom_id) == "🗑️":
+                                await config_message.delete()
+                                return
+                        
+                        elif selectresp in done:
+                            selectresp = selectresp.result()
+                            if str(selectresp.component[0].value) == "guild":
+                                await selectresp.respond(
+                                    type=7,
+                                    content='',
+                                    embed=guildembed
+                                )
+                            elif str(selectresp.component[0].value) == "user":
+                                await selectresp.respond(
+                                    type=7,
+                                    content='',
+                                    embed=userembed
+                                )
 
                 except asyncio.TimeoutError:
                     pass
@@ -926,7 +1086,7 @@ class Sudo:
                     embed=discord.Embed(
                         description=f"`{response}` is now the guild prefix"
                     )
-                )
+                )         
             # endregion
 
             # region user config settings

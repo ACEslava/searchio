@@ -234,7 +234,20 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         #     await error_handler(self.bot, ctx, e, args)
         # finally: return
 
-    async def genericSearch(self, ctx, searchObject, args):
+    async def genericSearch(self, ctx:commands.context, searchObject, args:list) -> None:
+        '''A generic search handler for bot search functions.
+        
+        Args:
+            ctx: discord.commands.context
+            searchObject: function
+            args: list
+        
+        Raises:
+            None
+        
+        Returns:
+            None
+        '''
         if Sudo.is_authorized_command(self.bot, ctx):
             # region args parsing
             UserCancel = KeyboardInterrupt

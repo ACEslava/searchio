@@ -78,7 +78,7 @@ class Administration(commands.Cog, name="Administration"):
                 Alias: Sets the search function's command to use.""")
     async def config(self, ctx, *args):
         args = list(args)
-
+        
         command = Sudo(self.bot, ctx)
         if len(args) > 0:
             localSetting = args[0] in ['locale', 'alias']
