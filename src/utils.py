@@ -12,6 +12,7 @@ import os
 import random
 import re
 import traceback
+import hashlib
 
 from discord.errors import HTTPException
 from discord.ext import commands
@@ -659,6 +660,7 @@ class Sudo:
             if not args or args[0].isdigit():
                 try:
                     if len(args)>0 and await self.user_search(args[0]) is not None and int(args[0]) in self.bot.userSettings.keys():
+                        old_author = self.ctx.author
                         self.ctx.author = await self.user_search(args[0])
                     
                     levelInfo = self.bot.userSettings[self.ctx.author.id]['level']
@@ -737,7 +739,7 @@ class Sudo:
                             "button_click",
                             check=lambda button_ctx: all(
                                 [
-                                    button_ctx.author.id == self.ctx.author.id,
+                                    button_ctx.author.id == old_author.id,
                                     button_ctx.message.id == config_message.id
                                 ]
                             ),
@@ -746,6 +748,12 @@ class Sudo:
                         
                         selectresp = asyncio.create_task(self.bot.wait_for(
                             "select_option",
+                            check=lambda i: all(
+                                [
+                                    i.author.id == old_author.id,
+                                    i.message.id == config_message.id
+                                ]
+                            ),
                             timeout=60
                         ))
                         
@@ -775,7 +783,10 @@ class Sudo:
                                     embed=userembed
                                 )
 
-                except asyncio.TimeoutError:
+                except TimeoutError:
+                    await config_message.edit(
+                        components=[]
+                    )
                     pass
                 except Exception as e:
                     await error_handler(self.bot, self.ctx, e)
@@ -1592,25 +1603,9 @@ async def error_handler(
         args = " ".join(args).strip()
     else:
         pass
-
-    with open("logs.csv", "r", encoding="utf-8-sig") as file:
-        does_error_code_match = True
-        while does_error_code_match:
-            error_code = "%06x" % random.randint(0, 0xFFFFFFFFFF)
-            try:
-                for line in csv.DictReader(file):
-                    if line["Command"] == "error":
-                        if line["Args"] == error_code:
-                            does_error_code_match = True
-                            break
-                        else:
-                            does_error_code_match = False
-                    else:
-                        continue
-                does_error_code_match = False
-            except Exception as e:
-                print(e)
-
+    
+    #Unique string to each error code
+    error_code = f'{int(hashlib.sha1(str(error).encode("utf-8")).hexdigest()[0:2],16):03}.{hashlib.sha1(str(traceback.format_exc()).encode("utf-8")).hexdigest()[0:6]}'
     Log.append_to_log(ctx, "error", error_code)
 
     # prevents doxxing by removing username
@@ -1625,39 +1620,49 @@ async def error_handler(
     if bot.devmode is False:
         # error message for the server
         embed = discord.Embed(
-            description=f"An unknown error has occured, please try again later. \n If you wish to report this error, press 🐛"
+            description=f"An unknown error has occured, please try again later."
         )
         embed.set_footer(text=f"Error Code: {error_code}")
+        components = [Button(style=ButtonStyle.red, label="Provide Feedback", custom_id="🐛")]
+        
+        if ctx.author.id == bot.owner_id:
+            components.append(Button(style=ButtonStyle.gray, label="Display Error", custom_id="dev"))
+            
         error_msg = await ctx.send(
             embed=embed,
-            components=[Button(style=ButtonStyle.red, label="🐛", custom_id="🐛")])
+            components=components
+        )
         
         try:
             # DMs a feedback form to the user
             response = None
-            await bot.wait_for(
+            resp = await bot.wait_for(
                 "button_click",
                 check=lambda b_ctx: b_ctx.user.id == ctx.author.id,
                 timeout=60,
             )
             await error_msg.edit(components=[])
             
-            dm = await ctx.author.create_dm()
-            err_form = await dm.send(
-                "Please send a message containing any feedback regarding this bug."
-            )
+            if resp.custom_id == '🐛':
+                dm = await ctx.author.create_dm()
+                err_form = await dm.send(
+                    f"Please send a message containing any feedback regarding Error `{error_code}`."
+                )
 
-            response = await bot.wait_for(
-                "message",
-                check=lambda m: m.author == ctx.author
-                and isinstance(m.channel, discord.DMChannel),
-                timeout=30,
-            )
-            response = response.content
+                response = await bot.wait_for(
+                    "message",
+                    check=lambda m: m.author == ctx.author
+                    and isinstance(m.channel, discord.DMChannel),
+                    timeout=30,
+                )
+                response = response.content
 
-            await dm.send(
-                "Thank you for your feedback! If you want to see the status of SearchIO's bugs, join the Discord (https://discord.gg/fH4YTaGMRH).\nNote: this link is temporary"
-            )
+                await dm.send(
+                    "Thank you for your feedback! If you want to see the status of SearchIO's bugs, join the Discord (https://discord.gg/fH4YTaGMRH).\nNote: this link is temporary"
+                )
+            
+            elif resp.custom_id == 'dev':
+                bot.devmode = True
         except discord.errors.Forbidden:
             await error_msg.edit(
                 embed=None,
@@ -1680,7 +1685,7 @@ async def error_handler(
         command = ctx.command
 
     # generates an error report for the tracker
-    string = "\n".join(
+    errstring = "\n".join(
         [
             f"Error `{error_code}`",
             f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
@@ -1694,31 +1699,21 @@ async def error_handler(
     )
     if bot.devmode is True:
         error_logging_channel = ctx.channel
+        if resp.custom_id == 'dev': bot.devmode = False
     else:
         error_logging_channel = await bot.fetch_channel(829172391557070878)
     
     try:
-        err_report = await error_logging_channel.send(string)
+        err_report = await error_logging_channel.send(errstring)
     except HTTPException as e:
         if e.code == 50035:
             with open(f"./src/cache/errorReport_{error_code}.txt", "w") as file:
                 file.write(error_out)
             
-            string = "\n".join(
-                [
-                    f"Error `{error_code}`",
-                    f"```In Guild: {str(ctx.guild)} ({ctx.guild.id})",
-                    f"In Channel: {str(ctx.channel)} ({ctx.channel.id})",
-                    f"By User: {str(ctx.author)}({ctx.author.id})",
-                    f"Command: {ctx.command}",
-                    f"Args: {args if len(args) != 0 else 'None'}",
-                    f"{f'User Feedback: {response}' if response is not None else ''}```"
-                ]
-            )
-            await error_logging_channel.send(string)
+            err_report = await error_logging_channel.send(errstring)
             await error_logging_channel.send(file=discord.File(f"./src/cache/errorReport_{error_code}.txt"))
             os.remove(f"./src/cache/errorReport_{error_code}.txt")
-            return       
+            
     except Exception as e:
         print(e)
     

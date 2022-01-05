@@ -16,6 +16,7 @@ from aiohttp import client_exceptions, ClientSession
 
 import discord
 import asyncio
+import csv
 
 def main() -> None:
     def prefix(bot, message):   # handler for individual guild prefixes
@@ -244,38 +245,53 @@ def main() -> None:
     @bot.command(hidden=True)
     @commands.is_owner()
     async def dev(ctx, *args):
-        args = ' '.join([x.strip() for x in list(args)]).split('--')
+        args = ' '.join([x.strip() for x in list(args)]).split()
         try:
-            if any('debug' in x for x in args):
-                bot.devmode = eval(next((x for x in args if 'debug' in x), None).replace('debug ', '').strip())
+            if args[0] == 'debug':
+                bot.devmode = eval(args[1])
                 await ctx.send(
                     embed=discord.Embed(
                         description=f'debug log {"enabled" if bot.devmode else "disabled"}'
                     )
                 )
 
-            if any('reload' in x for x in args):
-                cog = next((x for x in args if 'reload' in x), None).replace('reload ', '').strip()
+            elif args[0] == 'reload':
+                cog = args[1]
                 bot.reload_extension(cog)
                 await ctx.send(embed=discord.Embed(description=f'{cog} successfully reloaded'))
             
-            elif any('unload' in x for x in args):
-                cog = next((x for x in args if 'unload' in x), None).replace('unload ', '').strip()
+            elif args[0] == 'unload':
+                cog = args[1]
                 bot.unload_extension(cog)
                 await ctx.send(embed=discord.Embed(description=f'{cog} successfully unloaded'))
 
-            elif any('load' in x for x in args):
-                cog = next((x for x in args if 'load' in x), None).replace('load ', '').strip()
+            elif args[0] == 'load':
+                cog = args[1]
                 bot.load_extension(cog)
                 await ctx.send(embed=discord.Embed(description=f'{cog} successfully loaded'))
+            
+            elif args[0] == 'error':      
+                with open("logs.csv", "r", encoding="utf-8-sig") as file:
+                    reporters = [int(row['User']) for row in list(csv.DictReader(file)) if row["Command"] == 'error' and row["Args"] == args[1]]
+    
+                for r in reporters:
+                    user = await bot.fetch_user(r)
+                    dm = await user.create_dm()
+                    await dm.send(embed=discord.Embed(title=f'Error {args[1]}', description=f'Marked as {args[2]} by {ctx.author}'))
+                await ctx.send(embed=discord.Embed(description=f'Error reporters notified'))
+                
         except (commands.ExtensionNotFound, commands.ExtensionNotLoaded):
             await ctx.send(embed=discord.Embed(description=f'{cog} not found'))
 
         except commands.errors.ExtensionAlreadyLoaded:
             await ctx.send(embed=discord.Embed(description=f'{cog} already loaded'))
+        
+        except discord.errors.Forbidden:  
+            await ctx.send(embed=discord.Embed(description=f"Can't open DM to user"))
+        
         except Exception as e:
             await error_handler(bot, ctx, e, args)
-            return
+        finally: return
 
     @tasks.loop(minutes=60.0)
     async def auto_save():
