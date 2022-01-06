@@ -13,12 +13,10 @@ from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta, timezone
 from aiohttp import client_exceptions, ClientSession
-from tensorflow.python.keras.models import load_model
 
 import discord
 import asyncio
 import csv
-import pickle
 
 def main() -> None:
     def prefix(bot, message):   # handler for individual guild prefixes
