@@ -1,5 +1,4 @@
 from src.utils import Sudo, error_handler
-from src.intent_classifier import IntentClassifier
 from dotenv import load_dotenv
 from pathlib import Path
 from shutil import rmtree
@@ -64,18 +63,6 @@ def main() -> None:
     with open('userSettings.yaml', 'r') as data:
         bot.userSettings = load(data, FullLoader)
         if bot.userSettings is None: bot.userSettings = {}
-        
-    model = load_model('./src/model.h5')
-
-    with open('./src/classes.pkl','rb') as file:
-        classes = pickle.load(file)
-
-    with open('./src/tokenizer.pkl','rb') as file:
-        tokenizer = pickle.load(file)
-    with open('./src/label_encoder.pkl','rb') as file:
-        label_encoder = pickle.load(file)
-
-    bot.IntentClassifier = IntentClassifier(classes,model,tokenizer,label_encoder)
     #endregion
 
     @bot.event

@@ -237,31 +237,31 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         #     await error_handler(self.bot, ctx, e, args)
         # finally: return
 
-    @commands.Cog.listener()
-    async def on_message(self, message):
-        if random.random() <= 0.5: return
-        user_intent = self.bot.IntentClassifier.get_intent(message.content)
-        print(user_intent)
-        if user_intent == 'oos':
-            msg = await message.channel.send(
-                embed=discord.Embed(
-                    title='[BETA] SearchIO Automatic Query Detection',
-                    description='SearchIO detected a possible search query. Press to search google'),
-                components=[[
-                    Button(style=ButtonStyle.green, label=f"🔎", custom_id="search")
-                ]]
-            )
-            resp = await self.bot.wait_for(
-                "button_click",
-                check=lambda b_ctx: b_ctx.user.id == message.author.id,
-                timeout=60,
-            )
-            await msg.delete()
+    # @commands.Cog.listener()
+    # async def on_message(self, message):
+    #     if random.random() <= 0.5: return
+    #     user_intent = self.bot.IntentClassifier.get_intent(message.content)
+    #     print(user_intent)
+    #     if user_intent == 'oos':
+    #         msg = await message.channel.send(
+    #             embed=discord.Embed(
+    #                 title='[BETA] SearchIO Automatic Query Detection',
+    #                 description='SearchIO detected a possible search query. Press to search google'),
+    #             components=[[
+    #                 Button(style=ButtonStyle.green, label=f"🔎", custom_id="search")
+    #             ]]
+    #         )
+    #         resp = await self.bot.wait_for(
+    #             "button_click",
+    #             check=lambda b_ctx: b_ctx.user.id == message.author.id,
+    #             timeout=60,
+    #         )
+    #         await msg.delete()
 
-            if resp.custom_id == 'search':
-                message.content = f'&g {message.content}'
-                await self.bot.process_commands(message)
-            return
+    #         if resp.custom_id == 'search':
+    #             message.content = f'&g {message.content}'
+    #             await self.bot.process_commands(message)
+    #         return
         
     async def genericSearch(self, ctx:commands.context, searchObject, args:list) -> None:
         '''A generic search handler for bot search functions.
