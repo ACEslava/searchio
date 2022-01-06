@@ -1,4 +1,5 @@
 from src.utils import Sudo, error_handler
+from src.intent_classifier import IntentClassifier
 from dotenv import load_dotenv
 from pathlib import Path
 from shutil import rmtree
@@ -17,6 +18,8 @@ from aiohttp import client_exceptions, ClientSession
 import discord
 import asyncio
 import csv
+import pickle
+import tensorflow as tf
 
 def main() -> None:
     def prefix(bot, message):   # handler for individual guild prefixes
@@ -61,6 +64,20 @@ def main() -> None:
     with open('userSettings.yaml', 'r') as data:
         bot.userSettings = load(data, FullLoader)
         if bot.userSettings is None: bot.userSettings = {}
+        
+    with open('src/model.tflite', 'rb') as fid:
+        tflite_model = fid.read()
+
+    interpreter = tf.lite.Interpreter(model_content=tflite_model)
+    interpreter.allocate_tensors()
+
+    with open('src/classes.pkl','rb') as file:
+        classes = pickle.load(file)
+
+    with open('src/tokenizer.pkl','rb') as file:
+        tokenizer = pickle.load(file)
+
+    bot.IntentClassifier = IntentClassifier(classes,interpreter,tokenizer)
     #endregion
 
     @bot.event
@@ -166,7 +183,7 @@ def main() -> None:
             )
 
         return
-
+    
     @bot.command()
     async def help(ctx, *args):
         try:

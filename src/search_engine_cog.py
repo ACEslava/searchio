@@ -10,18 +10,21 @@ from src.xkcd import XKCDSearch
 from src.pornhub import PornhubSearch
 
 from discord.ext import commands
+from discord_components import Button, ButtonStyle, Select, SelectOption
 from asyncio import TimeoutError, create_task, wait
 from copy import deepcopy
 
 import discord
 import asyncio
+import random
 
 class SearchEngines(commands.Cog, name="Search Engines"):
     def __init__(self, bot):
-        self.bot = bot
+        self.bot:commands.bot = bot
         return
 
     async def cog_before_invoke(self, ctx):
+        print('hi')
         if Sudo.is_authorized_command(self.bot, ctx):
             old_userSettings = deepcopy(self.bot.userSettings)
             self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
@@ -234,6 +237,30 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         #     await error_handler(self.bot, ctx, e, args)
         # finally: return
 
+    @commands.Cog.listener()
+    async def on_message(self, message):
+        user_intent = self.bot.IntentClassifier.get_intent(message.content)
+        if user_intent == 'oos' and random.random() <= 0.5:
+            msg = await message.channel.send(
+                embed=discord.Embed(
+                    title='[BETA] SearchIO Automatic Query Detection',
+                    description='SearchIO detected a possible search query. Press to search google'),
+                components=[[
+                    Button(style=ButtonStyle.green, label=f"🔎", custom_id="search")
+                ]]
+            )
+            resp = await self.bot.wait_for(
+                "button_click",
+                check=lambda b_ctx: b_ctx.user.id == message.author.id,
+                timeout=60,
+            )
+            await msg.delete()
+
+            if resp.custom_id == 'search':
+                message.content = f'&g {message.content}'
+                await self.bot.process_commands(message)
+            return
+        
     async def genericSearch(self, ctx:commands.context, searchObject, args:list) -> None:
         '''A generic search handler for bot search functions.
         
