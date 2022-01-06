@@ -14,12 +14,12 @@ from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta, timezone
 from aiohttp import client_exceptions, ClientSession
+from tensorflow.python.keras.models import load_model
 
 import discord
 import asyncio
 import csv
 import pickle
-import tensorflow as tf
 
 def main() -> None:
     def prefix(bot, message):   # handler for individual guild prefixes
@@ -65,19 +65,17 @@ def main() -> None:
         bot.userSettings = load(data, FullLoader)
         if bot.userSettings is None: bot.userSettings = {}
         
-    with open('src/model.tflite', 'rb') as fid:
-        tflite_model = fid.read()
-
-    interpreter = tf.lite.Interpreter(model_content=tflite_model)
-    interpreter.allocate_tensors()
+    model = load_model('src/model.h5')
 
     with open('src/classes.pkl','rb') as file:
         classes = pickle.load(file)
 
     with open('src/tokenizer.pkl','rb') as file:
         tokenizer = pickle.load(file)
+    with open('src/label_encoder.pkl','rb') as file:
+        label_encoder = pickle.load(file)
 
-    bot.IntentClassifier = IntentClassifier(classes,interpreter,tokenizer)
+    bot.IntentClassifier = IntentClassifier(classes,model,tokenizer,label_encoder)
     #endregion
 
     @bot.event

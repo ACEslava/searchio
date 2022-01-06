@@ -3,26 +3,15 @@ import time
 from tensorflow.python.keras.preprocessing.sequence import pad_sequences
 
 class IntentClassifier:
-    def __init__(self,classes,model,tokenizer):
+    def __init__(self,classes,model,tokenizer,label_encoder):
         self.classes = classes
-        self.interpreter = model
+        self.classifier = model
         self.tokenizer = tokenizer
-        # self.label_encoder = label_encoder
-        
-        self.interpreter.allocate_tensors()
-        input_det = self.interpreter.get_input_details()[0]
-        output_det = self.interpreter.get_output_details()[0]
-        self.input_index = input_det["index"]
-        self.output_index = output_det["index"]
-        self.input_shape = input_det["shape"]
-        self.output_shape = output_det["shape"]
-        self.input_dtype = input_det["dtype"]
-        self.output_dtype = output_det["dtype"]
+        self.label_encoder = label_encoder
 
     def get_intent(self,text):
-        self.test_keras = self.tokenizer.texts_to_sequences([text])
-        self.test_keras_sequence = pad_sequences(self.test_keras, maxlen=16, padding='post', dtype='float32')
-        self.interpreter.set_tensor(self.input_index, self.test_keras_sequence)
-        self.interpreter.invoke()
-        self.pred = self.interpreter.get_tensor(self.output_index)[0]
-        return self.classes[np.argmax(self.pred,0)]
+        self.text = [text]
+        self.test_keras = self.tokenizer.texts_to_sequences(self.text)
+        self.test_keras_sequence = pad_sequences(self.test_keras, maxlen=16, padding='post')
+        self.pred = self.classifier(self.test_keras_sequence)
+        return self.label_encoder.inverse_transform(np.argmax(self.pred,1))[0]

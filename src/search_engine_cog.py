@@ -239,8 +239,10 @@ class SearchEngines(commands.Cog, name="Search Engines"):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        if random.random() <= 0.5: return
         user_intent = self.bot.IntentClassifier.get_intent(message.content)
-        if user_intent == 'oos' and random.random() <= 0.5:
+        print(user_intent)
+        if user_intent == 'oos':
             msg = await message.channel.send(
                 embed=discord.Embed(
                     title='[BETA] SearchIO Automatic Query Detection',
