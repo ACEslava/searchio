@@ -1,27 +1,30 @@
-from datetime import datetime, timedelta, date, timezone
+#External Dependencies
 import asyncio
-import csv
-import difflib
-from typing import Optional, Union, Tuple
-from discord_components.component import SelectOption
-from yaml import load, dump, FullLoader
+
 from concurrent.futures._base import TimeoutError
+from csv import DictReader, DictWriter
+from datetime import datetime, timedelta, date, timezone
+from difflib import ndiff
+from hashlib import sha1
+from os import path as os_path
+from os import remove as os_remove
+from re import search as re_search
 from requests import get
-import discord
-import os
-import random
-import re
-import traceback
-import hashlib
+from traceback import format_exc
+from typing import Optional, Union, Tuple
+from yaml import load, dump, FullLoader
 
-from discord.errors import HTTPException
-from discord.ext import commands
-from discord_slash import SlashContext
+#Discord Modules
+from discord import errors as discord_error
+from discord import Message, Embed, Member, File, DMChannel
+from discord import utils as discord_utils
 from discord_components import Button, ButtonStyle, Select, SelectOption
-import discord_components
+from discord_components.interaction import Interaction
+from discord_slash import SlashContext
+from discord.ext import commands
 
+#Utility Modules
 from src.loadingmessage import get_loading_message
-
 
 class Sudo:
     def __init__(
@@ -246,7 +249,7 @@ class Sudo:
     def pageTurnCheck(
         bot: commands.Bot, 
         ctx: commands.Context, 
-        button_ctx: discord_components.interaction.Interaction, 
+        button_ctx: Interaction, 
         message) -> bool:
         '''Determines whether or not the button interaction is from a permitted source
 
@@ -279,7 +282,7 @@ class Sudo:
 
         # Checks if sudoer has the designated adminrole or is a sudoer
         try:
-            role = discord.utils.find(
+            role = discord_utils.find(
                 lambda r: r.id == bot.serverSettings[hex(ctx.guild.id)]['adminrole'],
                 ctx.guild.roles)
             has_admin = button_ctx.author.id in [m.id for m in role.members] if role is not None else False
@@ -301,8 +304,8 @@ class Sudo:
     async def multi_page_system(
         bot: commands.bot, 
         ctx: Union[commands.Context, SlashContext],
-        message: discord.Message, 
-        embeds:'tuple[discord.Embed]',
+        message: Message, 
+        embeds:'tuple[Embed]',
         components: 'list[tuple[Button,function]]') -> None:
 
         '''Handler for the multi-page system used by various search functions
@@ -311,7 +314,7 @@ class Sudo:
             bot: discord.commands.Bot
             ctx: discord.commands.Context OR discord_slash.SlashContext
             message: discord.Message
-            embeds: list[discord.Embed]
+            embeds: list[Embed]
             emojis: dict[str:function]
 
         Raises:
@@ -390,7 +393,7 @@ class Sudo:
         print('User settings saved')
         return
     
-    async def user_search(self, search: Union[int, str]) -> Optional[discord.Member]:
+    async def user_search(self, search: Union[int, str]) -> Optional[Member]:
         '''Handler to search and return a discord.User object
         
         Args:
@@ -447,7 +450,7 @@ class Sudo:
                         [hex(self.ctx.guild.id)]["blacklist"] \
                         .append(user.id)
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description=f"`{str(user)}` blacklisted"
                         )
                     )
@@ -458,14 +461,14 @@ class Sudo:
                         .append(role.id)
                     
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description=f"'{role.name}' is now blacklisted"
                         )
                     )
                 
                 else:
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description=f"No user/role named `{''.join(args)}` was found in the guild"
                         )   
                     )
@@ -487,7 +490,7 @@ class Sudo:
                             .remove(user.id)
                         
                         await self.ctx.send(
-                            embed=discord.Embed(
+                            embed=Embed(
                                 description=f"`{str(user)}` removed from blacklist"
                             )
                         )
@@ -499,13 +502,13 @@ class Sudo:
                             .remove(role.id)
                         
                         await self.ctx.send(
-                            embed=discord.Embed(
+                            embed=Embed(
                                 description=f"'{role.name}' removed from blacklist"
                             )
                         )
                     else:
                         await self.ctx.send(
-                            embed=discord.Embed(
+                            embed=Embed(
                                 description=f"No user/role with the ID `{''.join(args)}` was found in the guild"
                             )
                         )
@@ -533,14 +536,14 @@ class Sudo:
                         .append(user.id)
                     
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description=f"`{str(user)}` is now a sudoer"
                         )
                     )
                 else:
                     
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description=f"`{str(user)}` is already a sudoer"
                         )
                     )
@@ -565,14 +568,14 @@ class Sudo:
                         .remove(user.id)
 
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description=f"`{str(user)}` has been removed from sudo"
                         )
                     )
                 
                 else:
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description=f"`{str(user)}` is not a sudoer"
                         )
                     )
@@ -600,7 +603,7 @@ class Sudo:
                 else:
                     await self.ctx.send(f"'{command}' is not a valid command.")
             else:
-                embed = discord.Embed(
+                embed = Embed(
                     title="Sudo",
                     description=f"Admin commands. Server owner has sudo privilege by default.\n"
                     f"Usage: {self.print_prefix(self.bot.serverSettings)}sudo [command] [args]",
@@ -667,7 +670,7 @@ class Sudo:
                     levelInfo = self.bot.userSettings[self.ctx.author.id]['level']
                     level_arithmeticSum = int(((levelInfo['rank']-1)*10)/2*levelInfo['rank'])
 
-                    userembed = discord.Embed(title=f"{self.ctx.author} Configuration")
+                    userembed = Embed(title=f"{self.ctx.author} Configuration")
                     userembed.add_field(
                         name="User Statistics",
                         value=f"""
@@ -694,7 +697,7 @@ class Sudo:
                     
                     userembed.set_thumbnail(url=self.ctx.author.avatar_url)
                     
-                    guildembed = discord.Embed(title=f"{self.ctx.guild} Configuration")
+                    guildembed = Embed(title=f"{self.ctx.guild} Configuration")
                     guildembed.add_field(
                         name="Guild Administration",
                         value=f"""
@@ -803,7 +806,7 @@ class Sudo:
                 for command in dict(self.bot.cogs)["Search Engines"].get_commands()
             ]:
                 if len(args) == 1:
-                    embed = discord.Embed(
+                    embed = Embed(
                         title=args[0],
                         description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}",
                     )
@@ -829,7 +832,7 @@ class Sudo:
                             self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][args[0].lower()] = False
                         await resp.respond(
                             type=7,
-                            embed=discord.Embed(
+                            embed=Embed(
                                 description=f'{args[0].capitalize()} {"enabled" if resp.custom_id == "enable" else "disabled"}'
                             ),
                             components = []
@@ -838,21 +841,21 @@ class Sudo:
                     except asyncio.TimeoutError:
                         pass
                 elif bool(
-                    re.search("^enable", args[1].lower())
-                    or re.search("^on", args[1].lower())
+                    re_search("^enable", args[1].lower())
+                    or re_search("^on", args[1].lower())
                 ):
                     self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][
                         args[0].lower()
                     ] = True
                 elif bool(
-                    re.search("^disable", args[1].lower())
-                    or re.search("^off", args[1].lower())
+                    re_search("^disable", args[1].lower())
+                    or re_search("^off", args[1].lower())
                 ):
                     self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][
                         args[0].lower()
                     ] = False
                 else:
-                    embed = discord.Embed(
+                    embed = Embed(
                         title=args[0],
                         description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['searchEngines'][args[0].lower()] == True else '❌'}",
                     )
@@ -878,7 +881,7 @@ class Sudo:
                             self.bot.serverSettings[hex(self.ctx.guild.id)]["searchEngines"][args[0].lower()] = False
                         await resp.respond(
                             type=7,
-                            embed=discord.Embed(
+                            embed=Embed(
                                 description=f'{args[0].capitalized()} {"enabled" if resp.custom_id == "enable" else "disabled"}'
                             ),
                             components = []
@@ -888,7 +891,7 @@ class Sudo:
                         pass
             elif args[0].lower() == "safesearch":
                 if len(args) == 1:
-                    embed = discord.Embed(
+                    embed = Embed(
                         title=args[0],
                         description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}",
                     )
@@ -914,7 +917,7 @@ class Sudo:
                             self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = False
                         await resp.respond(
                             type=7,
-                            embed=discord.Embed(
+                            embed=Embed(
                                 description=f'Safesearch {"enabled" if resp.custom_id == "enable" else "disabled"}'
                             ),
                             components = []
@@ -923,27 +926,27 @@ class Sudo:
                     except asyncio.TimeoutError:
                         pass
                 elif bool(
-                    re.search("^enable", args[1].lower())
-                    or re.search("^on", args[1].lower())
+                    re_search("^enable", args[1].lower())
+                    or re_search("^on", args[1].lower())
                 ):
                     self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = True
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description='Safesearch enabled'
                         ),
                     )
                 elif bool(
-                    re.search("^disable", args[1].lower())
-                    or re.search("^off", args[1].lower())
+                    re_search("^disable", args[1].lower())
+                    or re_search("^off", args[1].lower())
                 ):
                     self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = False
                     await self.ctx.send(
-                        embed=discord.Embed(
+                        embed=Embed(
                             description='Safesearch disabled'
                         ),
                     )
                 else:
-                    embed = discord.Embed(
+                    embed = Embed(
                         title=args[0],
                         description=f"{'✅' if self.bot.serverSettings[hex(self.ctx.guild.id)]['safesearch'] == True else '❌'}",
                     )
@@ -969,7 +972,7 @@ class Sudo:
                             self.bot.serverSettings[hex(self.ctx.guild.id)]["safesearch"] = False
                         await resp.respond(
                             type=7,
-                            embed=discord.Embed(
+                            embed=Embed(
                                 description=f'Safesearch {"enabled" if resp.custom_id == "enable" else "disabled"}'
                             ),
                             components = []
@@ -983,7 +986,7 @@ class Sudo:
                         "adminrole"
                     ]
 
-                    embed = discord.Embed(
+                    embed = Embed(
                         title="Adminrole",
                         description=f"{self.ctx.guild.get_role(int(adminrole_id)) if adminrole_id is not None else 'None set'}",
                     )
@@ -1014,7 +1017,7 @@ class Sudo:
                             "adminrole"
                         ] = adminrole.id
                         await self.ctx.send(
-                            embed=discord.Embed(
+                            embed=Embed(
                                 description=f"`{adminrole.name}` is now the admin role"
                             )
                         )
@@ -1049,7 +1052,7 @@ class Sudo:
                             response = "".join(
                                 [
                                     li
-                                    for li in difflib.ndiff(
+                                    for li in ndiff(
                                         message_edit[0].content, message_edit[1].content
                                     )
                                     if "+" in li
@@ -1071,7 +1074,7 @@ class Sudo:
                         pass
             elif args[0].lower() == "prefix":
                 if not args[1]:
-                    embed = discord.Embed(
+                    embed = Embed(
                         title="Prefix",
                         description=f"{self.bot.serverSettings[hex(self.ctx.guild.id)]['commandprefix']}",
                     )
@@ -1095,7 +1098,7 @@ class Sudo:
 
                 self.bot.serverSettings[hex(self.ctx.guild.id)]["commandprefix"] = response
                 await self.ctx.send(
-                    embed=discord.Embed(
+                    embed=Embed(
                         description=f"`{response}` is now the guild prefix"
                     )
                 )         
@@ -1103,7 +1106,7 @@ class Sudo:
 
             # region user config settings
             elif args[0].lower() == "locale":
-                if not os.path.exists('./src/cache/googleUULE.csv'):
+                if not os_path.exists('./src/cache/googleUULE.csv'):
                     with open('./src/cache/googleUULE.csv', 'w', encoding='utf-8-sig') as file:
                         file.write(
                             get('https://developers.google.com/adwords/api/docs/appendix/geo/geotargets-2021-04-16.csv').text
@@ -1171,7 +1174,7 @@ class Sudo:
                 result = [canonName["Canonical Name"] for canonName in user_places]
 
                 if len(result) == 0:
-                    embed = discord.Embed(
+                    embed = Embed(
                         description=f"No results found for '{localequery}'"
                     )
                     await msg[0].edit(content=None, embed=embed)
@@ -1187,7 +1190,7 @@ class Sudo:
                     cur_page = 1
 
                     if len(result) > 1:
-                        embed = discord.Embed(
+                        embed = Embed(
                             title=f"Locales matching '{localequery.capitalize()}'\n Page {cur_page}/{pages}:",
                             description="".join(
                                 [
@@ -1202,7 +1205,7 @@ class Sudo:
                         await msg[-1].add_reaction("▶️")
 
                     else:
-                        embed = discord.Embed(
+                        embed = Embed(
                             title=f"Locales matching '{localequery.capitalize()}':",
                             description="".join(
                                 [
@@ -1245,7 +1248,7 @@ class Sudo:
                             reaction, user = emojitask.result()
                             if str(reaction.emoji) == "▶️" and cur_page != pages:
                                 cur_page += 1
-                                embed = discord.Embed(
+                                embed = Embed(
                                     title=f"Locales matching '{localequery.capitalize()}'\nPage {cur_page}/{pages}:",
                                     description="".join(
                                         [
@@ -1262,7 +1265,7 @@ class Sudo:
 
                             elif str(reaction.emoji) == "◀️" and cur_page > 1:
                                 cur_page -= 1
-                                embed = discord.Embed(
+                                embed = Embed(
                                     title=f"Locales matching '{localequery.capitalize()}'\n Page {cur_page}/{pages}:",
                                     description="".join(
                                         [
@@ -1318,7 +1321,7 @@ class Sudo:
                             break
             elif args[0].lower() == "alias":
                 if len(args) == 1:
-                    embed = discord.Embed(
+                    embed = Embed(
                         title="Alias",
                         description="Reply with the command that you want to set as alias. Choose from:\n{j}".format(
                             j="\n".join(
@@ -1366,7 +1369,7 @@ class Sudo:
                             ] = response
                         error_count = 2
                     except AttributeError:
-                        embed = discord.Embed(
+                        embed = Embed(
                             description=(
                                 "Sorry, `{i}` is an invalid command.\n"
                                 "Please choose from:\n"
@@ -1476,7 +1479,7 @@ class Log:
             guild = "DM"
 
         with open("logs.csv", "a", newline="", encoding="utf-8-sig") as file:
-            writer = csv.DictWriter(
+            writer = DictWriter(
                 file, fieldnames=log_fieldnames, extrasaction="ignore"
             )
             try:
@@ -1517,12 +1520,12 @@ class Log:
             with open("logs.csv", "r", encoding="utf-8-sig") as file:
                 log_list = [
                     dict(row)
-                    for row in csv.DictReader(file)
+                    for row in DictReader(file)
                     if datetime.now(timezone.utc) - datetime.fromisoformat(dict(row)["Time"]) < timedelta(weeks=8)
                 ]
 
             with open("logs.csv", "w", encoding="utf-8-sig") as file:
-                writer = csv.DictWriter(
+                writer = DictWriter(
                     file, fieldnames=log_fieldnames, extrasaction="ignore"
                 )
                 writer.writeheader()
@@ -1534,9 +1537,9 @@ class Log:
             # if bot owner
             if await bot.is_owner(ctx.author):
                 dm = await ctx.author.create_dm()
-                await dm.send(file=discord.File(r"logs.csv"))
+                await dm.send(file=File(r"logs.csv"))
                 await dm.send(
-                    file=discord.File(f"./src/cache/{ctx.author}_userSettings.yaml")
+                    file=File(f"./src/cache/{ctx.author}_userSettings.yaml")
                 )
             else:
                 # if guild owner/guild sudoer
@@ -1559,20 +1562,20 @@ class Log:
                 with open(
                     f"./src/cache/{filename}.csv", "w", newline="", encoding="utf-8-sig"
                 ) as newFile:
-                    writer = csv.DictWriter(
+                    writer = DictWriter(
                         newFile, fieldnames=log_fieldnames, extrasaction="ignore"
                     )
                     writer.writeheader()
                     writer.writerows(line)
 
                 dm = await ctx.author.create_dm()
-                await dm.send(file=discord.File(f"./src/cache/{filename}.csv"))
+                await dm.send(file=File(f"./src/cache/{filename}.csv"))
                 await dm.send(
-                    file=discord.File(f"./src/cache/{ctx.author}_userSettings.yaml")
+                    file=File(f"./src/cache/{ctx.author}_userSettings.yaml")
                 )
-                os.remove(f"./src/cache/{filename}.csv")
+                os_remove(f"./src/cache/{filename}.csv")
             
-            os.remove(f"./src/cache/{ctx.author}_userSettings.yaml")
+            os_remove(f"./src/cache/{ctx.author}_userSettings.yaml")
 
         except Exception as e:
             await error_handler(bot, ctx, e)
@@ -1588,7 +1591,7 @@ async def error_handler(
 
     allowedErrors = [
         asyncio.CancelledError, 
-        discord.errors.NotFound,
+        discord_error.NotFound,
         asyncio.TimeoutError
     ]
 
@@ -1606,7 +1609,7 @@ async def error_handler(
         pass
     
     #Unique string to each error code
-    error_code = f'{int(hashlib.sha1(str(error).encode("utf-8")).hexdigest()[0:2],16):03}.{hashlib.sha1(str(traceback.format_exc()).encode("utf-8")).hexdigest()[0:6]}'
+    error_code = f'{int(sha1(str(error).encode("utf-8")).hexdigest()[0:2],16):03}.{sha1(str(format_exc()).encode("utf-8")).hexdigest()[0:6]}'
     Log.append_to_log(ctx, "error", error_code)
 
     # prevents doxxing by removing username
@@ -1615,19 +1618,19 @@ async def error_handler(
             lines
             if r"C:\Users" not in lines
             else "\\".join(lines.split("\\")[:2] + lines.split("\\")[3:])
-            for lines in str(traceback.format_exc()).split("\n")
+            for lines in str(format_exc()).split("\n")
         ]
     )
     if bot.devmode is False:
         # error message for the server
-        embed = discord.Embed(
+        embed = Embed(
             description=f"An unknown error has occured, please try again later."
         )
         embed.set_footer(text=f"Error Code: {error_code}")
-        components = [Button(style=ButtonStyle.red, label="Provide Feedback", custom_id="🐛")]
+        components = [[Button(style=ButtonStyle.red, label="Provide Feedback", custom_id="🐛")]]
         
         if await bot.is_owner(ctx.author):
-            components.append(Button(style=ButtonStyle.gray, label="Display Error", custom_id="dev"))
+            components[0].append(Button(style=ButtonStyle.gray, label="Display Error", custom_id="dev"))
             
         error_msg = await ctx.send(
             embed=embed,
@@ -1653,7 +1656,7 @@ async def error_handler(
                 response = await bot.wait_for(
                     "message",
                     check=lambda m: m.author == ctx.author
-                    and isinstance(m.channel, discord.DMChannel),
+                    and isinstance(m.channel, DMChannel),
                     timeout=30,
                 )
                 response = response.content
@@ -1664,7 +1667,7 @@ async def error_handler(
             
             elif resp.custom_id == 'dev':
                 bot.devmode = True
-        except discord.errors.Forbidden:
+        except discord_error.Forbidden:
             await error_msg.edit(
                 embed=None,
                 content="Sorry, I cannot open a DM at this time. Please check your privacy settings",
@@ -1706,14 +1709,14 @@ async def error_handler(
     
     try:
         err_report = await error_logging_channel.send(errstring)
-    except HTTPException as e:
+    except discord_error.HTTPException as e:
         if e.code == 50035:
             with open(f"./src/cache/errorReport_{error_code}.txt", "w") as file:
                 file.write(error_out)
             
             err_report = await error_logging_channel.send(errstring)
-            await error_logging_channel.send(file=discord.File(f"./src/cache/errorReport_{error_code}.txt"))
-            os.remove(f"./src/cache/errorReport_{error_code}.txt")
+            await error_logging_channel.send(file=File(f"./src/cache/errorReport_{error_code}.txt"))
+            os_remove(f"./src/cache/errorReport_{error_code}.txt")
             
     except Exception as e:
         print(e)

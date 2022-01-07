@@ -1,24 +1,26 @@
-from discord import user
-from discord_slash.error import RequestFailure
-from src.wikipedia import WikipediaSearch
-from src.google import GoogleSearch
-from src.myanimelist import MyAnimeListSearch
-from src.loadingmessage import get_loading_message
-from src.utils import Sudo, Log, error_handler
-from src.scholar import ScholarSearch
-from src.youtube import YoutubeSearch
-from src.xkcd import XKCDSearch
-from src.pornhub import PornhubSearch
-
+#Discord
+from discord import Embed
 from discord.ext import commands
-from discord_slash import cog_ext, SlashContext
+from discord_slash import cog_ext
 from discord_slash.utils.manage_commands import create_option, create_choice
 
+#Utility Modules
+from src.loadingmessage import get_loading_message
+from src.utils import Sudo, Log, error_handler
+
+#Search Engine Modules
+from src.search_engines.wikipedia import WikipediaSearch
+from search_engines.google import GoogleSearch
+from search_engines.myanimelist import MyAnimeListSearch
+from src.search_engines.scholar import ScholarSearch
+from src.search_engines.youtube import YoutubeSearch
+from src.search_engines.xkcd import XKCDSearch
+from src.search_engines.pornhub import PornhubSearch
+
+#External Dependencies
 from asyncio import TimeoutError, create_task, wait
 from copy import deepcopy
 from yaml import load, FullLoader
-
-import discord
 import asyncio
 
 with open('serverSettings.yaml', 'r') as data:
@@ -168,7 +170,7 @@ class SearchEnginesSlash(commands.Cog, name="Search Engines Slash"):
                 Sudo.save_configs(self.bot)
 
                 await ctx.send(
-                    embed=discord.Embed(
+                    embed=Embed(
                         description=f"Congratulations {ctx.author}, you are now level {self.bot.userSettings[ctx.author.id]['level']['rank']}"
                     )
                 )

@@ -1,22 +1,26 @@
-from src.utils import Sudo, error_handler
-from dotenv import load_dotenv
-from pathlib import Path
-from shutil import rmtree
-import os
-
-from discord.ext import commands, tasks
-from discord_slash import SlashCommand
-from discord_components import DiscordComponents
-
+#External Dependencies
+from aiohttp import client_exceptions, ClientSession
+from asyncio import ensure_future, get_event_loop, sleep
 from asyncio import TimeoutError
-from yaml import load, dump, FullLoader
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta, timezone
-from aiohttp import client_exceptions, ClientSession
+from dotenv import load_dotenv
+from os import getenv
+from os import path as os_path
+from pathlib import Path
+from shutil import rmtree
+from yaml import load, dump, FullLoader
 
-import discord
-import asyncio
-import csv
+#Discord Modules
+from discord import errors as discord_error
+from discord import Intents, Embed, Activity, ActivityType, Permissions
+from discord import utils as discord_utils
+from discord_components import DiscordComponents
+from discord_slash import SlashCommand
+from discord.ext import commands, tasks
+
+#Utility Modules
+from src.utils import Sudo, error_handler
 
 def main() -> None:
     def prefix(bot, message):   # handler for individual guild prefixes
@@ -28,7 +32,7 @@ def main() -> None:
 
     bot = commands.Bot(
         command_prefix=prefix, 
-        intents=discord.Intents.all(), 
+        intents=Intents.all(), 
         help_command=None)
 
     SlashCommand(
@@ -42,15 +46,15 @@ def main() -> None:
     #checks if required files exist
     Path("./src/cache").mkdir(parents=True, exist_ok=True)
 
-    if not os.path.exists('logs.csv'):
+    if not os_path.exists('logs.csv'):
         with open('logs.csv', 'w') as file:
             file.write('Time,Guild,User,User_Plaintext,Command,Args')
 
-    if not os.path.exists('serverSettings.yaml'):
+    if not os_path.exists('serverSettings.yaml'):
         with open('serverSettings.yaml', 'w') as file:
             file.write('')
 
-    if not os.path.exists('userSettings.yaml'):
+    if not os_path.exists('userSettings.yaml'):
         with open('userSettings.yaml', 'w') as file:
             file.write('')
 
@@ -72,7 +76,7 @@ def main() -> None:
         owner = await bot.fetch_user(guild.owner_id)
         dm = await owner.create_dm()
         try:
-            embed = discord.Embed(title=f"Search.io was added to your server: '{guild.name}'.", 
+            embed = Embed(title=f"Search.io was added to your server: '{guild.name}'.", 
                 description = f"""
             Search.io is a bot that searches through multiple search engines/APIs.
             The activation command is `&`, and a list of various commands can be found using `&help`.
@@ -92,7 +96,7 @@ def main() -> None:
             If you have any problems with Search.io, join the help server: https://discord.gg/YB8VGYMZSQ""")
             await dm.send(embed=embed)
         
-        except discord.errors.Forbidden:
+        except discord_error.Forbidden:
             pass
         finally: return
 
@@ -107,12 +111,12 @@ def main() -> None:
     @bot.event
     async def on_connect():
         bot.botuser = await bot.application_info()
-        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="command prefix '&'"))
+        await bot.change_presence(activity=Activity(type=ActivityType.listening, name="command prefix '&'"))
 
         DiscordComponents(bot)
         
-        bot.load_extension('src.search_engine_cog')
-        bot.load_extension('src.administration_cog')
+        bot.load_extension('src.cogs.search_engine_cog')
+        bot.load_extension('src.cogs.administration_cog')
         # bot.load_extension('src.administration_slashcog')
         # bot.load_extension('src.search_engine_slashcog')
         auto_save.start()
@@ -153,14 +157,14 @@ def main() -> None:
     async def on_command_error(ctx, error):
         if isinstance(error, commands.errors.CommandNotFound):
             await ctx.send(embed=
-                discord.Embed(
+                Embed(
                     description=f"Command not found. Do {Sudo.print_prefix(bot.serverSettings, ctx)}help for available commands"
                 )
             )
 
         elif isinstance(error, commands.CommandOnCooldown):
             await ctx.send(embed=
-                discord.Embed(
+                Embed(
                     description=f"Command currently ratelimited. Please try again in {round(error.retry_after)+1}s."
                 )
             )
@@ -179,7 +183,7 @@ def main() -> None:
             maxAdminCommandStrLength = len(max([command.name for command in adminCog.get_commands()], key=len))
             args = list(args)
 
-            embed = discord.Embed(title="SearchIO", 
+            embed = Embed(title="SearchIO", 
                 description="Search.io is a bot that searches through multiple search engines/APIs.\nIt is developed by ACEslava#1984, K1NG#6219, and Nanu#3294")
 
             embed.add_field(name="Administration", inline=False, value="\n".join([f'`{command.name:>{maxAdminCommandStrLength}}:` {command.brief}' for command in adminCog.get_commands()]))
@@ -202,7 +206,7 @@ def main() -> None:
                     except AttributeError: command = None
 
                 if command is not None:
-                    embed = discord.Embed(title=command.name, 
+                    embed = Embed(title=command.name, 
                         description=f"""
                         {command.help}
                         Usage:
@@ -221,9 +225,9 @@ def main() -> None:
                         await helpMessage.clear_reactions()
                 else: pass
             else:
-                invite_link=discord.utils.oauth_url(
+                invite_link=discord_utils.oauth_url(
                     client_id=bot.botuser.id, 
-                    permissions=discord.Permissions(4228381776), 
+                    permissions=Permissions(4228381776), 
                     scopes=['bot','applications.commands']
                 )
                 dm = await ctx.author.create_dm()
@@ -231,9 +235,9 @@ def main() -> None:
                 await dm.send('\n'.join(['If you have further questions, feel free to join the support server: https://discord.gg/YB8VGYMZSQ',
                 f'Want to add the bot to your server? Use this invite link: {invite_link}']))
 
-        except discord.errors.Forbidden:
+        except discord_error.Forbidden:
             await ctx.send(
-                embed=discord.Embed(
+                embed=Embed(
                     description='Sorry, I cannot open a DM at this time. Please check your privacy settings'
                 )
             )
@@ -250,7 +254,7 @@ def main() -> None:
             if args[0] == 'debug':
                 bot.devmode = eval(args[1])
                 await ctx.send(
-                    embed=discord.Embed(
+                    embed=Embed(
                         description=f'debug log {"enabled" if bot.devmode else "disabled"}'
                     )
                 )
@@ -258,36 +262,36 @@ def main() -> None:
             elif args[0] == 'reload':
                 cog = args[1]
                 bot.reload_extension(cog)
-                await ctx.send(embed=discord.Embed(description=f'{cog} successfully reloaded'))
+                await ctx.send(embed=Embed(description=f'{cog} successfully reloaded'))
             
             elif args[0] == 'unload':
                 cog = args[1]
                 bot.unload_extension(cog)
-                await ctx.send(embed=discord.Embed(description=f'{cog} successfully unloaded'))
+                await ctx.send(embed=Embed(description=f'{cog} successfully unloaded'))
 
             elif args[0] == 'load':
                 cog = args[1]
                 bot.load_extension(cog)
-                await ctx.send(embed=discord.Embed(description=f'{cog} successfully loaded'))
+                await ctx.send(embed=Embed(description=f'{cog} successfully loaded'))
             
             elif args[0] == 'error':      
                 with open("logs.csv", "r", encoding="utf-8-sig") as file:
-                    reporters = [int(row['User']) for row in list(csv.DictReader(file)) if row["Command"] == 'error' and row["Args"] == args[1]]
+                    reporters = [int(row['User']) for row in list(DictReader(file)) if row["Command"] == 'error' and row["Args"] == args[1]]
     
                 for r in reporters:
                     user = await bot.fetch_user(r)
                     dm = await user.create_dm()
-                    await dm.send(embed=discord.Embed(title=f'Error {args[1]}', description=f'Marked as {args[2]} by {ctx.author}'))
-                await ctx.send(embed=discord.Embed(description=f'Error reporters notified'))
+                    await dm.send(embed=Embed(title=f'Error {args[1]}', description=f'Marked as {args[2]} by {ctx.author}'))
+                await ctx.send(embed=Embed(description=f'Error reporters notified'))
                 
         except (commands.ExtensionNotFound, commands.ExtensionNotLoaded):
-            await ctx.send(embed=discord.Embed(description=f'{cog} not found'))
+            await ctx.send(embed=Embed(description=f'{cog} not found'))
 
         except commands.errors.ExtensionAlreadyLoaded:
-            await ctx.send(embed=discord.Embed(description=f'{cog} already loaded'))
+            await ctx.send(embed=Embed(description=f'{cog} already loaded'))
         
-        except discord.errors.Forbidden:  
-            await ctx.send(embed=discord.Embed(description=f"Can't open DM to user"))
+        except discord_error.Forbidden:  
+            await ctx.send(embed=Embed(description=f"Can't open DM to user"))
         
         except Exception as e:
             await error_handler(bot, ctx, e, args)
@@ -309,14 +313,14 @@ def main() -> None:
     async def startup():
         while 1:
             try:
-                await bot.login(token=os.getenv("DISCORD_TOKEN"), bot=True)
+                await bot.login(token=getenv("DISCORD_TOKEN"), bot=True)
                 await bot.connect(reconnect=True)
-            except (discord.errors.ConnectionClosed, client_exceptions.ClientConnectorError):
-                await asyncio.sleep(10)
+            except (discord_error.ConnectionClosed, client_exceptions.ClientConnectorError):
+                await sleep(10)
                 continue
     
-    asyncio.ensure_future(startup())
-    asyncio.get_event_loop().run_forever()
+    ensure_future(startup())
+    get_event_loop().run_forever()
     return
 
 if __name__ == "__main__":

@@ -4,8 +4,9 @@ from io import StringIO, BytesIO
 from matplotlib.pyplot import savefig, close
 from mplfinance import make_marketcolors, make_mpf_style, plot
 
-import discord
+from discord import Message, Embed, File
 from discord.ext import commands
+
 from src.utils import Sudo, Log
 
 class FinancialSearch:
@@ -15,7 +16,7 @@ class FinancialSearch:
         ctx: commands.Context,
         server_settings: dict,
         user_settings: dict,
-        message: discord.Message,
+        message: Message,
         args: list,
         query: str
     ):
@@ -34,7 +35,7 @@ class FinancialSearch:
         else:
             await self.message.edit(
                 content='', 
-                embed=discord.Embed(
+                embed=Embed(
                     title='finance',
                     description=self.ctx.command.help
                 )   
@@ -183,8 +184,8 @@ class FinancialSearch:
             chart = create_chart(data, tokens)
             chart.seek(0)
             
-            file = discord.File(fp=chart, filename='image.png')
-            embed = discord.Embed(title=tokens['ticker'])
+            file = File(fp=chart, filename='image.png')
+            embed = Embed(title=tokens['ticker'])
             embed.set_image(url="attachment://image.png")
             embed.set_footer(text=f"Requested by: {str(self.ctx.author)}")
 
@@ -202,6 +203,6 @@ class FinancialSearch:
         except TypeError as e:
             await self.message.edit(
                 content='',
-                embed=discord.Embed(description=e.args[0])
+                embed=Embed(description=e.args[0])
             )
             return

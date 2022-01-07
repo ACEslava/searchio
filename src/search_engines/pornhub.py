@@ -1,10 +1,11 @@
-import asyncio
+from pornhub_api import PornhubApi
+from asyncio import TimeoutError, CancelledError
 
-import discord
+from discord import errors as discord_error
+from discord import Message
 from discord import Embed
 from discord_components import Button, ButtonStyle
 from discord.ext import commands
-from pornhub_api import PornhubApi
 
 from src.utils import error_handler, Sudo
 
@@ -16,7 +17,7 @@ class PornhubSearch:
         ctx: commands.Context,
         server_settings: dict,
         user_settings: dict,
-        message: discord.Message,
+        message: Message,
         args: list,
         query: str
     ):
@@ -87,9 +88,9 @@ class PornhubSearch:
             await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
             return
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             raise
-        except (asyncio.CancelledError, discord.errors.NotFound):
+        except (CancelledError, discord_error.NotFound):
             pass
 
         except Exception as e:

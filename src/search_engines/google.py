@@ -1,29 +1,32 @@
+#External Dependencies
+import aiofiles
+import io
+
 from asyncio import TimeoutError, gather
 from base64 import standard_b64encode
-from re import findall, sub, search
-from string import ascii_uppercase, ascii_lowercase, digits
-from typing import List
 from bs4 import BeautifulSoup, SoupStrainer
-from PIL import Image, ImageFont, ImageDraw
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from os import getenv, path
 from iso639 import languages
 from langid import classify as detect
+from os import getenv
+from os import path as os_path
+from PIL import Image, ImageFont, ImageDraw
+from re import findall, sub
+from re import search as re_search
+from string import ascii_uppercase, ascii_lowercase, digits
 from translate import Translator
+from typing import List
 
+#Discord Modules
 from discord import Embed
-from discord.ext import commands
+from discord import Message, File, Embed
 from discord_components import Button, ButtonStyle
+from discord.ext import commands
 
+#Utility Modules
 from src.utils import Log, error_handler, Sudo
 from src.loadingmessage import get_loading_message
-
-import discord
-import aiofiles
-import os
-import io
-import re
 
 class GoogleSearch:
     def __init__(
@@ -32,7 +35,7 @@ class GoogleSearch:
         ctx: commands.Context,
         server_settings: dict,
         user_settings: dict,
-        message: discord.Message,
+        message: Message,
         args: list,
         query: str
     ):
@@ -47,20 +50,20 @@ class GoogleSearch:
 
     async def __call__(self) -> None:
         if any([
-            bool(re.search('translate', self.query.lower())),
+            bool(re_search('translate', self.query.lower())),
             'translate' in self.args
         ]):
             await self.translate()
 
         elif any([
-            bool(re.search('define', self.query.lower())), 
-            bool(re.search('meaning', self.query.lower())),
+            bool(re_search('define', self.query.lower())), 
+            bool(re_search('meaning', self.query.lower())),
             'define' in self.args
         ]):
             await self.define()
 
         elif any([
-            bool(re.search('weather', self.query.lower())),
+            bool(re_search('weather', self.query.lower())),
             'weather' in self.args
         ]):
             await self.weather()
@@ -188,7 +191,7 @@ class GoogleSearch:
 
         try:
             # checks if image is in search query
-            if bool(search("image", self.query.lower())):
+            if bool(re_search("image", self.query.lower())):
                 has_found_image = True
             else:
                 has_found_image = False
@@ -602,7 +605,7 @@ class GoogleSearch:
             OPENWEATHERMAP_TOKEN = getenv("OPENWEATHERMAP_TOKEN")
 
             #get font from cdn
-            if not path.exists('./src/cache/NotoSans-Bold.ttf'):
+            if not os_path.exists('./src/cache/NotoSans-Bold.ttf'):
                 async with self.bot.session.get(
                     'https://github.com/googlefonts/noto-fonts/raw/main/hinted/ttf/NotoSans/NotoSans-Bold.ttf'
                 ) as resp:
@@ -668,7 +671,7 @@ class GoogleSearch:
             imageList = set([
                 f'https://openweathermap.org/img/wn/{i}@4x.png' 
                 for i in iconCodes
-                if not os.path.exists(f'./src/cache/{i}@4x.png')
+                if not os_path.exists(f'./src/cache/{i}@4x.png')
             ])
             
             await getImages(imageList)
@@ -786,8 +789,8 @@ class GoogleSearch:
                 im.save(image_binary, 'PNG')
                 image_binary.seek(0)
 
-                file = discord.File(fp=image_binary, filename='image.png')
-                embed = discord.Embed()
+                file = File(fp=image_binary, filename='image.png')
+                embed = Embed()
                 embed.set_image(url="attachment://image.png")
                 embed.set_footer(text=f"Requested by: {str(self.ctx.author)}")
                 
