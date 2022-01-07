@@ -117,8 +117,9 @@ def main() -> None:
         
         bot.load_extension('src.cogs.search_engine_cog')
         bot.load_extension('src.cogs.administration_cog')
-        # bot.load_extension('src.administration_slashcog')
-        # bot.load_extension('src.search_engine_slashcog')
+        bot.load_extension('src.cogs.administration_slashcog')
+        bot.load_extension('src.cogs.search_engine_slashcog')
+        
         auto_save.start()
         cache_clear.start()
 

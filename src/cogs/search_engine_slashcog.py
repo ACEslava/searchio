@@ -10,8 +10,8 @@ from src.utils import Sudo, Log, error_handler
 
 #Search Engine Modules
 from src.search_engines.wikipedia import WikipediaSearch
-from search_engines.google import GoogleSearch
-from search_engines.myanimelist import MyAnimeListSearch
+from src.search_engines.google import GoogleSearch
+from src.search_engines.myanimelist import MyAnimeListSearch
 from src.search_engines.scholar import ScholarSearch
 from src.search_engines.youtube import YoutubeSearch
 from src.search_engines.xkcd import XKCDSearch
