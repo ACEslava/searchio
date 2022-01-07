@@ -7,6 +7,7 @@ import urllib.request as ureq
 
 import discord
 from discord import message
+from discord_components import Button, ButtonStyle
 from discord.ext import commands
 from discord.ext.commands import bot, context
 
@@ -47,9 +48,11 @@ class XKCDSearch:
                 Log.append_to_log(self.ctx, f"{self.ctx.command} result", x.url)
 
                 # sets the reactions for the search result
-                emojis = {"🗑️":None}
+                buttons = [[
+                    {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None}
+                ]]
 
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), buttons)
                 return
 
             except UserCancel:

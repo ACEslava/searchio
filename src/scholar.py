@@ -3,6 +3,7 @@ import asyncio
 import discord
 import scholarly as scholarly_exceptions
 from discord.ext import commands
+from discord_components import Button, ButtonStyle
 from fp.fp import FreeProxy
 from scholarly import scholarly, ProxyGenerator
 
@@ -131,11 +132,17 @@ class ScholarSearch:
 
             # sets the reactions for the search result
             if len(embeds) > 1:
-                emojis = {"🗑️":None,"◀️":None,"▶️":None}
+                buttons = [[
+                    {Button(style=ButtonStyle.grey, label="◀️", custom_id="◀️"): None},
+                    {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
+                    {Button(style=ButtonStyle.grey, label="▶️", custom_id="▶️"): None}
+                ]]
             else:
-                emojis = {"🗑️":None}
+                buttons = [[
+                    Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️")
+                ]]
 
-            await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), emojis)
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
             return
 
         except asyncio.TimeoutError:

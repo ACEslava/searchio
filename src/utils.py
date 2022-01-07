@@ -303,7 +303,7 @@ class Sudo:
         ctx: Union[commands.Context, SlashContext],
         message: discord.Message, 
         embeds:'tuple[discord.Embed]',
-        emojis: 'dict[str:function]') -> None:
+        components: 'list[tuple[Button,function]]') -> None:
 
         '''Handler for the multi-page system used by various search functions
 
@@ -323,15 +323,14 @@ class Sudo:
 
         # multipage result display
         cur_page = 0
-        
+
         await message.edit(
             content='',
             embed=embeds[cur_page % len(embeds)],
-            components=[[
-                Button(style=ButtonStyle.blue, label=e, custom_id=e)
-                for e in list(emojis.keys())
-            ]]
+            components=[[list(di)[0] for di in i] for i in components]
         )
+        
+        components = {key.custom_id:value for i in components for di in i for (key,value) in di.items()}
         while 1:
             try:
                 resp = await bot.wait_for(
@@ -352,8 +351,10 @@ class Sudo:
                     cur_page -= 1
                 elif str(resp.custom_id) == "▶️":
                     cur_page += 1
-                elif str(resp.custom_id) in list(emojis.keys()):
-                    await emojis[str(resp.custom_id)]()
+                elif str(resp.custom_id) in list(components.keys()):
+                    if isinstance(components[str(resp.custom_id)], tuple):
+                        await components[str(resp.custom_id)][0](*components[str(resp.custom_id)][1:])
+                    else: await components[str(resp.custom_id)]()
                     return
 
                 await resp.respond(
@@ -1625,7 +1626,7 @@ async def error_handler(
         embed.set_footer(text=f"Error Code: {error_code}")
         components = [Button(style=ButtonStyle.red, label="Provide Feedback", custom_id="🐛")]
         
-        if ctx.author.id == bot.owner_id:
+        if await bot.is_owner(ctx.author):
             components.append(Button(style=ButtonStyle.gray, label="Display Error", custom_id="dev"))
             
         error_msg = await ctx.send(

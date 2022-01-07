@@ -14,6 +14,7 @@ from translate import Translator
 
 from discord import Embed
 from discord.ext import commands
+from discord_components import Button, ButtonStyle
 
 from src.utils import Log, error_handler, Sudo
 from src.loadingmessage import get_loading_message
@@ -23,8 +24,6 @@ import aiofiles
 import os
 import io
 import re
-import time
-
 
 class GoogleSearch:
     def __init__(
@@ -320,13 +319,27 @@ class GoogleSearch:
                     self.ctx.author.name + " searched for: " + self.query[:233]
                 )
 
-                # sets the reactions for the search result
+                # sets the buttons for the search result
                 if len(embeds) > 1:
-                    emojis = {"🗑️":None,"◀️":None,"▶️":None}
+                    buttons = [
+                        [
+                        {Button(style=ButtonStyle.grey, label="◀️", custom_id="◀️"): None},
+                        {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
+                        {Button(style=ButtonStyle.grey, label="▶️", custom_id="▶️"): None}
+                        ]
+                    ]
                 else:
-                    emojis = {"🗑️":None}
+                    buttons = [[
+                        {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None}
+                    ]]
                     
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), emojis)
+                if "images" not in self.query.lower():
+                    buttons.insert(0, [{
+                        Button(style=ButtonStyle.blue, label="Images", custom_id="img", emoji=self.bot.get_emoji(928889019838894090)): 
+                        (self.search_google_handler, self.query + " images")
+                    }])
+                
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
                 return
             
             else:
@@ -336,8 +349,12 @@ class GoogleSearch:
                 )
 
                 embed.set_footer(text=f"Requested by {self.ctx.author}")
-                emojis = {"🗑️":None}
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
+                
+                buttons = [[
+                    Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️")
+                ]]
+                
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), buttons)
                 return
 
         except TimeoutError:
@@ -402,8 +419,11 @@ class GoogleSearch:
                 embed.set_footer(text='\n'.join(["React with 🔍 to search Google",f"Requested by {self.ctx.author}"]))
                 # sets the reactions for the search result
                 
-                emojis = {"🗑️":None, "🔍":self.search_google_handler}
-                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
+                buttons = [[
+                    {Button(style=ButtonStyle.grey, label="🔍", custom_id="🔍"): self.search_google_handler},
+                    {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
+                ]]
+                await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), buttons)
 
             else:
                 await self.message.edit(
@@ -512,10 +532,23 @@ class GoogleSearch:
                 )
 
             if len(embeds) > 1:
-                emojis = {"🗑️":None,"◀️":None,"▶️":None, "🔍":self.search_google_handler}
+                buttons = [
+                    [
+                    {Button(style=ButtonStyle.grey, label="🔍", custom_id="🔍"): self.search_google_handler}
+                    ],
+                    [
+                    {Button(style=ButtonStyle.grey, label="◀️", custom_id="◀️"): None},
+                    {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
+                    {Button(style=ButtonStyle.grey, label="▶️", custom_id="▶️"): None}
+                    ]
+                ]
             else:
-                emojis = {"🗑️":None, "🔍":self.search_google_handler}
-            await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), emojis)
+                buttons = [[
+                    {Button(style=ButtonStyle.grey, label="🔍", custom_id="🔍"): self.search_google_handler},
+                    {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
+                ]]
+                
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
 
         except TimeoutError:
             raise
@@ -764,8 +797,12 @@ class GoogleSearch:
                     file=file
                 )
 
-            emojis = {"🗑️":None, "🔍":self.search_google_handler}
-            await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), emojis)
+            buttons = [[
+                {Button(style=ButtonStyle.grey, label="🔍", custom_id="🔍"): self.search_google_handler},
+                {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
+            ]]
+            
+            await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), buttons)
 
         except TimeoutError:
             raise
@@ -789,7 +826,9 @@ class GoogleSearch:
         finally:
             return
 
-    async def search_google_handler(self) -> None:
+    async def search_google_handler(self, new_search=None) -> None:
+        if new_search is not None:
+            self.query = new_search
         await self.message.delete()
         self.message = await self.ctx.send(f"{get_loading_message()}")
         await self.google()
