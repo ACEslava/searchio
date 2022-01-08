@@ -12,7 +12,6 @@ from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from shutil import rmtree
-from webdriver_manager.firefox import GeckoDriverManager
 from yaml import load, dump, FullLoader
 
 #Discord Modules
@@ -164,7 +163,6 @@ def main() -> None:
         opts.headless = True
         
         bot.webdriver = webdriver.Firefox(
-            executable_path=GeckoDriverManager().install(),
             options=opts,
             capabilities=caps
         )
