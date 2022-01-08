@@ -140,43 +140,55 @@ class GoogleSearch:
             )
 
             # google results are separated by divs
-            # extracts all meaningful text in the search result by div
-            result_find = result.findAll("div")
-            divs = tuple(d for d in result_find if not d.find("div"))
-            lines = tuple(
-                " ".join(
-                    [
-                        string if string != "View all" else ""
-                        for string in div.stripped_strings
-                    ]
-                )
-                for div in divs
-            )
-            printstring = "\n".join(lines)
-
-            # discord prevents embeds longer than 2048 chars
-            # truncates adds ellipses to strings longer than 2048 chars
-            if len(printstring) > 2048:
-                printstring = printstring[:2045] + "..."
-
-            # sets embed description to string
-            result_embed.description = sub("\n\n+", "\n\n", printstring)
-
             # searches for link in div
             find_link = result.find_all("a", href_="")
             link_list = tuple(a for a in find_link if not a.find("img"))
+            link = None
             if len(link_list) != 0:
                 try:
                     # parses link from html
                     link = link_unicode_parse(
                         findall(r"(?<=url\?q=).*(?=&sa)", link_list[0]["href"])[0]
                     )
-
-                    # adds link to embed
-                    result_embed.add_field(name="Relevant Link", value=link)
-                    print(" link: " + link)
                 except:
-                    print("adding link failed")
+                    pass
+            
+            # extracts all meaningful text in the search result by div
+            result_find = result.findAll("div")
+            divs = tuple(d for d in result_find if not d.find("div"))
+            
+            titleinfo = [
+                " ".join(
+                    [
+                        string if string != "View all" else ""
+                        for string in div.stripped_strings
+                    ]
+                )
+                for div in divs[:2]
+            ]
+            titleinfo = [f"**{ti}**" for ti in titleinfo if ti != ""]
+            if link is not None:
+                titleinfo[-1] = link
+            
+            lines = [
+                " ".join(
+                    [
+                        string if string != "View all" else ""
+                        for string in div.stripped_strings
+                    ]
+                )
+                for div in divs[2:]
+            ]
+            
+            printstring = "\n".join(titleinfo+lines)
+
+            # discord prevents embeds longer than 2048 chars
+            # truncates adds ellipses to strings longer than 2048 chars
+            if len(printstring) > 1024:
+                printstring = printstring[:1020] + "..."
+
+            # sets embed description to string
+            result_embed.description = sub("\n\n+", "\n\n", printstring)
 
             # tries to add an image to the embed
             image = result.find("img")
@@ -311,6 +323,43 @@ class GoogleSearch:
                         for embed in list(map(text_embed, google_snippet_results))
                         if embed.description is not (None or '')
                     ]
+                    
+                    #Creates search groupings
+                    new_embed_list = []
+                    i = 0
+                    combinedDesc = ''
+                    for j in range(len(embeds)):
+                        embed_desc = '\n'.join(list(filter(None, embeds[j].description.split('\n'))))
+                        if 'image' in embeds[j].to_dict().keys():
+                            combinedDesc = ''
+                            new_embed_list.append([embeds[j]])
+                            i=j
+                            continue
+                        else:
+                            if len(combinedDesc + embed_desc) < 1048:
+                                combinedDesc += '\n'+ '\n'+embed_desc
+                                continue
+                            
+                            combinedDesc = ''
+                            new_embed_list.append(embeds[i:j+1])
+                            i=j
+                    new_embed_list.append(embeds[i:j+1])
+                    
+                    for idx, group in enumerate(new_embed_list):
+                        if len(group) == 1: continue
+                        combinedDesc = ''
+                        for embed in group:
+                            combinedDesc += '\n'+'\n'+'\n'.join(list(filter(None, embed.description.split('\n'))))
+                        
+                        new_embed_list[idx] = [
+                            Embed(
+                                title=f'Search results for: {self.query[:233]}{"..." if len(self.query) > 233 else ""}',
+                                description=combinedDesc,
+                                url = url
+                            )
+                        ]    
+                    
+                    embeds = [i[0] for i in new_embed_list]
                 
                 # adds the page numbering footer to the embeds
                 for index, item in enumerate(embeds):
@@ -341,7 +390,7 @@ class GoogleSearch:
                         Button(style=ButtonStyle.blue, label="Images", custom_id="img", emoji=self.bot.get_emoji(928889019838894090)): 
                         (self.search_google_handler, self.query + " images")
                     }])
-                
+                    
                 await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
                 return
             
@@ -419,11 +468,14 @@ class GoogleSearch:
                 )
                 embed.add_field(name=languages.get(alpha2=translator.from_lang).name, value=query)
                 embed.add_field(name=languages.get(alpha2=translator.to_lang).name, value=result)
-                embed.set_footer(text='\n'.join(["React with 🔍 to search Google",f"Requested by {self.ctx.author}"]))
+                embed.set_footer(text=f"Requested by {self.ctx.author}")
                 # sets the reactions for the search result
                 
                 buttons = [[
-                    {Button(style=ButtonStyle.grey, label="🔍", custom_id="🔍"): self.search_google_handler},
+                    {Button(style=ButtonStyle.blue, 
+                            label="Google Results", custom_id="google", 
+                            emoji=self.bot.get_emoji(928889019838894090)
+                    ): self.search_google_handler},
                     {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
                 ]]
                 await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), buttons)
@@ -530,15 +582,15 @@ class GoogleSearch:
             for index, item in enumerate(embeds):
                 item.set_footer(
                     text=f"Page {index+1}/{len(embeds)}\n"
-                    f"React with 🔍 to search Google\n"
                     f"Requested by: {str(self.ctx.author)}"
                 )
 
             if len(embeds) > 1:
                 buttons = [
-                    [
-                    {Button(style=ButtonStyle.grey, label="🔍", custom_id="🔍"): self.search_google_handler}
-                    ],
+                    [{Button(style=ButtonStyle.blue, 
+                            label="Google Results", custom_id="google", 
+                            emoji=self.bot.get_emoji(928889019838894090)
+                    ): self.search_google_handler}],
                     [
                     {Button(style=ButtonStyle.grey, label="◀️", custom_id="◀️"): None},
                     {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
@@ -547,7 +599,10 @@ class GoogleSearch:
                 ]
             else:
                 buttons = [[
-                    {Button(style=ButtonStyle.grey, label="🔍", custom_id="🔍"): self.search_google_handler},
+                    {Button(style=ButtonStyle.blue, 
+                            label="Google Results", custom_id="google", 
+                            emoji=self.bot.get_emoji(928889019838894090)
+                    ): self.search_google_handler},
                     {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
                 ]]
                 
@@ -784,24 +839,26 @@ class GoogleSearch:
 
                 x += 344
             
-
             with io.BytesIO() as image_binary:
                 im.save(image_binary, 'PNG')
                 image_binary.seek(0)
 
                 file = File(fp=image_binary, filename='image.png')
-                embed = Embed()
-                embed.set_image(url="attachment://image.png")
-                embed.set_footer(text=f"Requested by: {str(self.ctx.author)}")
-                
-                await self.message.delete()
-                self.message = await self.ctx.send(
-                    embed=embed,
-                    file=file
-                )
+            embed = Embed()
+            embed.set_image(url="attachment://image.png")
+            embed.set_footer(text=f"Requested by: {str(self.ctx.author)}")
+            
+            await self.message.delete()
+            self.message = await self.ctx.send(
+                embed=embed,
+                file=file
+            )
 
             buttons = [[
-                {Button(style=ButtonStyle.grey, label="🔍", custom_id="🔍"): self.search_google_handler},
+                {Button(style=ButtonStyle.blue, 
+                        label="Google Results", custom_id="google", 
+                        emoji=self.bot.get_emoji(928889019838894090)
+                ): self.search_google_handler},
                 {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
             ]]
             

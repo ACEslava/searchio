@@ -27,7 +27,6 @@ class SearchEngines(commands.Cog, name="Search Engines"):
         return
 
     async def cog_before_invoke(self, ctx):
-        print('hi')
         if Sudo.is_authorized_command(self.bot, ctx):
             old_userSettings = deepcopy(self.bot.userSettings)
             self.bot.userSettings = Sudo.user_settings_check(self.bot.userSettings, ctx.author.id)
