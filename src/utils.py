@@ -352,8 +352,18 @@ class Sudo:
                     return
                 elif str(resp.custom_id) == "◀️":
                     cur_page -= 1
+                    await resp.respond(
+                        type=7,
+                        content='',
+                        embed=embeds[cur_page % len(embeds)]
+                    )
                 elif str(resp.custom_id) == "▶️":
                     cur_page += 1
+                    await resp.respond(
+                        type=7,
+                        content='',
+                        embed=embeds[cur_page % len(embeds)]
+                    )
                 elif str(resp.custom_id) in list(components.keys()):
                     component_save = [[i for i in nest if i.custom_id != resp.custom_id] for nest in component_save]
                     await resp.respond(
@@ -365,13 +375,6 @@ class Sudo:
                     if isinstance(components[str(resp.custom_id)], tuple):
                         await components[str(resp.custom_id)][0](*components[str(resp.custom_id)][1:])
                     else: await components[str(resp.custom_id)]()
-                    return
-
-                await resp.respond(
-                    type=7,
-                    content='',
-                    embed=embeds[cur_page % len(embeds)]
-                )
 
             except TimeoutError:
                 await message.edit(
