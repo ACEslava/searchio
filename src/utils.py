@@ -327,12 +327,12 @@ class Sudo:
         # multipage result display
         cur_page = 0
 
+        component_save = [[list(di)[0] for di in i] for i in components]
         await message.edit(
             content='',
             embed=embeds[cur_page % len(embeds)],
-            components=[[list(di)[0] for di in i] for i in components]
+            components=component_save
         )
-        
         components = {key.custom_id:value for i in components for di in i for (key,value) in di.items()}
         while 1:
             try:
@@ -355,6 +355,13 @@ class Sudo:
                 elif str(resp.custom_id) == "▶️":
                     cur_page += 1
                 elif str(resp.custom_id) in list(components.keys()):
+                    component_save = [[i for i in nest if i.custom_id != resp.custom_id] for nest in component_save]
+                    await resp.respond(
+                        type=7,
+                        content='',
+                        embed=embeds[cur_page % len(embeds)],
+                        components=component_save
+                    )
                     if isinstance(components[str(resp.custom_id)], tuple):
                         await components[str(resp.custom_id)][0](*components[str(resp.custom_id)][1:])
                     else: await components[str(resp.custom_id)]()

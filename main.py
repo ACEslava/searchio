@@ -8,7 +8,11 @@ from dotenv import load_dotenv
 from os import getenv
 from os import path as os_path
 from pathlib import Path
+from selenium import webdriver
+from selenium.webdriver import FirefoxOptions
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from shutil import rmtree
+from webdriver_manager.firefox import GeckoDriverManager
 from yaml import load, dump, FullLoader
 
 #Discord Modules
@@ -152,6 +156,19 @@ def main() -> None:
             writer.writerows(lines)         
 
         bot.session = ClientSession()
+        
+        caps = DesiredCapabilities().FIREFOX
+        caps["pageLoadStrategy"] = "normal"
+        
+        opts = FirefoxOptions()
+        opts.headless = True
+        
+        bot.webdriver = webdriver.Firefox(
+            executable_path=GeckoDriverManager().install(),
+            options=opts,
+            capabilities=caps
+        )
+        bot.webdriver.get('https://google.com')
         return
 
     @bot.event

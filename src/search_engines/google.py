@@ -28,6 +28,7 @@ from discord.ext import commands
 from src.utils import Log, error_handler, Sudo
 from src.loadingmessage import get_loading_message
 
+import time
 class GoogleSearch:
     def __init__(
         self,
@@ -39,6 +40,20 @@ class GoogleSearch:
         args: list,
         query: str
     ):
+        # formats uule strings for use in locales
+        # found this on a random stackoverflow
+        def uule(city: str) -> str:
+            secret_list = (
+                list(ascii_uppercase)
+                + list(ascii_lowercase)
+                + list(digits)
+                + ["-", "_"]
+            )
+
+            secret = secret_list[len(city) % len(secret_list)]
+            hashed = standard_b64encode(city.encode()).decode().strip("=")
+            return f"w+CAIQICI{secret}{hashed}"
+
         self.bot = bot
         self.ctx = ctx
         self.serverSettings = server_settings
@@ -46,6 +61,25 @@ class GoogleSearch:
         self.message = message
         self.args = args if args is not None else []
         self.query = query
+                
+        # gets uule string based on user settings
+        if self.userSettings[self.ctx.author.id]["locale"] is not None:
+            uule_parse = uule(self.userSettings[self.ctx.author.id]["locale"])
+        else:
+            # default uule is Google HQ
+            uule_parse = "w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz"
+
+        # creates google search url
+        # format: https://google.com/search?pws=0&q=[query]&uule=[uule string]&num=[number of results]&safe=[safesearch status]
+        self.url = "".join(
+            [
+            "https://google.com/search?pws=0&q=",
+            self.query.replace(" ", "+"),
+            f'{"+-stock+-pinterest" if bool(re_search("image", self.query.lower())) else ""}',
+            f"&uule={uule_parse}&num=6"
+            f"{'&safe=active' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] and not self.ctx.channel.nsfw else ''}"
+            ]
+        )
         return
 
     async def __call__(self) -> None:
@@ -78,20 +112,6 @@ class GoogleSearch:
         # translates unicode codes in links
         def link_unicode_parse(link: str) -> str:
             return sub(r"%(.{2})", lambda m: chr(int(m.group(1), 16)), link)
-
-        # formats uule strings for use in locales
-        # found this on a random stackoverflow
-        def uule(city: str) -> str:
-            secret_list = (
-                list(ascii_uppercase)
-                + list(ascii_lowercase)
-                + list(digits)
-                + ["-", "_"]
-            )
-
-            secret = secret_list[len(city) % len(secret_list)]
-            hashed = standard_b64encode(city.encode()).decode().strip("=")
-            return f"w+CAIQICI{secret}{hashed}"
 
         # parses image url from html
         def image_url_parser(image) -> str:
@@ -126,7 +146,7 @@ class GoogleSearch:
 
                 # sets the discord embed to the image
                 result_embed.set_image(url=image_url_parser(image))
-                result_embed.url = url
+                result_embed.url = self.url
             except:
                 result_embed.set_image(url="https://external-preview.redd.it/9HZBYcvaOEnh4tOp5EqgcCr_vKH7cjFJwkvw-45Dfjs.png?auto=webp&s=ade9b43592942905a45d04dbc5065badb5aa3483")
             finally:
@@ -196,7 +216,7 @@ class GoogleSearch:
                 result_embed.set_image(url=image_url_parser(image))
             except:
                 pass
-            result_embed.url = url
+            result_embed.url = self.url
             return result_embed
 
         # endregion
@@ -208,28 +228,9 @@ class GoogleSearch:
             else:
                 has_found_image = False
 
-            # gets uule string based on user settings
-            if self.userSettings[self.ctx.author.id]["locale"] is not None:
-                uule_parse = uule(self.userSettings[self.ctx.author.id]["locale"])
-            else:
-                # default uule is Google HQ
-                uule_parse = "w+CAIQICI5TW91bnRhaW4gVmlldyxTYW50YSBDbGFyYSBDb3VudHksQ2FsaWZvcm5pYSxVbml0ZWQgU3RhdGVz"
-
-            # creates google search url
-            # format: https://google.com/search?pws=0&q=[query]&uule=[uule string]&num=[number of results]&safe=[safesearch status]
-            url = "".join(
-                [
-                "https://google.com/search?pws=0&q=",
-                self.query.replace(" ", "+"),
-                f'{"+-stock+-pinterest" if has_found_image else ""}',
-                f"&uule={uule_parse}&num=6"
-                f"{'&safe=active' if self.serverSettings[hex(self.ctx.guild.id)]['safesearch'] and not self.ctx.channel.nsfw else ''}"
-                ]
-            )
-
             # gets the webscraped html of the google search
             async with self.bot.session.get(
-                url, 
+                self.url, 
                 headers={'User-Agent':'python-requests/2.25.1'}
             ) as data:
                 html = await data.text()
@@ -241,11 +242,11 @@ class GoogleSearch:
             
             #Debug HTML output
             # with open('test.html', 'w', encoding='utf-8-sig') as file:
-            #    file.write(soup.prettify())
+            #     file.write(soup.prettify())
 
             # if the search returns results
             if soup.find("div", {"id": "main"}) is not None:
-                Log.append_to_log(self.ctx, f"{self.ctx.command} results", url)
+                Log.append_to_log(self.ctx, f"{self.ctx.command} results", self.url)
                 google_snippet_results = soup.find("div", {"id": "main"}).contents
 
                 # region html processing
@@ -355,7 +356,7 @@ class GoogleSearch:
                             Embed(
                                 title=f'Search results for: {self.query[:233]}{"..." if len(self.query) > 233 else ""}',
                                 description=combinedDesc,
-                                url = url
+                                url = self.url
                             )
                         ]    
                     
@@ -374,6 +375,10 @@ class GoogleSearch:
                 # sets the buttons for the search result
                 if len(embeds) > 1:
                     buttons = [
+                        [{
+                            Button(style=ButtonStyle.blue, label="Screenshot", custom_id="scr"): 
+                            self.webpage_screenshot
+                        }],
                         [
                         {Button(style=ButtonStyle.grey, label="◀️", custom_id="◀️"): None},
                         {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
@@ -381,16 +386,20 @@ class GoogleSearch:
                         ]
                     ]
                 else:
-                    buttons = [[
-                        {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None}
-                    ]]
+                    buttons = [
+                        [{
+                            Button(style=ButtonStyle.blue, label="Screenshot", custom_id="scr"): 
+                            self.webpage_screenshot
+                        }]
+                        [{Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None}]
+                    ]
                     
                 if "images" not in self.query.lower():
-                    buttons.insert(0, [{
+                    buttons[0].append({
                         Button(style=ButtonStyle.blue, label="Images", custom_id="img", emoji=self.bot.get_emoji(928889019838894090)): 
                         (self.search_google_handler, self.query + " images")
-                    }])
-                    
+                    })
+                
                 await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
                 return
             
@@ -892,4 +901,18 @@ class GoogleSearch:
         await self.message.delete()
         self.message = await self.ctx.send(f"{get_loading_message()}")
         await self.google()
+        return
+
+    async def webpage_screenshot(self):
+        async with self.ctx.typing():
+            self.bot.webdriver.get(self.url)
+            img = self.bot.webdriver.get_screenshot_as_png()
+            embed = Embed()
+            embed.set_image(url=f'attachment://{self.query.replace(" ", "_")}.png')
+            embed.set_footer(text=f"Requested by: {str(self.ctx.author)}")
+
+            await self.ctx.send(
+                embed=embed,
+                file=File(fp=io.BytesIO(img), filename=f'{self.query.replace(" ", "_")}.png')
+            )
         return
