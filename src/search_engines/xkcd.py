@@ -6,10 +6,8 @@ import random
 import urllib.request as ureq
 
 import discord
-from discord import message
 from discord_components import Button, ButtonStyle
 from discord.ext import commands
-from discord.ext.commands import bot, context
 
 from src.utils import Log, error_handler, Sudo
 class XKCDSearch:

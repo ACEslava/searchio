@@ -27,8 +27,6 @@ from discord.ext import commands
 #Utility Modules
 from src.utils import Log, error_handler, Sudo
 from src.loadingmessage import get_loading_message
-
-import time
 class GoogleSearch:
     def __init__(
         self,
@@ -390,7 +388,7 @@ class GoogleSearch:
                         [{
                             Button(style=ButtonStyle.blue, label="Screenshot", custom_id="scr"): 
                             self.webpage_screenshot
-                        }]
+                        }],
                         [{Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None}]
                     ]
                     
