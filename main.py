@@ -12,6 +12,7 @@ from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from shutil import rmtree
+from time import time
 from yaml import load, dump, FullLoader
 
 #Discord Modules
@@ -113,9 +114,7 @@ def main() -> None:
 
     @bot.event
     async def on_connect():
-        bot.botuser = await bot.application_info()
-        await bot.change_presence(activity=Activity(type=ActivityType.listening, name="command prefix '&'"))
-
+        t0 = time()
         DiscordComponents(bot)
         
         bot.load_extension('src.cogs.search_engine_cog')
@@ -156,17 +155,10 @@ def main() -> None:
 
         bot.session = ClientSession()
         
-        caps = DesiredCapabilities().FIREFOX
-        caps["pageLoadStrategy"] = "normal"
-        
-        opts = FirefoxOptions()
-        opts.headless = True
-        
-        bot.webdriver = webdriver.Firefox(
-            options=opts,
-            capabilities=caps
-        )
-        bot.webdriver.get('https://google.com')
+        bot.botuser = await bot.application_info()
+        await bot.change_presence(activity=Activity(type=ActivityType.listening, name="command prefix '&'"))
+        t1 = time()
+        print(f"Bot alive. Took {t1-t0:.3f}s")
         return
 
     @bot.event
@@ -322,6 +314,19 @@ def main() -> None:
     async def cache_clear():
         rmtree('./src/cache')
         Path("./src/cache").mkdir(parents=True, exist_ok=True)
+        
+        try: bot.webdriver.quit()
+        except: pass
+        caps = DesiredCapabilities().FIREFOX
+        caps["pageLoadStrategy"] = "normal"
+        opts = FirefoxOptions()
+        opts.headless = True
+        bot.webdriver = webdriver.Firefox(
+            options=opts,
+            capabilities=caps
+        )
+        bot.webdriver.get('https://google.com')
+        bot.webdriver.get_screenshot_as_png()
         return
 
     load_dotenv()

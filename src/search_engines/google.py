@@ -2,7 +2,7 @@
 import aiofiles
 import io
 
-from asyncio import TimeoutError, gather
+from asyncio import TimeoutError, gather, sleep
 from base64 import standard_b64encode
 from bs4 import BeautifulSoup, SoupStrainer
 from datetime import datetime, timezone
@@ -14,6 +14,7 @@ from os import path as os_path
 from PIL import Image, ImageFont, ImageDraw
 from re import findall, sub
 from re import search as re_search
+from selenium.webdriver.support.ui import WebDriverWait
 from string import ascii_uppercase, ascii_lowercase, digits
 from translate import Translator
 from typing import List
@@ -370,12 +371,25 @@ class GoogleSearch:
                     self.ctx.author.name + " searched for: " + self.query[:233]
                 )
 
+                #finds the first https link
+                first_link = None
+                for idx, e in enumerate(embeds):
+                    try:
+                        first_link = next(filter(lambda x: 'https://' in x, e.description.split('\n')))
+                        break
+                    except Exception:
+                        continue
+                
                 # sets the buttons for the search result
                 if len(embeds) > 1:
                     buttons = [
                         [{
                             Button(style=ButtonStyle.blue, label="Screenshot", custom_id="scr"): 
                             self.webpage_screenshot
+                        },
+                        {
+                            Button(style=ButtonStyle.blue, label="Screenshot First Result", custom_id="scrfr"): 
+                            (self.webpage_screenshot, first_link)
                         }],
                         [
                         {Button(style=ButtonStyle.grey, label="◀️", custom_id="◀️"): None},
@@ -388,14 +402,18 @@ class GoogleSearch:
                         [{
                             Button(style=ButtonStyle.blue, label="Screenshot", custom_id="scr"): 
                             self.webpage_screenshot
+                        },
+                        {
+                            Button(style=ButtonStyle.blue, label="Screenshot First Result", custom_id="scrfr"): 
+                            (self.webpage_screenshot, first_link)
                         }],
                         [{Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None}]
                     ]
-                    
+                
                 if "images" not in self.query.lower():
                     buttons[0].append({
                         Button(style=ButtonStyle.blue, label="Images", custom_id="img", emoji=self.bot.get_emoji(928889019838894090)): 
-                        (self.search_google_handler, self.query + " images")
+                        (self.images)
                     })
                 
                 await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
@@ -892,8 +910,8 @@ class GoogleSearch:
 
         finally:
             return
-
-    async def search_google_handler(self, new_search=None) -> None:
+    
+    async def search_google_handler(self, new_search:str=None) -> None:
         if new_search is not None:
             self.query = new_search
         await self.message.delete()
@@ -901,9 +919,12 @@ class GoogleSearch:
         await self.google()
         return
 
-    async def webpage_screenshot(self):
+    async def webpage_screenshot(self, url:str=None):
+        if url is None: url = self.url
         async with self.ctx.typing():
-            self.bot.webdriver.get(self.url)
+            self.bot.webdriver.get(url)
+            await sleep(1.5)
+            
             img = self.bot.webdriver.get_screenshot_as_png()
             embed = Embed()
             embed.set_image(url=f'attachment://{self.query.replace(" ", "_")}.png')

@@ -365,7 +365,8 @@ class Sudo:
                         embed=embeds[cur_page % len(embeds)]
                     )
                 elif str(resp.custom_id) in list(components.keys()):
-                    component_save = [[i for i in nest if i.custom_id != resp.custom_id] for nest in component_save]
+                    component_save = [[i for i in nest if not bool(re_search(resp.custom_id, i.custom_id))] for nest in component_save]
+                    component_save = list(filter(lambda i: len(i) > 0, component_save))
                     await resp.respond(
                         type=7,
                         content='',
