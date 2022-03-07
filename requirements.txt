@@ -50,9 +50,9 @@ mccabe==0.6.1
 mplfinance==0.12.7a17
 multidict==4.7.6
 nodeenv==1.6.0
-numpy
+numpy==1.21.1
 packaging==21.0
-pandas
+pandas==1.3.2
 pep517==0.11.0
 Pillow==8.3.2
 pip-tools==6.2.0
