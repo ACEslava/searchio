@@ -42,8 +42,8 @@ def main() -> None:
                 continue
 
     bot = commands.Bot(
-        command_prefix=prefix, 
-        intents=Intents.all(), 
+        command_prefix=prefix,
+        intents=Intents.all(),
         help_command=None)
 
     SlashCommand(
@@ -77,11 +77,6 @@ def main() -> None:
         bot.userSettings = load(data, FullLoader)
         if bot.userSettings is None: bot.userSettings = {}
     #endregion
-
-    load_dotenv()
-
-    ensure_future(startup())
-    get_event_loop().run_forever()
 
     @bot.event
     async def on_guild_join(guild):
@@ -341,6 +336,10 @@ def main() -> None:
         bot.webdriver.get_screenshot_as_png()
         return
 
+    load_dotenv()
+
+    ensure_future(startup())
+    get_event_loop().run_forever()
 
 if __name__ == "__main__":
     main()

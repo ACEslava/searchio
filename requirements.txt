@@ -21,7 +21,6 @@ configparser==5.2.0
 crayons==0.4.0
 cryptography==3.4.7
 cycler==0.10.0
-discord==1.7.3
 discord-components==1.1.4
 discord-py-slash-command==2.3.2
 discord.py==1.7.3

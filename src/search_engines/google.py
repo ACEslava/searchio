@@ -358,9 +358,9 @@ class GoogleSearch:
                                 url = self.url
                             )
                         ]    
-                    
+
                     embeds = [i[0] for i in new_embed_list]
-                
+
                 # adds the page numbering footer to the embeds
                 for index, item in enumerate(embeds):
                     item.set_footer(
@@ -375,11 +375,13 @@ class GoogleSearch:
                 first_link = None
                 for idx, e in enumerate(embeds):
                     try:
-                        first_link = next(filter(lambda x: 'https://' in x, e.description.split('\n')))
+                        first_link = next(filter(
+                            lambda x: 'https://' in x, e.description.split('\n')
+                        ))
                         break
                     except Exception:
                         continue
-                
+
                 # sets the buttons for the search result
                 if len(embeds) > 1:
                     buttons = [
@@ -409,16 +411,17 @@ class GoogleSearch:
                         }],
                         [{Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None}]
                     ]
-                
+
+                #search for images button
                 if "images" not in self.query.lower():
                     buttons[0].append({
                         Button(style=ButtonStyle.blue, label="Images", custom_id="img", emoji=self.bot.get_emoji(928889019838894090)): 
-                        (self.images)
+                        (self.search_google_handler, f'{self.query} images')
                     })
-                
+
                 await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
                 return
-            
+
             else:
                 embed = Embed(
                     title=f'Search results for: {self.query[:233]}{"..." if len(self.query) > 233 else ""}',
@@ -630,7 +633,7 @@ class GoogleSearch:
                     ): self.search_google_handler},
                     {Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️"): None},
                 ]]
-                
+
             await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
 
         except TimeoutError:
@@ -674,7 +677,7 @@ class GoogleSearch:
                     for url in imageList
                 ]
             )
-            
+
         try:
             load_dotenv()
             query = self.query \
