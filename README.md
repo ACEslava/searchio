@@ -12,6 +12,8 @@ Obtain Discord bot credentials and place in a .env file in the same directory as
 
 `DISCORD_TOKEN = [YOUR TOKEN]`
 
+Download and add to PATH: geckodriver and firefox browser
+
 Run main.py
 
 
