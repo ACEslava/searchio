@@ -1,28 +1,26 @@
 #External Dependencies
-from aiohttp import client_exceptions, ClientSession
-from asyncio import ensure_future, get_event_loop, sleep
-from asyncio import TimeoutError
+from asyncio import ensure_future, get_event_loop, sleep, TimeoutError
 from csv import DictReader, DictWriter
 from datetime import datetime, timedelta, timezone
-from dotenv import load_dotenv
 from os import getenv
 from os import path as os_path
 from pathlib import Path
+from shutil import rmtree
+from time import time
+from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
 from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
-from shutil import rmtree
-from time import time
 from yaml import load, dump, FullLoader
+from aiohttp import client_exceptions, ClientSession
 
 #Discord Modules
 from discord import errors as discord_error
 from discord import Intents, Embed, Activity, ActivityType, Permissions
 from discord import utils as discord_utils
+from discord.ext import commands, tasks
 from discord_components import DiscordComponents
 from discord_slash import SlashCommand
-from discord.ext import commands, tasks
-
 #Utility Modules
 from src.utils import Sudo, error_handler
 
@@ -84,7 +82,7 @@ def main() -> None:
 
     ensure_future(startup())
     get_event_loop().run_forever()
-    
+
     @bot.event
     async def on_guild_join(guild):
         #Creates new settings entry for guild
@@ -192,7 +190,7 @@ def main() -> None:
             )
 
         return
-    
+
     @bot.command()
     async def help(ctx, *args):
         try:
@@ -323,7 +321,7 @@ def main() -> None:
     async def auto_save():
         Sudo.save_configs(bot)
         return
-    
+
     @tasks.loop(minutes=120.0)
     async def cache_clear():
         rmtree('./src/cache')
@@ -342,8 +340,7 @@ def main() -> None:
         bot.webdriver.get('https://google.com')
         bot.webdriver.get_screenshot_as_png()
         return
-    
-    return
+
 
 if __name__ == "__main__":
     main()
