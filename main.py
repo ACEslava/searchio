@@ -34,6 +34,15 @@ def main() -> None:
             commandprefix:str = '&'
         finally: return commandprefix
 
+    async def startup():
+        while 1:
+            try:
+                await bot.login(token=getenv("DISCORD_TOKEN"), bot=True)
+                await bot.connect(reconnect=True)
+            except (discord_error.ConnectionClosed, client_exceptions.ClientConnectorError):
+                await sleep(10)
+                continue
+
     bot = commands.Bot(
         command_prefix=prefix, 
         intents=Intents.all(), 
@@ -71,6 +80,11 @@ def main() -> None:
         if bot.userSettings is None: bot.userSettings = {}
     #endregion
 
+    load_dotenv()
+
+    ensure_future(startup())
+    get_event_loop().run_forever()
+    
     @bot.event
     async def on_guild_join(guild):
         #Creates new settings entry for guild
@@ -328,20 +342,7 @@ def main() -> None:
         bot.webdriver.get('https://google.com')
         bot.webdriver.get_screenshot_as_png()
         return
-
-    load_dotenv()
-
-    async def startup():
-        while 1:
-            try:
-                await bot.login(token=getenv("DISCORD_TOKEN"), bot=True)
-                await bot.connect(reconnect=True)
-            except (discord_error.ConnectionClosed, client_exceptions.ClientConnectorError):
-                await sleep(10)
-                continue
     
-    ensure_future(startup())
-    get_event_loop().run_forever()
     return
 
 if __name__ == "__main__":
