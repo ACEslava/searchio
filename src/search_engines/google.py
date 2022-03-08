@@ -1,6 +1,7 @@
 #External Dependencies
 import aiofiles
 import io
+import time
 
 from asyncio import TimeoutError, gather, sleep
 from base64 import standard_b64encode
@@ -20,7 +21,6 @@ from translate import Translator
 from typing import List
 
 #Discord Modules
-from discord import Embed
 from discord import Message, File, Embed
 from discord_components import Button, ButtonStyle
 from discord.ext import commands
@@ -420,7 +420,6 @@ class GoogleSearch:
                     })
 
                 await Sudo.multi_page_system(self.bot, self.ctx, self.message, tuple(embeds), buttons)
-                return
 
             else:
                 embed = Embed(
@@ -433,9 +432,7 @@ class GoogleSearch:
                 buttons = [[
                     Button(style=ButtonStyle.red, label="🗑️", custom_id="🗑️")
                 ]]
-                
                 await Sudo.multi_page_system(self.bot, self.ctx, self.message, (embed,), buttons)
-                return
 
         except TimeoutError:
             raise

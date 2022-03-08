@@ -8,6 +8,7 @@ from difflib import ndiff
 from hashlib import sha1
 from os import path as os_path
 from os import remove as os_remove
+from os import strerror
 from re import search as re_search
 from requests import get
 from traceback import format_exc
@@ -1603,7 +1604,8 @@ async def error_handler(
     allowedErrors = [
         asyncio.CancelledError, 
         discord_error.NotFound,
-        asyncio.TimeoutError
+        asyncio.TimeoutError,
+        OSError
     ]
 
     if error in allowedErrors:
