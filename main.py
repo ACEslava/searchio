@@ -10,9 +10,9 @@ from time import time
 from dotenv import load_dotenv
 from selenium import webdriver
 from selenium.webdriver import FirefoxOptions
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from selenium.webdriver.firefox.service import Service
 from yaml import load, dump, FullLoader
-from aiohttp import client_exceptions, ClientSession
+from aiohttp import ClientSession
 
 #Discord Modules
 from discord import errors as discord_error
@@ -33,12 +33,17 @@ def main() -> None:
         finally: return commandprefix
 
     async def startup():
+        error = 0
         while 1:
             try:
                 await bot.login(token=getenv("DISCORD_TOKEN"), bot=True)
                 await bot.connect(reconnect=True)
-            except (discord_error.ConnectionClosed, client_exceptions.ClientConnectorError):
-                await sleep(10)
+            except Exception as e:
+                error += 1
+                print(e)
+                print(f'Client disconnected. Retrying in {30*error}s')
+                print('\n---------------------------------------------')
+                await sleep(30*error)
                 continue
 
     bot = commands.Bot(
@@ -322,15 +327,17 @@ def main() -> None:
         rmtree('./src/cache')
         Path("./src/cache").mkdir(parents=True, exist_ok=True)
         
-        try: bot.webdriver.quit()
-        except: pass
-        caps = DesiredCapabilities().FIREFOX
-        caps["pageLoadStrategy"] = "normal"
+        try: 
+            bot.webdriver.quit()
+        except: 
+            pass
+        
         opts = FirefoxOptions()
         opts.headless = True
+        service = Service()
         bot.webdriver = webdriver.Firefox(
             options=opts,
-            capabilities=caps
+            service=service
         )
         bot.webdriver.get('https://google.com')
         bot.webdriver.get_screenshot_as_png()
