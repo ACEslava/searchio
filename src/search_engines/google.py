@@ -737,6 +737,7 @@ class GoogleSearch:
             }
 
             #creating dict with weekday forecast
+            print(json)
             forecast = {
                 weekDayCodes[datetime.fromtimestamp(i['dt']+json['timezone_offset'], timezone.utc).weekday()]:i 
                 for i in json['daily'][1:6]

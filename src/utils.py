@@ -1735,4 +1735,6 @@ async def error_handler(
         print(e)
     
     await err_report.add_reaction("✅")
+    print(f'{error_out}')
+    print('\n\n-------------------------')
     return
