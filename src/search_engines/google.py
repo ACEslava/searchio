@@ -893,12 +893,12 @@ class GoogleSearch:
         except TimeoutError:
             raise
 
-        except KeyError:
-            await self.message.edit(
-                content=f"{get_loading_message()}",
-                embed=None,
-            )
-            await self.google()
+        # except KeyError:
+        #     await self.message.edit(
+        #         content=f"{get_loading_message()}",
+        #         embed=None,
+        #     )
+        #     await self.google()
 
         except Exception as e:
             await self.message.delete()
