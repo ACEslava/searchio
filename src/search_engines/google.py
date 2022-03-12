@@ -737,7 +737,6 @@ class GoogleSearch:
             }
 
             #creating dict with weekday forecast
-            print(json)
             forecast = {
                 weekDayCodes[datetime.fromtimestamp(i['dt']+json['timezone_offset'], timezone.utc).weekday()]:i 
                 for i in json['daily'][1:6]
@@ -894,12 +893,12 @@ class GoogleSearch:
         except TimeoutError:
             raise
 
-        # except KeyError:
-        #     await self.message.edit(
-        #         content=f"{get_loading_message()}",
-        #         embed=None,
-        #     )
-        #     await self.google()
+        except KeyError:
+            await self.message.edit(
+                content=f"{get_loading_message()}",
+                embed=None,
+            )
+            await self.google()
 
         except Exception as e:
             await self.message.delete()
