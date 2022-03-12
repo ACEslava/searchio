@@ -710,6 +710,7 @@ class GoogleSearch:
                     if g["type"] =='administrative'
                 ]
                 if len(geocode) == 0:
+                    print('No cities found, reverting to Google')
                     #no results found
                     await self.google()
                     return
